@@ -29,3 +29,8 @@ case $opt in
   0) exit 0 ;;
   *) echo -e "${red}❌ 无效输入！${reset}" && sleep 1; bash /root/VPN/menu.sh ;;
 esac
+done
+EOF
+
+# 赋予执行权限
+chmod +x menu.sh
