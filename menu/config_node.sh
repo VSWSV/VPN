@@ -36,6 +36,7 @@ while true; do
             read -p "操作完成，按任意键返回菜单..."
             ;;
         0) 
+            break
             bash /root/VPN/menu.sh
             break
             ;;
