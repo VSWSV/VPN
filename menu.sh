@@ -29,12 +29,10 @@ reset="\033[0m"
     0) 
       echo -e "${yellow}正在退出...${reset}"
       sleep 0.5
-      break
       exit 0 ;;
     *) 
       echo -e "${red}❌ 无效输入！${reset}"
       sleep 0.5
       ;;
   esac
-done
 chmod +x menu.sh
