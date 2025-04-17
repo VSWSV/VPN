@@ -21,26 +21,19 @@ show_menu() {
 while true; do
     show_menu
     read -p "请输入选项编号： " opt
-    
     case $opt in
-        1) 
-            bash /root/VPN/menu/config/config_hy2.sh
+        1) bash /root/VPN/menu/config/config_hy2.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        2) 
-            bash /root/VPN/menu/config/config_vless.sh
+        2) bash /root/VPN/menu/config/config_vless.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        3) 
-            bash /root/VPN/menu/config/config_all.sh
+        3) bash /root/VPN/menu/config/config_all.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        0) 
-            bash /root/VPN/menu.sh
+        0) bash /root/VPN/menu.sh
             break ;;
-        *) 
-            echo -e "${red}❌ 无效输入！${reset}"
-            sleep 0.5
-            ;;
+        *) echo -e "${red}❌ 无效输入！${reset}"
+            sleep 0.5 ;;
     esac
 done    
