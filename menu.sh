@@ -30,12 +30,12 @@ while true; do
     6) bash /root/VPN/menu/network_tools.sh ;;
     7) bash /root/VPN/menu/uninstall.sh ;;
     0) 
-      echo -e "${green}正在返回命令行...${reset}"
-      sleep 1
-      break
+      echo -e "${yellow}正在退出..."
+      sleep 1  
+      exit 0
       ;;
     *) 
-      echo -e "${red}❌ 无效输入，请重新选择！${reset}"
+      echo -e "${red}❌ 无效输入！${reset}"
       sleep 1
       ;;
   esac
