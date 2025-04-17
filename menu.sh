@@ -36,7 +36,8 @@ while true; do
     break ;;
     6) bash /root/VPN/menu/network_tools.sh
     break ;;
-    7) bash /root/VPN/menu/uninstall.sh ;;
+    7) bash /root/VPN/menu/uninstall.sh 
+    break ;;
     0) echo -e "${green}正在退出${reset}"
     sleep 0.5
     exit 0
