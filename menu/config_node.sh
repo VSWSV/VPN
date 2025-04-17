@@ -14,7 +14,7 @@ show_menu() {
     echo -e "                                 ${orange}🌐 配置-节点${reset}"
     echo -e "${pink}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "  ${yellow}❶${reset} ${green}配置 HY2${reset}                                                         ${yellow}❷${reset} ${green}配置 VES${reset}"
-    echo -e "  ${yellow}❸${reset} ${green}配置全部${reset}                                                         ${yellow}⓿${reset} ${red}返回主菜单${reset}"
+    echo -e "  ${yellow}❸${reset} ${green}配置隧道-DNS${reset}                                                         ${yellow}⓿${reset} ${red}返回主菜单${reset}"
     echo -e "${pink}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
@@ -28,7 +28,7 @@ while true; do
         2) bash /root/VPN/menu/config/config_vless.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        3) bash /root/VPN/menu/config/config_all.sh
+        3) bash /root/VPN/menu/config/tunnel.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
         0) bash /root/VPN/menu.sh
