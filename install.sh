@@ -41,7 +41,7 @@ sudo apt install -y git curl
 
 # 检查 /root/VPN 目录是否存在
 if [ -d "/root/VPN" ]; then
-  echo -e "${yellow}⚠️ 发现已有 /root/VPN 目录存在正在覆盖${reset}"
+  echo -e "${yellow}⚠️ 发现已有 /ROOT/VPN 目录存在正在覆盖${reset}"
   sudo rm -rf /root/VPN
 fi
 
