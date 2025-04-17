@@ -22,7 +22,8 @@ while true; do
   show_menu
   read -p "请输入选项编号： " opt
   case "$opt" in
-    1) bash /root/VPN/menu/install_upgrade.sh ;;
+    1) bash /root/VPN/menu/install_upgrade.sh
+    break ;;
     2) bash /root/VPN/menu/start_service.sh ;;
     3) bash /root/VPN/menu/stop_service.sh ;;
     4) bash /root/VPN/menu/config_node.sh ;;
