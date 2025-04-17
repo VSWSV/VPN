@@ -7,7 +7,7 @@
 ## 🛠️ 安装方法（建议一键命令）
 
 ```bash
-apt update && apt install -y git curl && git clone https://github.com/VSWSV/VPN.git /root/VPN && bash /root/VPN/menu.sh
+bash <(curl -sL https://raw.githubusercontent.com/VSWSV/VPN/main/install.sh)
 ```
 
 ---
