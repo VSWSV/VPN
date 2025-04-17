@@ -16,7 +16,9 @@ show_menu() {
     echo -e "                                  ${orange}🧰 网络-工具${reset}"
     echo -e "${pink}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "  ${yellow}❶${reset} ${green}查看本机 IP 地址${reset}               ${yellow}❷${reset} ${green}网络连通性测试${reset}               ${yellow}❸${reset} ${green}Ping 指定 IP${reset}"
-    echo -e "  ${yellow}❹${reset} ${green}查看端口使用情况${reset}               ${yellow}❺${reset} ${green}查看日志${reset}                     ${yellow}⓿${reset} ${red}返回主菜单${reset}"
+    echo -e "  ${yellow}❹${reset} ${green}查看端口使用情况${reset}               ${yellow}❺${reset} ${green}查看日志${reset}                     ${yellow}❻${reset} ${green}测速 speedtest${reset}"
+    echo -e "  ${yellow}❼${reset} ${green}路由追踪 MTR${reset}                   ${yellow}❽${reset} ${green}DNS 查询 dig${reset}                 ${yellow}❾${reset} ${green}网速图 bmon${reset}"
+    echo -e "  ${yellow}⓿${reset} ${red}返回主菜单${reset}                                         "
     echo -e "${pink}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
@@ -37,6 +39,18 @@ while true; do
             read -p "操作完成，按任意键返回菜单..."
             ;;
         5) bash /root/VPN/menu/network/view_logs.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        6) bash /root/VPN/menu/network/speedtest.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        7) bash /root/VPN/menu/network/mtrtrace.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        8) bash /root/VPN/menu/network/dnsquery.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        9) bash /root/VPN/menu/network/bmonview.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
         0) bash /root/VPN/menu.sh
