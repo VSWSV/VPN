@@ -39,7 +39,7 @@ while true; do
       sleep 0.5
       ;;
   esac
-done
+done 
 EOF
 
 chmod +x menu.sh
