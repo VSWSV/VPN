@@ -29,7 +29,11 @@ while true; do
     5) bash /root/VPN/menu/maintain.sh ;;
     6) bash /root/VPN/menu/network_tools.sh ;;
     7) bash /root/VPN/menu/uninstall.sh ;;
-    0) exit 0 ;;
+    0) bash /root/VPN/menu.sh
+       echo -e "${yellow}正在退出..."
+       sleep 0.5
+       exit 0
+      ;;
     *) 
       echo -e "${red}❌ 无效输入！${reset}"
       sleep 0.5
