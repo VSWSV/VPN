@@ -34,7 +34,7 @@ while true; do
             read -p "操作完成，按任意键返回菜单..."
             ;;
         0) bash /root/VPN/menu.sh
-            break  ;;
+            break ;;
         *) echo -e "${red}❌ 无效输入！${reset}"
             sleep 0.5 ;;
     esac
