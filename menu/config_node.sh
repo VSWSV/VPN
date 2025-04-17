@@ -23,14 +23,11 @@ while true; do
     read -p "请输入选项编号： " opt
     case $opt in
         1) bash /root/VPN/menu/config/config_hy2.sh
-            break "
-            ;;
+            break ;;
         2) bash /root/VPN/menu/config/config_vless.sh
-            break "
-            ;;
+            break ;;
         3) bash /root/VPN/menu/config/tunnel.sh
-            break "
-            ;;
+            break ;;
         0) bash /root/VPN/menu.sh
             break ;;
         *) echo -e "${red}❌ 无效输入！${reset}"
