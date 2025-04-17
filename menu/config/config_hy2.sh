@@ -57,7 +57,7 @@ if [ -f "$CONFIG_PATH" ]; then
   IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
   IPV6=$(curl -s6 ifconfig.co || echo "获取失败")
 
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
   echo -e "${cyan}                              🌐 当前 HY2 节点配置预览                          ${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
   echo -e " ${lightpink}UUID：     ${reset}${green}$UUID${reset}"
@@ -73,7 +73,12 @@ if [ -f "$CONFIG_PATH" ]; then
     echo ""
     case $overwrite in
       [yY]) break ;;
-      [nN]) echo -e "${red}❌ 已取消操作${reset}"; footer; exit 0 ;;
+      [nN]) 
+        echo -e "${red}❌ 已取消操作${reset}"
+        footer
+        bash /root/VPN/menu/config_node.sh
+        exit 0
+        ;;
       *) echo -e "${red}❌ 无效输入，请输入 y 或 n${reset}" ;;
     esac
   done
@@ -115,7 +120,7 @@ while true; do
     echo -e "${green}✔️  SNI 域名：${lightpink}$SNI${reset}"
     break
   else
-    echo -e "${red}❌ 域名格式无效，请重新输入${reset}"
+    echo -e "${red}❌ 域名格式无效，请重新输入（示例：example.com）${reset}"
   fi
 done
 
@@ -126,7 +131,7 @@ while true; do
     echo -e "${green}✔️  ALPN 协议：${lightpink}$ALPN${reset}"
     break
   else
-    echo -e "${red}❌ 无效的ALPN协议，支持的协议: h2, h3, http/1.1, stun.turn, webrtc${reset}"
+    echo -e "${red}❌ 无效协议，支持：h2, h3, http/1.1${reset}"
   fi
 done
 
@@ -156,5 +161,5 @@ echo -e "${green}🔓 已开放完整权限${reset}"
 footer
 
 echo ""
-read -p "$(echo -e "${cyan}⓿ 返回配置菜单，按任意键继续...${reset}")" -n 1
+read -p "$(echo -e "${cyan}返回配置菜单，按任意键继续${reset}")" -n 1
 bash /root/VPN/menu/config_node.sh
