@@ -29,6 +29,14 @@ function validate_port() {
   [[ "$1" =~ ^[0-9]{2,5}$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
 }
 
+function validate_domain() {
+  [[ "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]
+}
+
+function validate_alpn() {
+  [[ "$1" =~ ^(h2|h3|http/1\.1|stun\.turn|webrtc|custom|http/1\.0|spdy/3\.1)$ ]]
+}
+
 function format_file_time() {
   stat -c %y "$1" 2>/dev/null | awk -F'.' '{print $1}' | sed 's/-/年/;s/-/月/;s/ /日  /;s/:/时/;s/:/分/;s/$/秒/'
 }
@@ -60,9 +68,15 @@ if [ -f "$CONFIG_PATH" ]; then
   echo -e " ${lightpink}IPv6：     ${reset}${green}$IPV6${reset}"
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
-  read -p "$(echo -e "\n${yellow}是否覆盖现有配置？(y/n): ${reset}")" -n 1 overwrite
-  echo ""
-  [[ "$overwrite" != "y" ]] && echo -e "${red}❌ 已取消操作${reset}" && footer && exit 1
+  while true; do
+    read -p "$(echo -e "\n${yellow}是否覆盖现有配置？(y/n): ${reset}")" -n 1 overwrite
+    echo ""
+    case $overwrite in
+      [yY]) break ;;
+      [nN]) echo -e "${red}❌ 已取消操作${reset}"; footer; exit 0 ;;
+      *) echo -e "${red}❌ 无效输入，请输入 y 或 n${reset}" ;;
+    esac
+  done
 fi
 
 while true; do
@@ -97,15 +111,24 @@ while true; do
   read -p "$(echo -e "\n${cyan}请输入 SNI 域名（如：www.bing.com）: ${reset}")" SNI
   if [ -z "$SNI" ]; then
     echo -e "${red}❌ SNI 不能为空，请重新输入${reset}"
-  else
+  elif validate_domain "$SNI"; then
     echo -e "${green}✔️  SNI 域名：${lightpink}$SNI${reset}"
     break
+  else
+    echo -e "${red}❌ 域名格式无效，请重新输入${reset}"
   fi
 done
 
-read -p "$(echo -e "\n${cyan}请输入 ALPN 协议（默认 h3，直接回车使用）: ${reset}")" ALPN
-[ -z "$ALPN" ] && ALPN="h3"
-echo -e "${green}✔️  ALPN 协议：${lightpink}$ALPN${reset}"
+while true; do
+  read -p "$(echo -e "\n${cyan}请输入 ALPN 协议（默认 h3，直接回车使用）: ${reset}")" ALPN
+  [ -z "$ALPN" ] && ALPN="h3"
+  if validate_alpn "$ALPN"; then
+    echo -e "${green}✔️  ALPN 协议：${lightpink}$ALPN${reset}"
+    break
+  else
+    echo -e "${red}❌ 无效的ALPN协议，支持的协议: h2, h3, http/1.1, stun.turn, webrtc${reset}"
+  fi
+done
 
 echo -e "\n${yellow}📡 正在获取网络信息..."
 IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
