@@ -36,7 +36,6 @@ if [ -f "$CONFIG_PATH" ]; then
   echo -e "${cyan}👉 配置路径：$CONFIG_PATH${reset}"
 
   if command -v jq &> /dev/null; then
-    echo -e "${cyan}═════════ 配置预览 ═════════${reset}"
     if command -v grep >/dev/null; then
       UUID=$(grep password "$CONFIG_PATH" | awk -F '"' '{print $2}')
       PORT=$(grep listen "$CONFIG_PATH" | awk '{print $2}' | sed 's/://')
@@ -48,24 +47,17 @@ if [ -f "$CONFIG_PATH" ]; then
       echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
       echo -e "                              🌐 当前 HY2 节点配置预览"
       echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-      echo -e " ${pink}UUID：     ${reset}${green}$UUID${reset}"
-      echo -e " ${pink}端口号：   ${reset}${green}$PORT${reset}"
-      echo -e " ${pink}SNI 域名： ${reset}${green}$SNI${reset}"
-      echo -e " ${pink}ALPN 协议：${reset}${green}$ALPN${reset}"
-      echo -e " ${pink}IPv4：     ${reset}${green}$IPV4${reset}"
-      echo -e " ${pink}IPv6：     ${reset}${green}$IPV6${reset}"
+      echo -e " ${cyan}UUID：     ${reset}${green}$UUID${reset}"
+      echo -e " ${cyan}端口号：   ${reset}${green}$PORT${reset}"
+      echo -e " ${cyan}SNI 域名： ${reset}${green}$SNI${reset}"
+      echo -e " ${cyan}ALPN 协议：${reset}${green}$ALPN${reset}"
+      echo -e " ${cyan}IPv4：     ${reset}${green}$IPV4${reset}"
+      echo -e " ${cyan}IPv6：     ${reset}${green}$IPV6${reset}"
       echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-      echo -e " ${pink}UUID：     ${reset}${green}$UUID${reset}"
-      echo -e " ${pink}端口号：   ${reset}${green}$PORT${reset}"
-      echo -e " ${pink}SNI 域名： ${reset}${green}$SNI${reset}"
-      echo -e " ${pink}ALPN 协议：${reset}${green}$ALPN${reset}"
-      echo -e " ${pink}IPv4：     ${reset}${green}$IPV4${reset}"
-      echo -e " ${pink}IPv6：     ${reset}${green}$IPV6${reset}"
-      echo -e "${cyan}═════════════════════════════════════════════════════════════════════════════════${reset}"
     else
       cat "$CONFIG_PATH"
     fi
-    echo -e "${cyan}═══════════════════════════${reset}"
+    
   else
     cat "$CONFIG_PATH"
   fi
@@ -80,9 +72,10 @@ while true; do
   read -p "请输入 UUID（留空自动生成）: " UUID
   if [ -z "$UUID" ]; then
     UUID=$(cat /proc/sys/kernel/random/uuid)
-    echo -e "${green}✔️ 自动生成 UUID：$UUID${reset}"
+    echo -e "${green}✔️  UUID：$UUID${reset}"
     break
   elif validate_uuid "$UUID"; then
+    echo -e "${green}✔️  UUID：$UUID${reset}"
     break
   else
     echo -e "${red}❌ UUID 格式无效，请重新输入${reset}"
@@ -94,9 +87,10 @@ while true; do
   read -p "请输入监听端口（1024-65535，留空自动生成）: " PORT
   if [ -z "$PORT" ]; then
     PORT=$((RANDOM%30000+10000))
-    echo -e "${green}✔️ 自动分配端口：$PORT${reset}"
+    echo -e "${green}✔️  端口号：$PORT${reset}"
     break
   elif validate_port "$PORT"; then
+    echo -e "${green}✔️  端口号：$PORT${reset}"
     break
   else
     echo -e "${red}❌ 端口无效，请重新输入${reset}"
@@ -109,6 +103,7 @@ while true; do
   if [ -z "$SNI" ]; then
     echo -e "${red}❌ SNI 不能为空，请重新输入${reset}"
   else
+    echo -e "${green}✔️  SNI 域名：$SNI${reset}"
     break
   fi
 done
@@ -116,6 +111,7 @@ done
 # ALPN（可空，自动默认）
 read -p "请输入 ALPN 协议（默认 h3，直接回车使用）: " ALPN
 [ -z "$ALPN" ] && ALPN="h3"
+echo -e "${green}✔️  ALPN 协议：$ALPN${reset}"
 
 # 展示公网 IP
 IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
