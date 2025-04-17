@@ -1,4 +1,3 @@
-cat > menu.sh << 'EOF'
 #!/bin/bash
 
 green="\033[1;32m"
@@ -41,6 +40,4 @@ while true; do
       ;;
   esac
 done
-EOF
-
 chmod +x menu.sh
