@@ -27,10 +27,6 @@ function validate_port() {
   [[ "$1" =~ ^[0-9]{2,5}$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
 }
 
-function get_ip() {
-  curl -s6 ifconfig.co || curl -s ifconfig.me
-}
-
 clear
 header
 
@@ -52,37 +48,56 @@ if [ -f "$CONFIG_PATH" ]; then
   [[ "$overwrite" != "y" ]] && echo -e "${red}❌ 已取消操作${reset}" && footer && exit 1
 fi
 
-read -p "请输入 UUID（留空自动生成）: " UUID
-if [ -z "$UUID" ]; then
-  UUID=$(cat /proc/sys/kernel/random/uuid)
-  echo -e "${green}✔️ 自动生成 UUID：$UUID${reset}"
-elif ! validate_uuid "$UUID"; then
-  echo -e "${red}❌ UUID 格式无效，必须为 36 位标准 UUID${reset}"
-  exit 1
-fi
+# UUID 输入（带循环）
+while true; do
+  read -p "请输入 UUID（留空自动生成）: " UUID
+  if [ -z "$UUID" ]; then
+    UUID=$(cat /proc/sys/kernel/random/uuid)
+    echo -e "${green}✔️ 自动生成 UUID：$UUID${reset}"
+    break
+  elif validate_uuid "$UUID"; then
+    break
+  else
+    echo -e "${red}❌ UUID 格式无效，请重新输入${reset}"
+  fi
+done
 
-read -p "请输入监听端口（1024-65535，留空自动生成）: " PORT
-if [ -z "$PORT" ]; then
-  PORT=$((RANDOM%30000+10000))
-  echo -e "${green}✔️ 自动分配端口：$PORT${reset}"
-elif ! validate_port "$PORT"; then
-  echo -e "${red}❌ 端口无效，请输入 1024-65535 范围内数字${reset}"
-  exit 1
-fi
+# 端口输入（带循环）
+while true; do
+  read -p "请输入监听端口（1024-65535，留空自动生成）: " PORT
+  if [ -z "$PORT" ]; then
+    PORT=$((RANDOM%30000+10000))
+    echo -e "${green}✔️ 自动分配端口：$PORT${reset}"
+    break
+  elif validate_port "$PORT"; then
+    break
+  else
+    echo -e "${red}❌ 端口无效，请重新输入${reset}"
+  fi
+done
 
-read -p "请输入 SNI 域名（如：www.bing.com）: " SNI
-[ -z "$SNI" ] && { echo -e "${red}❌ SNI 不能为空${reset}"; exit 1; }
+# SNI（不能为空）
+while true; do
+  read -p "请输入 SNI 域名（如：www.bing.com）: " SNI
+  if [ -z "$SNI" ]; then
+    echo -e "${red}❌ SNI 不能为空，请重新输入${reset}"
+  else
+    break
+  fi
+done
 
+# ALPN（可空，自动默认）
 read -p "请输入 ALPN 协议（默认 h3，直接回车使用）: " ALPN
 [ -z "$ALPN" ] && ALPN="h3"
 
+# 展示公网 IP
 IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
 IPV6=$(curl -s6 ifconfig.co || echo "获取失败")
 
 echo -e "${yellow}📶 当前公网 IPv4：$IPV4${reset}"
 echo -e "${yellow}📶 当前公网 IPv6：$IPV6${reset}"
 
-# 写入配置文件
+# 写入配置
 cat > "$CONFIG_PATH" <<EOF
 listen: :$PORT
 protocol: hysteria2
@@ -99,8 +114,7 @@ EOF
 echo -e "${green}✅ HY2 配置已生成：$CONFIG_PATH${reset}"
 footer
 
-
-# 添加返回选项
-echo -e ""
+# 返回菜单
+echo ""
 read -p "$(echo -e "${cyan}⓿ 返回配置菜单，按任意键继续...${reset}")"
 bash /root/VPN/menu/config_node.sh
