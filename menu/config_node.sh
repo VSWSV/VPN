@@ -26,10 +26,10 @@ while true; do
             break "
             ;;
         2) bash /root/VPN/menu/config/config_vless.sh
-            read -p "操作完成，按任意键返回菜单..."
+            break "
             ;;
         3) bash /root/VPN/menu/config/tunnel.sh
-            read -p "操作完成，按任意键返回菜单..."
+            break "
             ;;
         0) bash /root/VPN/menu.sh
             break ;;
