@@ -9,7 +9,6 @@ reset="\033[0m"
 CONFIG_PATH="/root/VPN/config/hysteria.yaml"
 mkdir -p /root/VPN/config
 
-# 美观边框
 function header() {
 echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
 echo -e "                              🌐 配置 HY2 节点参数"
@@ -32,18 +31,25 @@ function get_ip() {
   curl -s6 ifconfig.co || curl -s ifconfig.me
 }
 
-# 开始
 clear
 header
 
+# 检查现有配置
 if [ -f "$CONFIG_PATH" ]; then
-  echo -e "${yellow}⚠️  已检测到现有配置文件：$CONFIG_PATH${reset}"
-  read -p "是否覆盖？(y/n): " overwrite
-  if [[ "$overwrite" != "y" ]]; then
-    echo -e "${red}❌ 配置已取消，未覆盖原文件${reset}"
-    footer
-    exit 1
+  echo -e "${yellow}⚠️  检测到已有 HY2 配置文件${reset}"
+  echo -e "${cyan}👉 配置路径：$CONFIG_PATH${reset}"
+
+  if command -v jq &> /dev/null; then
+    echo -e "${cyan}═════════ 配置预览 ═════════${reset}"
+    jq . "$CONFIG_PATH" || cat "$CONFIG_PATH"
+    echo -e "${cyan}═══════════════════════════${reset}"
+  else
+    cat "$CONFIG_PATH"
   fi
+
+  read -p "$(echo -e "${yellow}是否覆盖？(y/n): ${reset}")" -n 1 overwrite
+  echo ""
+  [[ "$overwrite" != "y" ]] && echo -e "${red}❌ 已取消操作${reset}" && footer && exit 1
 fi
 
 read -p "请输入 UUID（留空自动生成）: " UUID
@@ -92,3 +98,9 @@ EOF
 
 echo -e "${green}✅ HY2 配置已生成：$CONFIG_PATH${reset}"
 footer
+
+
+# 添加返回选项
+echo -e ""
+read -p "$(echo -e "${cyan}⓿ 返回配置菜单，按任意键继续...${reset}")"
+bash /root/VPN/menu/config_node.sh
