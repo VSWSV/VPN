@@ -37,7 +37,25 @@ if [ -f "$CONFIG_PATH" ]; then
 
   if command -v jq &> /dev/null; then
     echo -e "${cyan}═════════ 配置预览 ═════════${reset}"
-    jq . "$CONFIG_PATH" || cat "$CONFIG_PATH"
+    if command -v grep >/dev/null; then
+      UUID=$(grep password "$CONFIG_PATH" | awk -F '"' '{print $2}')
+      PORT=$(grep listen "$CONFIG_PATH" | awk '{print $2}' | sed 's/://')
+      SNI=$(grep sni "$CONFIG_PATH" | awk '{print $2}')
+      ALPN=$(grep -A 1 alpn "$CONFIG_PATH" | tail -n 1 | sed 's/- //')
+      IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
+      IPV6=$(curl -s6 ifconfig.co || echo "获取失败")
+
+      echo -e "${cyan}═════════════════════════════════════════════════════════════════════════════════${reset}\n echo -e "                              🌐 当前 HY2 节点配置预览"\n${cyan}═════════════════════════════════════════════════════════════════════════════════${reset}"
+      echo -e " ${pink}UUID：     ${reset}${green}$UUID${reset}"
+      echo -e " ${pink}端口号：   ${reset}${green}$PORT${reset}"
+      echo -e " ${pink}SNI 域名： ${reset}${green}$SNI${reset}"
+      echo -e " ${pink}ALPN 协议：${reset}${green}$ALPN${reset}"
+      echo -e " ${pink}IPv4：     ${reset}${green}$IPV4${reset}"
+      echo -e " ${pink}IPv6：     ${reset}${green}$IPV6${reset}"
+      echo -e "${cyan}═════════════════════════════════════════════════════════════════════════════════${reset}"
+    else
+      cat "$CONFIG_PATH"
+    fi
     echo -e "${cyan}═══════════════════════════${reset}"
   else
     cat "$CONFIG_PATH"
