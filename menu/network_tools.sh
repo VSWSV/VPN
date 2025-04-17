@@ -10,25 +10,48 @@ orange="\033[38;5;214m"
 pink="\033[1;35m"
 reset="\033[0m"
 
-echo -e "${pink}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+show_menu() {
+    clear
+    echo -e "${pink}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+    echo -e "                                  ${orange}🧰 网络-工具${reset}"
+    echo -e "${pink}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "  ${yellow}❶${reset} ${green}查看本机 IP 地址${reset}               ${yellow}❷${reset} ${green}网络连通性测试${reset}               ${yellow}❸${reset} ${green}Ping 指定 IP${reset}"
+    echo -e "  ${yellow}❹${reset} ${green}查看端口使用情况${reset}               ${yellow}❺${reset} ${green}查看日志${reset}                     ${yellow}⓿${reset} ${red}返回主菜单${reset}"
+    echo -e "${pink}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+}
 
-echo -e "                                  ${orange}🧰 网络-工具${reset}"
-
-echo -e "${pink}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-
-echo -e "  ${yellow}❶${reset} ${green}查看本机 IP 地址${reset}               ${yellow}❷${reset} ${green}网络连通性测试${reset}               ${yellow}❸${reset} ${green}Ping 指定 IP${reset} "
-echo -e "  ${yellow}❹${reset} ${green}查看端口使用情况${reset}               ${yellow}❺${reset} ${green}查看日志${reset}                     ${yellow}⓿${reset} ${red}返回主菜单${reset}"
-
-echo -e "${pink}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-
-read -p "请输入选项编号： " opt
-
-case $opt in
-  1) bash /root/VPN/menu/network/check_ip.sh ;;
-  2) bash /root/VPN/menu/network/ping_test.sh ;;
-  3) bash /root/VPN/menu/network/ping_ip.sh ;;
-  4) bash /root/VPN/menu/network/check_ports.sh ;;
-  5) bash /root/VPN/menu/network/view_logs.sh ;;
-  0) bash /root/VPN/menu.sh ;;
-  *) echo -e "${red}❌ 无效输入${reset}" && read -p "请输入选项编号： " opt ;;
-esac
+while true; do
+    show_menu
+    read -p "请输入选项编号： " opt
+    
+    case $opt in
+        1) 
+            bash /root/VPN/menu/network/check_ip.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        2) 
+            bash /root/VPN/menu/network/ping_test.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        3) 
+            bash /root/VPN/menu/network/ping_ip.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        4) 
+            bash /root/VPN/menu/network/check_ports.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        5) 
+            bash /root/VPN/menu/network/view_logs.sh
+            read -p "操作完成，按任意键返回菜单..."
+            ;;
+        0) 
+            bash /root/VPN/menu.sh
+            break
+            ;;
+        *) 
+            echo -e "${red}❌ 无效输入，请重新选择！${reset}"
+            sleep 1
+            ;;
+    esac
+done
