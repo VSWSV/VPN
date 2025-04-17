@@ -18,7 +18,6 @@ show_menu() {
     echo -e "${pink}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-while true; do
     show_menu
     read -p "请输入选项编号： " opt
     
@@ -44,4 +43,3 @@ while true; do
             sleep 1
             ;;
     esac
-done
