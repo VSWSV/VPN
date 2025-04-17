@@ -33,6 +33,7 @@ reset="\033[0m"
     *) 
       echo -e "${red}❌ 无效输入！${reset}"
       sleep 0.5
+  read -p "请输入选项编号： " opt
       ;;
   esac
 chmod +x menu.sh
