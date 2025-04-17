@@ -39,8 +39,8 @@ while true; do
     7) bash /root/VPN/menu/uninstall.sh ;;
     0) echo -e "${green}正在退出${reset}"
     sleep 0.5
-    break
-    exit 0 ;;
+    exit 0
+    break ;;
     *) 
     echo -e "${red}❌ 无效输入！${reset}"
     sleep 0.5 ;;
