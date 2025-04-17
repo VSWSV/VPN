@@ -36,10 +36,10 @@ show_menu() {
             ;;
         0) 
             bash /root/VPN/menu.sh
-            break
             ;;
         *) 
             echo -e "${red}❌ 无效输入，请重新选择！${reset}"
             sleep 1
             ;;
     esac
+done
