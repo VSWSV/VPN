@@ -36,8 +36,8 @@ while true; do
             read -p "操作完成，按任意键返回菜单..."
             ;;
         0) 
-            print_info "返回主菜单..."
-            exec bash /root/VPN/menu.sh
+            bash /root/VPN/menu.sh
+            break
             ;;
         *) 
             echo -e "${red}❌ 无效输入，请重新选择！${reset}"
