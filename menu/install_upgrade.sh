@@ -43,7 +43,7 @@ while true; do
             ;;
         0) 
             bash /root/VPN/menu.sh
-            exit 0
+            break
             ;;
         *) 
             echo -e "${red}❌ 无效输入，请重新选择！${reset}"
