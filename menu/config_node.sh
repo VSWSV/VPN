@@ -42,4 +42,3 @@ show_menu() {
             sleep 1
             ;;
     esac
-done
