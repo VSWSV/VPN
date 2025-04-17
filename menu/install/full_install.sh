@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 set -e
@@ -45,8 +46,11 @@ cd /root/VPN || error_exit "无法进入 /root/VPN"
 info "🔧 安装基础依赖（curl wget unzip socat tar sudo）..."
 apt update && apt install -y curl wget unzip socat tar sudo && success "基础依赖安装完成" || error_exit "依赖安装失败"
 
-info "🧰 安装网络功能依赖（speedtest-cli mtr bmon iproute2 dnsutils net-tools traceroute）..."
-apt install -y speedtest-cli mtr bmon iproute2 dnsutils net-tools traceroute && success "网络工具安装完成"
+info "🔓 启用 Universe 源..."
+apt install -y software-properties-common && add-apt-repository universe -y && apt update && success "Universe 源启用成功" || warning "启用 Universe 源失败，可能已启用"
+
+info "🧰 安装网络工具（mtr-tiny traceroute bmon）..."
+apt install -y mtr-tiny traceroute bmon && success "网络工具安装完成" || warning "部分网络工具安装失败，请手动检查"
 
 info "⬇️ 下载 Xray..."
 wget -O Xray-linux-64.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip && success "Xray 下载成功" || error_exit "Xray 下载失败"
