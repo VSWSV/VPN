@@ -17,7 +17,7 @@ echo -e "${blue}╠════════════════════�
 echo -e "      本脚本将执行以下操作：                            ${green}作者邮箱:${reset}${light_pink}MAIL@VSWSV.COM"
 echo -e "      ${green}1.${reset} 清理APT缓存并更新源"
 echo -e "      ${green}2.${reset} 安装必要工具 GIT和CUR"
-echo -e "      ${green}3.${reset} 克隆或覆盖 GITHUB 仓库到 /root/VPN"
+echo -e "      ${green}3.${reset} 克隆或覆盖 GITHUB 仓库到 /ROOT/VPN"
 echo -e "      ${green}4.${reset} 设置 'vpn' 命令来快速启动菜单"
 echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
