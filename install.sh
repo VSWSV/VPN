@@ -16,7 +16,7 @@ echo -e "                           ${orange}🧰 超级工具箱 一键安装�
 echo -e "${blue}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 echo -e "      本脚本将执行以下操作：                            ${green}作者邮箱:${reset}${light_pink}MAIL@VSWSV.COM"
 echo -e "      ${green}1.${reset} 清理APT缓存并更新源"
-echo -e "      ${green}2.${reset} 安装必要工具（GIT和CURL）"
+echo -e "      ${green}2.${reset} 安装必要工具 GIT和CUR"
 echo -e "      ${green}3.${reset} 克隆或覆盖 GITHUB 仓库到 /root/VPN"
 echo -e "      ${green}4.${reset} 设置 'vpn' 命令来快速启动菜单"
 echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
@@ -30,15 +30,23 @@ fi
 
 # 清理APT缓存并更新源
 echo -e "${green}🧹 正在清理APT缓存${reset}"
-sudo apt-get clean
+sudo apt-get clean && echo -e "${green}✅ 清理完成${reset}"
 
 echo -e "${green}🌐 正在更新APT源${reset}"
-sudo apt-get update 
-
+if sudo apt-get update; then
+  echo -e "${green}✅ APT 源更新成功${reset}"
+else
+  echo -e "${red}❌ APT 源更新失败，请检查网络${reset}"
+  exit 1
+fi
 # 安装必要工具
-echo -e "${green}🔧 正在安装GIT和CURL${reset}"
-sudo apt install -y git curl
-
+echo -e "${green}🔧 正在安装 GIT和CURL${reset}"
+if sudo apt install -y git curl; then
+  echo -e "${green}✅ GIT和CURL 安装完成${reset}"
+else
+  echo -e "${red}❌ 安装失败，请检查网络或软件源配置${reset}"
+  exit 1
+fi
 # 检查 /root/VPN 目录是否存在
 if [ -d "/root/VPN" ]; then
   echo -e "${yellow}⚠️ 发现已有 /ROOT/VPN 目录存在正在覆盖${reset}"
