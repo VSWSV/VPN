@@ -32,6 +32,8 @@ while true; do
     0) 
       echo -e "${yellow}正在退出..."
       sleep 0
+      break
+      exit 0
       ;;
     *) 
       echo -e "${red}❌ 无效输入！${reset}"
