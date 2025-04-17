@@ -33,7 +33,7 @@ echo -e "${green}🧹 正在清理APT缓存${reset}"
 sudo apt-get clean
 
 echo -e "${green}🌐 正在更新APT源${reset}"
-sudo apt-get update --no-cache
+sudo apt-get update 
 
 # 安装必要工具
 echo -e "${green}🔧 正在安装GIT和CURL${reset}"
