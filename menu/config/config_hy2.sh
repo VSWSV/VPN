@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Color definitions
+# 颜色定义
 cyan="\033[1;36m"
 green="\033[1;32m"
 yellow="\033[1;33m"
 red="\033[1;31m"
-lightpink="\033[38;5;213m"  # Changed to lighter pink
+lightpink="\033[38;5;213m"
 reset="\033[0m"
 
 CONFIG_PATH="/root/VPN/config/hysteria.yaml"
@@ -32,17 +32,15 @@ function validate_port() {
 clear
 header
 
-# 检查现有配置
 if [ -f "$CONFIG_PATH" ]; then
   echo -e "\n${yellow}⚠️  检测到已有 HY2 配置文件${reset}"
   echo -e "${cyan}📂 配置路径: ${lightpink}$CONFIG_PATH${reset}\n"
 
-  # 使用更可靠的解析方式
   config_content=$(cat "$CONFIG_PATH" 2>/dev/null)
-  UUID=$(echo "$config_content" | grep -oP '(?<=password: ")[^"]+' || echo "获取失败")
-  PORT=$(echo "$config_content" | grep -oP '(?<=listen: :)[0-9]+' || echo "获取失败")
-  SNI=$(echo "$config_content" | grep -oP '(?<=sni: )[^ ]+' || echo "未设置")
-  ALPN=$(echo "$config_content" | grep -oP '(?<=alpn:\n\s+- )[^ ]+' || echo "h3")
+  UUID=$(echo "$config_content" | grep "password:" | awk -F'"' '{print $2}' || echo "获取失败")
+  PORT=$(echo "$config_content" | grep "listen:" | awk -F':' '{print $2}' || echo "获取失败")
+  SNI=$(echo "$config_content" | grep "sni:" | awk '{print $2}' || echo "未设置")
+  ALPN=$(echo "$config_content" | grep -A1 "alpn:" | tail -1 | tr -d ' -' || echo "h3")
   IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
   IPV6=$(curl -s6 ifconfig.co || echo "获取失败")
 
@@ -62,7 +60,6 @@ if [ -f "$CONFIG_PATH" ]; then
   [[ "$overwrite" != "y" ]] && echo -e "${red}❌ 已取消操作${reset}" && footer && exit 1
 fi
 
-# UUID 输入（带循环）
 while true; do
   read -p "$(echo -e "\n${cyan}请输入 UUID（留空自动生成）: ${reset}")" UUID
   if [ -z "$UUID" ]; then
@@ -77,7 +74,6 @@ while true; do
   fi
 done
 
-# 端口输入（带循环）
 while true; do
   read -p "$(echo -e "\n${cyan}请输入监听端口（1024-65535，留空自动生成）: ${reset}")" PORT
   if [ -z "$PORT" ]; then
@@ -92,7 +88,6 @@ while true; do
   fi
 done
 
-# SNI（不能为空）
 while true; do
   read -p "$(echo -e "\n${cyan}请输入 SNI 域名（如：www.bing.com）: ${reset}")" SNI
   if [ -z "$SNI" ]; then
@@ -103,19 +98,16 @@ while true; do
   fi
 done
 
-# ALPN（可空，自动默认）
 read -p "$(echo -e "\n${cyan}请输入 ALPN 协议（默认 h3，直接回车使用）: ${reset}")" ALPN
 [ -z "$ALPN" ] && ALPN="h3"
 echo -e "${green}✔️  ALPN 协议：${lightpink}$ALPN${reset}"
 
-# 展示公网 IP
 echo -e "\n${yellow}📡 正在获取网络信息..."
 IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
 IPV6=$(curl -s6 ifconfig.co || echo "获取失败")
 echo -e "${yellow}📶 当前公网 IPv4：${lightpink}$IPV4${reset}"
 echo -e "${yellow}📶 当前公网 IPv6：${lightpink}$IPV6${reset}"
 
-# 写入配置
 cat > "$CONFIG_PATH" <<EOF
 listen: :$PORT
 protocol: hysteria2
@@ -129,10 +121,12 @@ tls:
   insecure: true
 EOF
 
+chmod 777 "$CONFIG_PATH"
 echo -e "\n${green}✅ HY2 配置已生成: ${lightpink}$CONFIG_PATH${reset}"
+echo -e "${green}🔓 已开放完整权限${reset}"
+
 footer
 
-# 返回菜单
 echo ""
-read -p "$(echo -e "${cyan}⓿ 返回配置菜单，按任意键继续...${reset}")" -n 1
+read -p "$(echo -e "${cyan}返回配置菜单，按任意键继续${reset}")" -n 1
 bash /root/VPN/menu/config_node.sh
