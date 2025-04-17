@@ -29,16 +29,21 @@ function validate_port() {
   [[ "$1" =~ ^[0-9]{2,5}$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
 }
 
+function format_file_time() {
+  stat -c %y "$1" 2>/dev/null | awk -F'.' '{print $1}' | sed 's/-/年/;s/-/月/;s/ /日  /;s/:/时/;s/:/分/;s/$/秒/'
+}
+
 clear
 header
 
 if [ -f "$CONFIG_PATH" ]; then
   echo -e "\n${yellow}⚠️  检测到已有 HY2 配置文件${reset}"
-  echo -e "${cyan}📂 配置路径: ${lightpink}$CONFIG_PATH${reset}\n"
+  echo -e "${cyan}📂 配置路径: ${lightpink}$CONFIG_PATH${reset}"
+  echo -e "${cyan}🕒 生成时间: ${lightpink}$(format_file_time "$CONFIG_PATH")${reset}\n"
 
   config_content=$(cat "$CONFIG_PATH" 2>/dev/null)
   UUID=$(echo "$config_content" | grep "password:" | awk -F'"' '{print $2}' || echo "获取失败")
-  PORT=$(echo "$config_content" | grep "listen:" | awk -F':' '{print $2}' || echo "获取失败")
+  PORT=$(echo "$config_content" | grep "listen:" | awk '{print $2}' | tr -d ':')
   SNI=$(echo "$config_content" | grep "sni:" | awk '{print $2}' || echo "未设置")
   ALPN=$(echo "$config_content" | grep -A1 "alpn:" | tail -1 | tr -d ' -' || echo "h3")
   IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
@@ -128,5 +133,5 @@ echo -e "${green}🔓 已开放完整权限${reset}"
 footer
 
 echo ""
-read -p "$(echo -e "${cyan}返回配置菜单，按任意键继续${reset}")" -n 1
+read -p "$(echo -e "${cyan}⓿ 返回配置菜单，按任意键继续...${reset}")" -n 1
 bash /root/VPN/menu/config_node.sh
