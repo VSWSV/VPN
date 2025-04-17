@@ -24,16 +24,21 @@ while true; do
   case "$opt" in
     1) bash /root/VPN/menu/install_upgrade.sh
     break ;;
-    2) bash /root/VPN/menu/start_service.sh ;;
-    3) bash /root/VPN/menu/stop_service.sh ;;
-    4) bash /root/VPN/menu/config_node.sh ;;
-    5) bash /root/VPN/menu/maintain.sh ;;
-    6) bash /root/VPN/menu/network_tools.sh ;;
+    2) bash /root/VPN/menu/start_service.sh
+    break ;;
+    3) bash /root/VPN/menu/stop_service.sh
+    break ;;
+    4) bash /root/VPN/menu/config_node.sh
+    break;;
+    5) bash /root/VPN/menu/maintain.sh
+    break ;;
+    6) bash /root/VPN/menu/network_tools.sh
+    break ;;
     7) bash /root/VPN/menu/uninstall.sh ;;
     0) echo -e "${green}正在退出${reset}"
        sleep 0.5
        break
-       exit ;;
+       exit 0 ;;
     *) 
       echo -e "${red}❌ 无效输入！${reset}"
         sleep 0.5
