@@ -12,12 +12,6 @@ CONFIG_DIR="/root/VPN/config"
 mkdir -p $CONFIG_DIR
 CLOUDFLARE_BIN="/root/VPN/cloudflared"
 
-# 🧠 请先手动填写以下变量
-API_TOKEN="填写你的 Cloudflare API Token"
-ZONE_NAME="vswsv.com"                 # 主域名
-TUNNEL_SUB="vpn"                      # 子域名前缀（如 vpn）
-EMAIL="填写你的账号邮箱"               # 如果用 Global Key，则可能需要邮箱
-
 header() {
 echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
 echo -e "${cyan}                  ☁️ Cloudflare 隧道 + 自动添加 DNS 记录（A/AAAA/CNAME）              ${reset}"
@@ -28,27 +22,8 @@ footer() {
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-get_zone_id() {
-  curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$ZONE_NAME" \
-    -H "Authorization: Bearer $API_TOKEN" \
-    -H "Content-Type: application/json" | jq -r '.result[0].id'
-}
-
-add_dns_record() {
-  local TYPE=$1
-  local NAME=$2
-  local VALUE=$3
-
-  curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-    -H "Authorization: Bearer $API_TOKEN" \
-    -H "Content-Type: application/json" \
-    --data '{
-      "type":"'"$TYPE"'",
-      "name":"'"$NAME"'",
-      "content":"'"$VALUE"'",
-      "ttl":120,
-      "proxied":false
-    }' | jq -r '.success'
+validate_domain() {
+  [[ "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]
 }
 
 clear
@@ -60,41 +35,107 @@ if [ ! -f "$CLOUDFLARE_BIN" ]; then
   footer; exit 1
 fi
 
-echo -e "${yellow}📤 执行 Cloudflare 授权登录...${reset}"
+# 第一步：输入域名信息
+while true; do
+  read -p "$(echo -e "\n${cyan}请输入主域名（如 vswsv.com）: ${reset}")" ZONE_NAME
+  if validate_domain "$ZONE_NAME"; then
+    break
+  else
+    echo -e "${red}❌ 域名格式无效，请重新输入${reset}"
+  fi
+done
+
+while true; do
+  read -p "$(echo -e "${cyan}请输入子域名前缀（如 vpn）: ${reset}")" TUNNEL_SUB
+  if [ -n "$TUNNEL_SUB" ]; then
+    break
+  else
+    echo -e "${red}❌ 子域名不能为空，请重新输入${reset}"
+  fi
+done
+
+FULL_DOMAIN="${TUNNEL_SUB}.${ZONE_NAME}"
+
+# 第二步：授权登录
+echo -e "\n${yellow}📤 执行 Cloudflare 授权登录...${reset}"
 $CLOUDFLARE_BIN tunnel login
 
-read -p "$(echo -e "${cyan}请输入隧道名称（建议英文）: ${reset}")" TUNNEL_NAME
-read -p "$(echo -e "${cyan}请输入完整 SNI 域名（如 vpn.vswsv.com）: ${reset}")" FULL_DOMAIN
+# 第三步：创建隧道
+while true; do
+  read -p "$(echo -e "\n${cyan}请输入隧道名称（建议英文）: ${reset}")" TUNNEL_NAME
+  if [ -n "$TUNNEL_NAME" ]; then
+    break
+  else
+    echo -e "${red}❌ 隧道名称不能为空，请重新输入${reset}"
+  fi
+done
 
-TUNNEL_HOST=$FULL_DOMAIN
-SUB_DOMAIN=${TUNNEL_HOST%%.$ZONE_NAME}
-
+echo -e "${yellow}🛠️ 正在创建隧道...${reset}"
 $CLOUDFLARE_BIN tunnel create "$TUNNEL_NAME"
 TUNNEL_ID=$($CLOUDFLARE_BIN tunnel list | grep "$TUNNEL_NAME" | awk '{print $1}')
 
+if [ -z "$TUNNEL_ID" ]; then
+  echo -e "${red}❌ 隧道创建失败${reset}"
+  footer; exit 1
+fi
+
+# 配置隧道
+echo -e "${yellow}⚙️ 正在配置隧道...${reset}"
+mkdir -p /root/.cloudflared
 cat > "/root/.cloudflared/config.yml" <<EOF
 tunnel: $TUNNEL_ID
 credentials-file: /root/.cloudflared/$TUNNEL_ID.json
 
 ingress:
-  - hostname: $TUNNEL_HOST
+  - hostname: $FULL_DOMAIN
     service: http://localhost:80
   - service: http_status:404
 EOF
 
-$CLOUDFLARE_BIN tunnel route dns "$TUNNEL_NAME" "$TUNNEL_HOST"
+# 设置DNS记录
+echo -e "\n${yellow}🌐 正在设置DNS记录...${reset}"
 
-echo -e "${green}✅ CNAME 记录已设置，开始添加 A/AAAA ...${reset}"
+# 设置CNAME记录
+echo -e "${yellow}🔄 设置CNAME记录...${reset}"
+CNAME_RESULT=$($CLOUDFLARE_BIN tunnel route dns "$TUNNEL_NAME" "$FULL_DOMAIN" 2>&1)
 
-# 获取 zone_id
-ZONE_ID=$(get_zone_id)
-[ -z "$ZONE_ID" ] && echo -e "${red}❌ 无法获取 Zone ID，检查 API Token 是否正确${reset}" && footer && exit 1
+if [[ $CNAME_RESULT == *"successfully"* ]]; then
+  echo -e "${green}✅ CNAME记录设置成功: ${lightpink}$FULL_DOMAIN → $TUNNEL_NAME${reset}"
+else
+  echo -e "${red}❌ CNAME记录设置失败: ${lightpink}$CNAME_RESULT${reset}"
+fi
 
-IPV4=$(curl -s4 ifconfig.co || echo "192.0.2.1")
-IPV6=$(curl -s6 ifconfig.co || echo "100::")
+# 获取IP地址
+IPV4=$(curl -s4 ifconfig.co || echo "")
+IPV6=$(curl -s6 ifconfig.co || echo "")
 
-add_dns_record "A" "$TUNNEL_HOST" "$IPV4"
-add_dns_record "AAAA" "$TUNNEL_HOST" "$IPV6"
+# 设置A记录
+if [ -n "$IPV4" ]; then
+  echo -e "${yellow}🔄 设置A记录...${reset}"
+  $CLOUDFLARE_BIN tunnel route ip "$TUNNEL_NAME" "$IPV4" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo -e "${green}✅ A记录设置成功: ${lightpink}$FULL_DOMAIN → $IPV4${reset}"
+  else
+    echo -e "${red}❌ A记录设置失败${reset}"
+  fi
+else
+  echo -e "${yellow}⚠️ 未检测到IPv4地址，跳过A记录设置${reset}"
+fi
 
-echo -e "${green}🎉 所有记录设置完成！${reset}"
+# 设置AAAA记录
+if [ -n "$IPV6" ]; then
+  echo -e "${yellow}🔄 设置AAAA记录...${reset}"
+  $CLOUDFLARE_BIN tunnel route ip "$TUNNEL_NAME" "$IPV6" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo -e "${green}✅ AAAA记录设置成功: ${lightpink}$FULL_DOMAIN → $IPV6${reset}"
+  else
+    echo -e "${red}❌ AAAA记录设置失败${reset}"
+  fi
+else
+  echo -e "${yellow}⚠️ 未检测到IPv6地址，跳过AAAA记录设置${reset}"
+fi
+
+echo -e "\n${green}🎉 隧道配置完成！${reset}"
+echo -e "${cyan}🔗 您的隧道地址: ${lightpink}https://$FULL_DOMAIN${reset}"
+
 footer
