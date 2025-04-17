@@ -18,7 +18,6 @@ show_menu() {
   echo -e "  ${yellow}❼${reset} ${red}卸载${reset}           ${yellow}⓿${reset} ${red}退出${reset}"
   echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
-while true; do
   show_menu
   read -p "请输入选项编号： " opt
   case "$opt" in
@@ -31,13 +30,14 @@ while true; do
     7) bash /root/VPN/menu/uninstall.sh ;;
     0) echo -e "${green}正在退出${reset}"
        sleep 0.5
-       exit 0
-      ;;
+       exit 0 ;;
     *) 
-      echo -e "${red}❌ 无效输入！${reset}"
-      sleep 0.5
-  read -p "请输入选项编号： " opt
+      if [[ "$opt" =~ ^[1-7]$ ]]; then
+        bash "/root/VPN/menu/${options[$opt]}.sh"
+      else
+        echo -e "${red}❌ 无效输入！${reset}"
+        sleep 0.5
+      fi
       ;;
   esac
-done
 chmod +x menu.sh
