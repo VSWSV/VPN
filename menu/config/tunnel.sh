@@ -26,6 +26,10 @@ footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
+validate_domain() {
+  [[ "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]] && [[ "$1" == *"."* ]]
+}
+
 check_prerequisites() {
   # 检查cloudflared是否安装
   if [ ! -f "$CLOUDFLARE_BIN" ]; then
@@ -45,14 +49,26 @@ check_prerequisites() {
   return 0
 }
 
+get_public_ip() {
+  echo -e "${yellow}🔄 正在获取公网IP地址...${reset}"
+  
+  IPV4=$(curl -s4 --connect-timeout 5 https://api.ipify.org || 
+         curl -s4 --connect-timeout 5 https://ipv4.icanhazip.com || 
+         curl -s4 --connect-timeout 5 https://checkip.amazonaws.com)
+  
+  IPV6=$(curl -s6 --connect-timeout 5 https://api6.ipify.org || 
+         curl -s6 --connect-timeout 5 https://ipv6.icanhazip.com)
+  
+  [ -n "$IPV4" ] && echo -e "${green}✔ IPv4地址: ${lightpink}$IPV4${reset}" || echo -e "${red}❌ 无法获取IPv4地址${reset}"
+  [ -n "$IPV6" ] && echo -e "${green}✔ IPv6地址: ${lightpink}$IPV6${reset}" || echo -e "${yellow}⚠ 无法获取IPv6地址${reset}"
+}
+
 clean_tunnel_resources() {
   echo -e "${yellow}🔄 清理现有隧道资源...${reset}"
   
-  # 删除本地配置文件
   rm -f "$TUNNEL_CONFIG_DIR"/*.json 2>/dev/null
   rm -f "$TUNNEL_CONFIG_DIR"/config_*.yml 2>/dev/null
   
-  # 删除Cloudflare上的隧道
   if $CLOUDFLARE_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
     echo -e "${yellow}⚠ 删除Cloudflare上的旧隧道: $TUNNEL_NAME${reset}"
     $CLOUDFLARE_BIN tunnel delete -f "$TUNNEL_NAME" 2>/dev/null
@@ -64,8 +80,6 @@ clean_tunnel_resources() {
 create_new_tunnel() {
   echo -e "${yellow}🛠️ 创建新隧道: $TUNNEL_NAME${reset}"
   
-  # 创建隧道
-  echo -e "${yellow}🚇 正在创建隧道...${reset}"
   if ! TUNNEL_CREATE_OUTPUT=$($CLOUDFLARE_BIN tunnel create "$TUNNEL_NAME" 2>&1); then
     echo -e "${red}❌ 隧道创建失败:${reset}"
     echo -e "${red}$TUNNEL_CREATE_OUTPUT${reset}"
@@ -78,8 +92,7 @@ create_new_tunnel() {
     return 1
   }
   
-  # 移动证书文件到配置目录
-  mv "$HOME/.cloudflared/$TUNNEL_ID.json" "$TUNNEL_CONFIG_DIR/" 2>/dev/null || {
+  mv "$HOME/.cloudflared/$TUNNEL_ID.json" "$TUNNEL_CONFIG_DIR/" || {
     echo -e "${red}❌ 无法移动证书文件${reset}"
     return 1
   }
@@ -91,14 +104,57 @@ create_new_tunnel() {
 configure_dns() {
   echo -e "\n${yellow}🌐 正在设置DNS记录...${reset}"
   
-  # 设置CNAME记录
-  echo -e "${yellow}🔄 设置DNS记录...${reset}"
-  if $CLOUDFLARE_BIN tunnel route dns --overwrite-dns "$TUNNEL_NAME" "$FULL_DOMAIN"; then
-    echo -e "${green}✔ DNS记录设置成功: ${lightpink}$FULL_DOMAIN → $TUNNEL_NAME${reset}"
+  if [ "$TUNNEL_SUB" = "@" ]; then
+    echo -e "${yellow}🛑 注意：主域名将设置A/AAAA记录${reset}"
+    
+    if [ -n "$IPV4" ]; then
+      echo -e "${yellow}🔄 设置A记录: ${lightpink}$ZONE_NAME → $IPV4${reset}"
+      if $CLOUDFLARE_BIN tunnel route ip "$IPV4" "$ZONE_NAME"; then
+        echo -e "${green}✔ A记录设置成功: ${lightpink}$ZONE_NAME → $IPV4${reset}"
+        A_SUCCESS=true
+      else
+        echo -e "${red}❌ A记录设置失败${reset}"
+      fi
+    fi
+
+    if [ -n "$IPV6" ]; then
+      echo -e "${yellow}🔄 设置AAAA记录: ${lightpink}$ZONE_NAME → $IPV6${reset}"
+      if $CLOUDFLARE_BIN tunnel route ip "$IPV6" "$ZONE_NAME"; then
+        echo -e "${green}✔ AAAA记录设置成功: ${lightpink}$ZONE_NAME → $IPV6${reset}"
+        AAAA_SUCCESS=true
+      else
+        echo -e "${red}❌ AAAA记录设置失败${reset}"
+      fi
+    fi
+    
+    [ -z "$IPV4" ] && [ -z "$IPV6" ] && {
+      echo -e "${red}❌ 没有可用的IP地址用于设置DNS记录${reset}"
+      return 1
+    }
   else
-    echo -e "${red}❌ DNS记录设置失败${reset}"
-    return 1
+    echo -e "${yellow}🔄 设置CNAME记录: ${lightpink}$FULL_DOMAIN → $TUNNEL_NAME${reset}"
+    if $CLOUDFLARE_BIN tunnel route dns --overwrite-dns "$TUNNEL_NAME" "$FULL_DOMAIN"; then
+      echo -e "${green}✔ CNAME记录设置成功: ${lightpink}$FULL_DOMAIN → $TUNNEL_NAME${reset}"
+      CNAME_SUCCESS=true
+    else
+      echo -e "${red}❌ CNAME记录设置失败${reset}"
+      return 1
+    fi
   fi
+  
+  # 显示绑定摘要
+  echo -e "\n${cyan}═════════════════════════════════════════════════════════════════════════════════${reset}"
+  echo -e "${orange}                      📝 DNS记录绑定摘要                         ${reset}"
+  echo -e "${cyan}═════════════════════════════════════════════════════════════════════════════════${reset}"
+  
+  if [ "$TUNNEL_SUB" = "@" ]; then
+    [ -n "$A_SUCCESS" ] && echo -e "${green} A记录:    ${lightpink}$ZONE_NAME → $IPV4${reset}"
+    [ -n "$AAAA_SUCCESS" ] && echo -e "${green} AAAA记录: ${lightpink}$ZONE_NAME → $IPV6${reset}"
+  else
+    [ -n "$CNAME_SUCCESS" ] && echo -e "${green} CNAME记录: ${lightpink}$FULL_DOMAIN → $TUNNEL_NAME${reset}"
+  fi
+  
+  echo -e "${cyan}═════════════════════════════════════════════════════════════════════════════════${reset}"
   
   return 0
 }
@@ -107,7 +163,6 @@ main() {
   clear
   header
 
-  # 检查前置条件
   if ! check_prerequisites; then
     footer
     read -p "$(echo -e "${yellow}按回车键返回菜单...${reset}")"
@@ -115,27 +170,34 @@ main() {
     exit 1
   fi
 
+  get_public_ip
+
   # 输入域名信息
   while true; do
     read -p "$(echo -e "\n${cyan}请输入主域名（如 example.com）: ${reset}")" ZONE_NAME
-    if [[ "$ZONE_NAME" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
+    if validate_domain "$ZONE_NAME"; then
+      echo -e "${green}✔ 主域名: ${lightpink}$ZONE_NAME${reset}"
       break
     else
-      echo -e "${red}❌ 域名格式无效，请重新输入${reset}"
+      echo -e "${red}❌ 域名格式无效（必须包含点且符合域名规则），请重新输入${reset}"
     fi
   done
 
   while true; do
-    read -p "$(echo -e "${cyan}请输入子域名前缀（如 vpn）: ${reset}")" TUNNEL_SUB
+    read -p "$(echo -e "${cyan}请输入子域名前缀（如 vpn 或 @ 表示主域名）: ${reset}")" TUNNEL_SUB
     if [ -n "$TUNNEL_SUB" ]; then
+      if [ "$TUNNEL_SUB" = "@" ]; then
+        FULL_DOMAIN="$ZONE_NAME"
+        echo -e "${green}✔ 将配置主域名记录: ${lightpink}$ZONE_NAME${reset}"
+      else
+        FULL_DOMAIN="${TUNNEL_SUB}.${ZONE_NAME}"
+        echo -e "${green}✔ 完整子域名: ${lightpink}$FULL_DOMAIN${reset}"
+      fi
       break
     else
       echo -e "${red}❌ 子域名不能为空，请重新输入${reset}"
     fi
   done
-
-  FULL_DOMAIN="${TUNNEL_SUB}.${ZONE_NAME}"
-  echo -e "${green}✔ 完整域名: ${lightpink}$FULL_DOMAIN${reset}"
 
   # 输入隧道名称
   while true; do
@@ -148,7 +210,6 @@ main() {
     fi
   done
 
-  # 清理并创建隧道
   clean_tunnel_resources
   if ! create_new_tunnel; then
     read -p "$(echo -e "${yellow}按回车键返回菜单...${reset}")"
@@ -156,7 +217,6 @@ main() {
     exit 1
   fi
 
-  # 生成配置文件
   CONFIG_FILE="$TUNNEL_CONFIG_DIR/config_$(date +%Y%m%d_%H%M%S).yml"
   echo -e "${yellow}⚙️ 生成配置文件 $CONFIG_FILE ...${reset}"
   cat > "$CONFIG_FILE" <<EOF
@@ -169,14 +229,12 @@ ingress:
   - service: http_status:404
 EOF
 
-  # 配置DNS
-  configure_dns || {
+  if ! configure_dns; then
     read -p "$(echo -e "${yellow}按回车键返回菜单...${reset}")"
     bash /root/VPN/menu/config_node.sh
     exit 1
-  }
+  fi
 
-  # 保存配置信息
   cat > "$CONFIG_DIR/tunnel_info_$TUNNEL_NAME" <<EOF
 # Cloudflare 隧道配置信息
 隧道名称: $TUNNEL_NAME
@@ -187,8 +245,14 @@ EOF
 创建时间: $(date "+%Y-%m-%d %H:%M:%S")
 
 DNS记录:
-CNAME: $FULL_DOMAIN → $TUNNEL_NAME
 EOF
+
+  [ "$TUNNEL_SUB" = "@" ] && {
+    [ -n "$IPV4" ] && echo "A:    $ZONE_NAME → $IPV4" >> "$CONFIG_DIR/tunnel_info_$TUNNEL_NAME"
+    [ -n "$IPV6" ] && echo "AAAA: $ZONE_NAME → $IPV6" >> "$CONFIG_DIR/tunnel_info_$TUNNEL_NAME"
+  } || {
+    echo "CNAME: $FULL_DOMAIN → $TUNNEL_NAME" >> "$CONFIG_DIR/tunnel_info_$TUNNEL_NAME"
+  }
 
   echo -e "\n${green}🎉 隧道配置完成！${reset}"
   echo -e "${cyan}🔗 访问地址: ${lightpink}https://$FULL_DOMAIN${reset}"
@@ -199,5 +263,4 @@ EOF
   bash /root/VPN/menu/config_node.sh
 }
 
-# 执行主流程
 main
