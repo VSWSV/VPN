@@ -26,91 +26,66 @@ footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-validate_domain() {
-  [[ "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]
-}
-
-show_existing_config() {
-  local config_file="$TUNNEL_CONFIG_DIR/config.yml"
-  echo -e "\n${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "${cyan}                              🌐 现有隧道配置详情                          ${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+clean_tunnel_resources() {
+  echo -e "${yellow}🔄 清理现有隧道资源...${reset}"
   
-  if [ -f "$config_file" ]; then
-    echo -e " ${lightpink}配置文件: ${reset}${green}$config_file${reset}"
-    
-    local tunnel_id=$(grep "tunnel:" "$config_file" | awk '{print $2}')
-    local credentials_file=$(grep "credentials-file:" "$config_file" | awk '{print $2}')
-    local domain=$(grep -A1 "ingress:" "$config_file" | grep "hostname:" | awk '{print $2}')
-    
-    echo -e " ${lightpink}隧道ID: ${reset}${green}$tunnel_id${reset}"
-    echo -e " ${lightpink}证书文件: ${reset}${green}$credentials_file${reset}"
-    echo -e " ${lightpink}绑定域名: ${reset}${green}$domain${reset}"
-    
-    if [ -f "$credentials_file" ]; then
-      echo -e " ${lightpink}创建时间: ${reset}${green}$(stat -c %y "$credentials_file" | cut -d'.' -f1)${reset}"
-    fi
-  else
-    echo -e " ${red}未找到有效配置文件${reset}"
+  # 删除本地证书和配置文件
+  rm -f /root/.cloudflared/cert.pem 2>/dev/null
+  rm -f "$TUNNEL_CONFIG_DIR"/*.json 2>/dev/null
+  rm -f "$TUNNEL_CONFIG_DIR"/config_*.yml 2>/dev/null
+  
+  # 删除Cloudflare上的隧道（如果存在）
+  if $CLOUDFLARE_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
+    echo -e "${yellow}⚠ 删除Cloudflare上的旧隧道: $TUNNEL_NAME${reset}"
+    $CLOUDFLARE_BIN tunnel delete -f "$TUNNEL_NAME" 2>/dev/null
   fi
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+  
+  echo -e "${green}✔ 清理完成${reset}"
 }
 
-show_error_and_exit() {
-  echo -e "\n${red}❌ 错误详情：${reset}"
-  echo -e "${red}$1${reset}"
-  read -p "$(echo -e "${yellow}按回车键返回菜单...${reset}")" 
-  bash /root/VPN/menu/config_node.sh
-  exit 1
+create_new_tunnel() {
+  echo -e "${yellow}🛠️ 创建新隧道: $TUNNEL_NAME${reset}"
+  
+  # 强制清理旧隧道
+  clean_tunnel_resources
+  
+  # 重新授权
+  echo -e "${yellow}📤 重新Cloudflare授权...${reset}"
+  $CLOUDFLARE_BIN tunnel login --force 2>/dev/null
+  
+  # 创建隧道
+  if ! TUNNEL_CREATE_OUTPUT=$($CLOUDFLARE_BIN tunnel create "$TUNNEL_NAME" 2>&1); then
+    echo -e "${red}❌ 隧道创建失败:${reset}"
+    echo -e "${red}$TUNNEL_CREATE_OUTPUT${reset}"
+    return 1
+  fi
+  
+  TUNNEL_ID=$($CLOUDFLARE_BIN tunnel list | grep "$TUNNEL_NAME" | awk '{print $1}')
+  if [ -z "$TUNNEL_ID" ]; then
+    echo -e "${red}❌ 无法获取隧道ID${reset}"
+    return 1
+  fi
+  
+  echo -e "${green}✔ 隧道创建成功 (ID: $TUNNEL_ID)${reset}"
+  return 0
 }
 
-clean_old_config() {
-  echo -e "${yellow}🔄 正在清理旧配置...${reset}"
-  rm -f "$TUNNEL_CONFIG_DIR"/config*.yml
-  rm -f "$TUNNEL_CONFIG_DIR"/*.json
-  rm -f "$CONFIG_DIR"/tunnel_info_*
-  echo -e "${green}✔ 旧配置已清理${reset}\n"
-}
-
-# 主流程
 main() {
   clear
   header
 
   # 检查 cloudflared
   if [ ! -f "$CLOUDFLARE_BIN" ]; then
-    show_error_and_exit "未找到 cloudflared，请先安装！"
-  fi
-
-  # 自动检测现有配置
-  if ls "$TUNNEL_CONFIG_DIR"/config*.yml 1> /dev/null 2>&1; then
-    show_existing_config
-    
-    # 覆盖确认流程
-    while true; do
-      read -p "$(echo -e "\n${yellow}检测到已有配置，是否覆盖？(y/n): ${reset}")" overwrite
-      case $overwrite in
-        [yY])
-          clean_old_config
-          break
-          ;;
-        [nN])
-          echo -e "${red}❌ 已取消操作${reset}"
-          footer
-          bash /root/VPN/menu/config_node.sh
-          exit 0
-          ;;
-        *)
-          echo -e "${red}❌ 无效输入，请输入 y 或 n${reset}"
-          ;;
-      esac
-    done
+    echo -e "${red}❌ 未找到 cloudflared，请先安装！${reset}"
+    footer
+    bash /root/VPN/menu/config_node.sh
+    exit 1
   fi
 
   # 输入域名信息
   while true; do
     read -p "$(echo -e "\n${cyan}请输入主域名（如 example.com）: ${reset}")" ZONE_NAME
-    if validate_domain "$ZONE_NAME"; then
+    if [[ "$ZONE_NAME" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; then
       break
     else
       echo -e "${red}❌ 域名格式无效，请重新输入${reset}"
@@ -132,27 +107,19 @@ main() {
   while true; do
     read -p "$(echo -e "\n${cyan}请输入隧道名称（建议英文）: ${reset}")" TUNNEL_NAME
     if [ -n "$TUNNEL_NAME" ]; then
+      # 立即显示输入内容
+      echo -e "${green}✔ 隧道名称: ${lightpink}$TUNNEL_NAME${reset}"
       break
     else
       echo -e "${red}❌ 隧道名称不能为空，请重新输入${reset}"
     fi
   done
 
-  # Cloudflare 授权登录
-  echo -e "\n${yellow}📤 执行 Cloudflare 授权登录...${reset}"
-  if ! LOGIN_OUTPUT=$($CLOUDFLARE_BIN tunnel login 2>&1); then
-    show_error_and_exit "$LOGIN_OUTPUT"
-  fi
-
-  # 创建隧道
-  echo -e "${yellow}🛠️ 正在创建隧道...${reset}"
-  if ! TUNNEL_CREATE_OUTPUT=$($CLOUDFLARE_BIN tunnel create "$TUNNEL_NAME" 2>&1); then
-    show_error_and_exit "$TUNNEL_CREATE_OUTPUT"
-  fi
-
-  TUNNEL_ID=$($CLOUDFLARE_BIN tunnel list | grep "$TUNNEL_NAME" | awk '{print $1}')
-  if [ -z "$TUNNEL_ID" ]; then
-    show_error_and_exit "无法获取隧道ID"
+  # 创建隧道（自动处理冲突）
+  if ! create_new_tunnel; then
+    read -p "$(echo -e "${yellow}按回车键返回菜单...${reset}")"
+    bash /root/VPN/menu/config_node.sh
+    exit 1
   fi
 
   # 生成配置文件
@@ -173,30 +140,33 @@ EOF
   
   # CNAME记录
   echo -e "${yellow}🔄 设置CNAME记录...${reset}"
-  if ! CNAME_OUTPUT=$($CLOUDFLARE_BIN tunnel route dns "$TUNNEL_NAME" "$FULL_DOMAIN" 2>&1); then
-    show_error_and_exit "$CNAME_OUTPUT"
+  if $CLOUDFLARE_BIN tunnel route dns "$TUNNEL_NAME" "$FULL_DOMAIN" 2>/dev/null; then
+    echo -e "${green}✔ CNAME记录设置成功: ${lightpink}$FULL_DOMAIN → $TUNNEL_NAME${reset}"
+  else
+    echo -e "${red}❌ CNAME记录设置失败${reset}"
   fi
-  echo -e "${green}✔ CNAME记录设置成功: ${lightpink}$FULL_DOMAIN → $TUNNEL_NAME${reset}"
 
-  # A/AAAA记录
+  # 获取IP地址
   IPV4=$(curl -s4 ifconfig.co || echo "")
   IPV6=$(curl -s6 ifconfig.co || echo "")
 
+  # A记录
   if [ -n "$IPV4" ]; then
     echo -e "${yellow}🔄 设置A记录...${reset}"
-    if ! A_OUTPUT=$($CLOUDFLARE_BIN tunnel route ip "$TUNNEL_NAME" "$IPV4" 2>&1); then
-      echo -e "${red}⚠ A记录设置失败: ${lightpink}${A_OUTPUT##*ERR }${reset}"
-    else
+    if $CLOUDFLARE_BIN tunnel route ip "$TUNNEL_NAME" "$IPV4" 2>/dev/null; then
       echo -e "${green}✔ A记录设置成功: ${lightpink}$FULL_DOMAIN → $IPV4${reset}"
+    else
+      echo -e "${red}❌ A记录设置失败${reset}"
     fi
   fi
 
+  # AAAA记录
   if [ -n "$IPV6" ]; then
     echo -e "${yellow}🔄 设置AAAA记录...${reset}"
-    if ! AAAA_OUTPUT=$($CLOUDFLARE_BIN tunnel route ip "$TUNNEL_NAME" "$IPV6" 2>&1); then
-      echo -e "${red}⚠ AAAA记录设置失败: ${lightpink}${AAAA_OUTPUT##*ERR }${reset}"
-    else
+    if $CLOUDFLARE_BIN tunnel route ip "$TUNNEL_NAME" "$IPV6" 2>/dev/null; then
       echo -e "${green}✔ AAAA记录设置成功: ${lightpink}$FULL_DOMAIN → $IPV6${reset}"
+    else
+      echo -e "${red}❌ AAAA记录设置失败${reset}"
     fi
   fi
 
