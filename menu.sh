@@ -28,7 +28,8 @@ show_menu() {
     5) bash /root/VPN/menu/maintain.sh ;;
     6) bash /root/VPN/menu/network_tools.sh ;;
     7) bash /root/VPN/menu/uninstall.sh ;;
-    0) echo -e "${green}正在退出${reset}"
+    0) break
+       echo -e "${green}正在退出${reset}"
        sleep 0.5
        exit 0 ;;
     *) 
