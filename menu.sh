@@ -30,7 +30,7 @@ while true; do
     6) bash /root/VPN/menu/network_tools.sh ;;
     7) bash /root/VPN/menu/uninstall.sh ;;
     0) bash /root/VPN/menu.sh
-       echo -e "${yellow}正在退出..."
+       echo -e "正在退出..."
        sleep 0.5
        exit 0
       ;;
