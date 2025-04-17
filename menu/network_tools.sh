@@ -24,24 +24,24 @@ while true; do
     show_menu
     read -p "请输入选项编号： " opt
     case $opt in
-        1)  bash /root/VPN/menu/network/check_ip.sh
+        1) bash /root/VPN/menu/network/check_ip.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        2)  bash /root/VPN/menu/network/ping_test.sh
+        2) bash /root/VPN/menu/network/ping_test.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        3)  bash /root/VPN/menu/network/ping_ip.sh
+        3) bash /root/VPN/menu/network/ping_ip.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        4)  bash /root/VPN/menu/network/check_ports.sh
+        4) bash /root/VPN/menu/network/check_ports.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        5)   bash /root/VPN/menu/network/view_logs.sh
+        5) bash /root/VPN/menu/network/view_logs.sh
             read -p "操作完成，按任意键返回菜单..."
             ;;
-        0)  bash /root/VPN/menu.sh
+        0) bash /root/VPN/menu.sh
             break ;;
-        *)  echo -e "${red}❌ 无效输入！${reset}"
+        *) echo -e "${red}❌ 无效输入！${reset}"
             sleep 0.5 ;;
     esac
 done
