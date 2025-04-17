@@ -66,14 +66,34 @@ fi
 chmod -R +x /root/VPN
 
 
-# 设置快捷命令 vpn
-if [ -f "/usr/local/bin/vpn" ]; then
-  sudo rm -f /usr/local/bin/vpn
-fi
+# 输入自定义命令并检测冲突/是否覆盖
+while true; do
+  read -p "$(echo -e ${yellow}请输入你要设置的自定义启动命令（如 vpn）：${reset}) " custom_command
+  if [[ -z "$custom_command" ]]; then
+    echo -e "${red}❌ 命令不能为空，请重新输入${reset}"
+    continue
+  fi
 
-sudo ln -s /root/VPN/menu.sh /usr/local/bin/vpn
+  if command -v $custom_command &> /dev/null; then
+    echo -e "${yellow}⚠️ 命令 '${custom_command}' 已存在。是否覆盖？ [Y/N] ${reset}"
+    read -p "" overwrite
+    if [[ "$overwrite" == "Y" || "$overwrite" == "y" ]]; then
+      sudo rm -f /usr/local/bin/$custom_command
+      sudo ln -s /root/VPN/menu.sh /usr/local/bin/$custom_command
+      echo -e "${green}✅ 命令 '${custom_command}' 已成功覆盖并设置！${reset}"
+      break
+    else
+      echo -e "${red}❌ 未覆盖，重新输入命令名...${reset}"
+      continue
+    fi
+  else
+    sudo ln -s /root/VPN/menu.sh /usr/local/bin/$custom_command
+    echo -e "${green}✅ 已成功设置命令 '${custom_command}' 来启动主菜单！${reset}"
+    break
+  fi
+done
 
-# 成功提示
+# 安装完成提示
 echo -e "${blue}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-echo -e "              ${green}🎉 安装完成！现在你可以直接输入 ${yellow}vpn${green} 来启动菜单！${reset}"
+echo -e "              ${green}🎉 安装完成！现在你可以直接输入 ${yellow}${custom_command}${green} 来启动菜单！${reset}"
 echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
