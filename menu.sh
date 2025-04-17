@@ -8,6 +8,7 @@ purple="\033[1;35m"
 cyan="\033[1;36m"
 orange="\033[38;5;214m"
 reset="\033[0m"
+
 show_menu() {
   clear
   echo -e "${blue}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
@@ -18,6 +19,7 @@ show_menu() {
   echo -e "  ${yellow}❼${reset} ${red}卸载${reset}           ${yellow}⓿${reset} ${red}退出${reset}"
   echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
+
 while true; do
   show_menu
   read -p "请输入选项编号： " opt
@@ -36,13 +38,12 @@ while true; do
     break ;;
     7) bash /root/VPN/menu/uninstall.sh ;;
     0) echo -e "${green}正在退出${reset}"
-       sleep 0.5
-       break
-       exit 0 ;;
+    sleep 0.5
+    break
+    exit 0 ;;
     *) 
-      echo -e "${red}❌ 无效输入！${reset}"
-        sleep 0.5
-      ;;
+    echo -e "${red}❌ 无效输入！${reset}"
+    sleep 0.5 ;;
   esac
 done
 chmod +x menu.sh
