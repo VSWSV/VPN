@@ -5,7 +5,7 @@ cyan="\033[1;36m"
 green="\033[1;32m"
 yellow="\033[1;33m"
 red="\033[1;31m"
-pink="\033[1;35m"
+lightpink="\033[38;5;213m"  # Changed to lighter pink
 reset="\033[0m"
 
 CONFIG_PATH="/root/VPN/config/hysteria.yaml"
@@ -35,7 +35,7 @@ header
 # 检查现有配置
 if [ -f "$CONFIG_PATH" ]; then
   echo -e "\n${yellow}⚠️  检测到已有 HY2 配置文件${reset}"
-  echo -e "${cyan}📂 配置路径: ${pink}$CONFIG_PATH${reset}\n"
+  echo -e "${cyan}📂 配置路径: ${lightpink}$CONFIG_PATH${reset}\n"
 
   # 使用更可靠的解析方式
   config_content=$(cat "$CONFIG_PATH" 2>/dev/null)
@@ -49,12 +49,12 @@ if [ -f "$CONFIG_PATH" ]; then
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
   echo -e "${cyan}                              🌐 当前 HY2 节点配置预览                          ${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-  echo -e " ${pink}UUID：     ${reset}${green}$UUID${reset}"
-  echo -e " ${pink}端口号：   ${reset}${green}$PORT${reset}"
-  echo -e " ${pink}SNI 域名： ${reset}${green}$SNI${reset}"
-  echo -e " ${pink}ALPN 协议：${reset}${green}$ALPN${reset}"
-  echo -e " ${pink}IPv4：     ${reset}${green}$IPV4${reset}"
-  echo -e " ${pink}IPv6：     ${reset}${green}$IPV6${reset}"
+  echo -e " ${lightpink}UUID：     ${reset}${green}$UUID${reset}"
+  echo -e " ${lightpink}端口号：   ${reset}${green}$PORT${reset}"
+  echo -e " ${lightpink}SNI 域名： ${reset}${green}$SNI${reset}"
+  echo -e " ${lightpink}ALPN 协议：${reset}${green}$ALPN${reset}"
+  echo -e " ${lightpink}IPv4：     ${reset}${green}$IPV4${reset}"
+  echo -e " ${lightpink}IPv6：     ${reset}${green}$IPV6${reset}"
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
   read -p "$(echo -e "\n${yellow}是否覆盖现有配置？(y/n): ${reset}")" -n 1 overwrite
@@ -67,10 +67,10 @@ while true; do
   read -p "$(echo -e "\n${cyan}请输入 UUID（留空自动生成）: ${reset}")" UUID
   if [ -z "$UUID" ]; then
     UUID=$(cat /proc/sys/kernel/random/uuid)
-    echo -e "${green}✔️  UUID：${pink}$UUID${reset}"
+    echo -e "${green}✔️  UUID：${lightpink}$UUID${reset}"
     break
   elif validate_uuid "$UUID"; then
-    echo -e "${green}✔️  UUID：${pink}$UUID${reset}"
+    echo -e "${green}✔️  UUID：${lightpink}$UUID${reset}"
     break
   else
     echo -e "${red}❌ UUID 格式无效，请重新输入${reset}"
@@ -82,10 +82,10 @@ while true; do
   read -p "$(echo -e "\n${cyan}请输入监听端口（1024-65535，留空自动生成）: ${reset}")" PORT
   if [ -z "$PORT" ]; then
     PORT=$((RANDOM%30000+10000))
-    echo -e "${green}✔️  端口号：${pink}$PORT${reset}"
+    echo -e "${green}✔️  端口号：${lightpink}$PORT${reset}"
     break
   elif validate_port "$PORT"; then
-    echo -e "${green}✔️  端口号：${pink}$PORT${reset}"
+    echo -e "${green}✔️  端口号：${lightpink}$PORT${reset}"
     break
   else
     echo -e "${red}❌ 端口无效，请重新输入${reset}"
@@ -98,7 +98,7 @@ while true; do
   if [ -z "$SNI" ]; then
     echo -e "${red}❌ SNI 不能为空，请重新输入${reset}"
   else
-    echo -e "${green}✔️  SNI 域名：${pink}$SNI${reset}"
+    echo -e "${green}✔️  SNI 域名：${lightpink}$SNI${reset}"
     break
   fi
 done
@@ -106,14 +106,14 @@ done
 # ALPN（可空，自动默认）
 read -p "$(echo -e "\n${cyan}请输入 ALPN 协议（默认 h3，直接回车使用）: ${reset}")" ALPN
 [ -z "$ALPN" ] && ALPN="h3"
-echo -e "${green}✔️  ALPN 协议：${pink}$ALPN${reset}"
+echo -e "${green}✔️  ALPN 协议：${lightpink}$ALPN${reset}"
 
 # 展示公网 IP
 echo -e "\n${yellow}📡 正在获取网络信息..."
 IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
 IPV6=$(curl -s6 ifconfig.co || echo "获取失败")
-echo -e "${yellow}📶 当前公网 IPv4：${pink}$IPV4${reset}"
-echo -e "${yellow}📶 当前公网 IPv6：${pink}$IPV6${reset}"
+echo -e "${yellow}📶 当前公网 IPv4：${lightpink}$IPV4${reset}"
+echo -e "${yellow}📶 当前公网 IPv6：${lightpink}$IPV6${reset}"
 
 # 写入配置
 cat > "$CONFIG_PATH" <<EOF
@@ -129,7 +129,7 @@ tls:
   insecure: true
 EOF
 
-echo -e "\n${green}✅ HY2 配置已生成: ${pink}$CONFIG_PATH${reset}"
+echo -e "\n${green}✅ HY2 配置已生成: ${lightpink}$CONFIG_PATH${reset}"
 footer
 
 # 返回菜单
