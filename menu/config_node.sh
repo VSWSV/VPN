@@ -39,8 +39,8 @@ while true; do
             bash /root/VPN/menu.sh
             break ;;
         *) 
-            echo -e "${red}❌ 无效输入，请重新选择！${reset}"
-            sleep 1
+            echo -e "${red}❌ 无效输入！${reset}"
+            sleep 0.5
             ;;
     esac
 done    
