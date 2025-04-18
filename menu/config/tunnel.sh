@@ -219,6 +219,17 @@ final_info() {
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 }
 
+    # ➕ 自动查找 tunnel 凭证并输出运行命令
+    CREDENTIAL_FILE=$(find ~/.cloudflared -name "${TUNNEL_ID}.json" 2>/dev/null)
+    if [[ -f "$CREDENTIAL_FILE" ]]; then
+        cp "$CREDENTIAL_FILE" "$VPN_DIR/"
+        success "已保存隧道凭证到：$VPN_DIR/$(basename \"$CREDENTIAL_FILE\")"
+        echo -e "${yellow}👉 启动命令如下：${reset}"
+        echo -e "${green}TUNNEL_ORIGIN_CERT=$CERT_FILE $CFD_BIN tunnel run --cred-file $VPN_DIR/$(basename \"$CREDENTIAL_FILE\") $TUNNEL_NAME${reset}"
+    else
+        error "未找到 ${TUNNEL_ID}.json 凭证文件，请检查 ~/.cloudflared 目录"
+    fi
+
 main() {
     clear
     show_top_title
