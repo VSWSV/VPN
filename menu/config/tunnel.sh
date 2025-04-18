@@ -7,6 +7,7 @@ lightpink='\033[38;5;218m'
 reset='\033[0m'
 
 VPN_DIR="/root/VPN"
+CERT_FILE="$VPN_DIR/cert.pem"
 XRAY_BIN="$VPN_DIR/xray/xray"
 XRAY_CONF="$VPN_DIR/xray/config.json"
 HYSTERIA_BIN="$VPN_DIR/hysteria"
@@ -18,7 +19,7 @@ CONFIG_FILE="$CONFIG_DIR/config_info.txt"
 
 show_header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
-    printf "${orange}║%*s配置隧道 - DNS%*s║\n" $(( (83 - 18) / 2 )) "" $(( (83 - 18 + 1) / 2 )) ""
+    printf "${orange}%*s配置隧道 - DNS%*s\n" $(( (83 - 18) / 2 )) "" $(( (83 - 18 + 1) / 2 )) ""
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -38,23 +39,36 @@ error() {
     echo -e "\033[1;31m❌ $1${reset}"
 }
 
-check_prev_config() {
+check_config_and_cert() {
+    show_header
+
     if [[ -f "$CONFIG_FILE" ]]; then
-        show_header
         info "检测到已有配置文件：$CONFIG_FILE"
         info "生成时间：$(stat -c %y $CONFIG_FILE)"
         cat "$CONFIG_FILE"
-        show_footer
-        read -p "是否覆盖现有配置？(Y/n): " choice
+        read -p "是否覆盖现有配置文件？(Y/n): " choice
         if [[ $choice == [Yy] ]]; then
             info "删除旧配置..."
-            rm -rf "$CONFIG_DIR"/*
+            rm -f "$CONFIG_FILE"
         else
-            info "返回主菜单..."
+            info "保留旧配置，返回菜单"
             bash "$VPN_DIR/menu/config_node.sh"
             exit 0
         fi
     fi
+
+    if [[ -f "$CERT_FILE" ]]; then
+        info "检测到残留的 Cloudflare 授权证书：$CERT_FILE"
+        read -p "是否删除旧证书？(Y/n): " certchoice
+        if [[ $certchoice == [Yy] ]]; then
+            rm -f "$CERT_FILE"
+            success "已删除旧 Cloudflare 授权证书"
+        else
+            info "保留旧证书，继续执行"
+        fi
+    fi
+
+    show_footer
 }
 
 get_ip_addresses() {
@@ -139,35 +153,35 @@ create_dns_records() {
     A_RECORD=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" \
-        --data '{"type":"A","name":"@","content":"'"$IPV4"'","ttl":1,"proxied":false}')
+        --data "{\"type\":\"A\",\"name\":\"@\",\"content\":\"$IPV4\",\"ttl\":1,\"proxied\":false}")
 
     AAAA_RECORD=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" \
-        --data '{"type":"AAAA","name":"@","content":"'"$IPV6"'","ttl":1,"proxied":false}')
+        --data "{\"type\":\"AAAA\",\"name\":\"@\",\"content\":\"$IPV6\",\"ttl\":1,\"proxied\":false}")
 
-    echo "$A_RECORD" | grep -q '"success":true' && success "A记录创建成功" || error "A记录创建失败"
-    echo "$AAAA_RECORD" | grep -q '"success":true' && success "AAAA记录创建成功" || error "AAAA记录创建失败"
+    echo "$A_RECORD" | grep -q '\"success\":true' && success "A记录创建成功" || error "A记录创建失败"
+    echo "$AAAA_RECORD" | grep -q '\"success\":true' && success "AAAA记录创建成功" || error "AAAA记录创建失败"
     show_footer
 }
 
 authorize_and_create_tunnel() {
     show_header
     info "🧩 开始 Cloudflare 隧道授权..."
-    $CFD_BIN tunnel login
+    $CFD_BIN tunnel login --origincert "$CERT_FILE"
     if [[ $? -ne 0 ]]; then
         error "授权失败，请检查 Cloudflared 登录"
         exit 1
     fi
     success "授权成功"
 
-    $CFD_BIN tunnel create "$TUNNEL_NAME"
+    $CFD_BIN tunnel create "$TUNNEL_NAME" --origincert "$CERT_FILE"
     if [[ $? -ne 0 ]]; then
         error "隧道创建失败"
         exit 1
     fi
 
-    TUNNEL_ID=$($CFD_BIN tunnel list | grep "$TUNNEL_NAME" | awk '{print $1}')
+    TUNNEL_ID=$($CFD_BIN tunnel list --origincert "$CERT_FILE" | grep "$TUNNEL_NAME" | awk '{print $1}')
     success "隧道 ID：$TUNNEL_ID"
 
     info "🔗 创建 CNAME 记录..."
@@ -176,7 +190,7 @@ authorize_and_create_tunnel() {
         -H "Content-Type: application/json" \
         --data "{\"type\":\"CNAME\",\"name\":\"$SUB_DOMAIN\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
 
-    echo "$CNAME_RESULT" | grep -q '"success":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
+    echo "$CNAME_RESULT" | grep -q '\"success\":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
     show_footer
 }
 
@@ -188,7 +202,7 @@ final_info() {
 }
 
 main() {
-    check_prev_config
+    check_config_and_cert
     get_ip_addresses
     input_info
     create_dns_records
