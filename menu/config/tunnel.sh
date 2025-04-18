@@ -45,7 +45,7 @@ check_config_and_cert() {
         echo -e "${yellow}🔹 检测到已有配置文件：${reset}"
         printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
         printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
-        echo -e "${lightpink}%-12s${reset}" "配置信息："
+        printf "${lightpink}%-12s${reset}" "配置信息："
         cat "$CONFIG_FILE"
         while true; do
             read -p "是否覆盖现有配置文件？(Y/n): " choice
