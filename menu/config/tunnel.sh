@@ -54,6 +54,23 @@ check_config_and_cert() {
             key_len=$(echo -n "$key" | awk '{len=0; for(i=1;i<=length($0);i++){c=substr($0,i,1); len+=c~/[\x00-\x7F]/?1:2} print len}')
             (( key_len > max_len )) && max_len=$key_len
         done < "$CONFIG_FILE"
+        echo
+        read -p "是否删除现有配置并重新设置？(Y/n): " delchoice
+        case "$delchoice" in
+            Y|y)
+                TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+                rm -f "$CONFIG_FILE"
+                [[ -n "$TUNNEL_ID" ]] && rm -f "$VPN_DIR/${TUNNEL_ID}.json"
+                success "已删除旧配置文件及对应隧道 JSON：$TUNNEL_ID"
+                ;;
+            N|n)
+                info "保留现有配置，继续执行"
+                ;;
+            *)
+                info "未选择有效操作，默认保留配置继续执行"
+                ;;
+        esac
+
 
         while IFS= read -r line; do
             line=${line//:/：}
