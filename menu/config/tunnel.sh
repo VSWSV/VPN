@@ -43,13 +43,26 @@ error() {
 check_config_and_cert() {
     if [[ -f "$CONFIG_FILE" ]]; then
         echo -e "${yellow}🔹 检测到已有配置文件：${reset}"
-        printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
-        printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
-        printf "${lightpink}%-12s${reset}\n" "配置信息："
+        printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
+        printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
+        echo -e "${lightpink}配置信息：${reset}"
+        
+        # 预计算最大键长度（中文算2字符）
+        max_len=0
         while IFS= read -r line; do
+            line=${line//:/：}
+            key=$(echo "$line" | awk -F '：' '{print $1}')
+            key_len=$(echo -n "$key" | awk '{len=0; for(i=1;i<=length($0);i++){c=substr($0,i,1); len+=c~/[\x00-\x7F]/?1:2} print len}')
+            (( key_len > max_len )) && max_len=$key_len
+        done < "$CONFIG_FILE"
+        
+        # 重新输出对齐的内容
+        while IFS= read -r line; do
+            line=${line//:/：}
             key=$(echo "$line" | awk -F '：' '{print $1}')
             value=$(echo "$line" | awk -F '：' '{print $2}')
-            printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "$key" "$value"
+            key_len=$(echo -n "$key" | awk '{len=0; for(i=1;i<=length($0);i++){c=substr($0,i,1); len+=c~/[\x00-\x7F]/?1:2} print len}')
+            printf "${lightpink}%-$(($max_len+3))s${reset}${green}%s${reset}\n" "${key}：" "$value"
         done < "$CONFIG_FILE"
     fi
 
@@ -218,13 +231,13 @@ final_info() {
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 
-    # ➕ 自动查找 tunnel 凭证并输出运行命令
+    # 自动查找 tunnel 凭证并输出运行命令
     CREDENTIAL_FILE=$(find ~/.cloudflared -name "${TUNNEL_ID}.json" 2>/dev/null)
     if [[ -f "$CREDENTIAL_FILE" ]]; then
         cp "$CREDENTIAL_FILE" "$VPN_DIR/"
-        success "已保存隧道凭证到：$VPN_DIR/$(basename \"$CREDENTIAL_FILE\")"
+        success "已保存隧道凭证到：$VPN_DIR/$(basename "$CREDENTIAL_FILE")"
         echo -e "${yellow}👉 启动命令如下：${reset}"
-        echo -e "${green}TUNNEL_ORIGIN_CERT=$CERT_FILE $CFD_BIN tunnel run --cred-file $VPN_DIR/$(basename \"$CREDENTIAL_FILE\") $TUNNEL_NAME${reset}"
+        echo -e "${green}TUNNEL_ORIGIN_CERT=$CERT_FILE $CFD_BIN tunnel run --cred-file $VPN_DIR/$(basename "$CREDENTIAL_FILE") $TUNNEL_NAME${reset}"
     else
         error "未找到 ${TUNNEL_ID}.json 凭证文件，请检查 ~/.cloudflared 目录"
     fi
