@@ -223,12 +223,11 @@ authorize_and_create_tunnel() {
     success "隧道 ID：$TUNNEL_ID"
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
 
-if [[ -f "/root/.cloudflared/${TUNNEL_ID}.json" ]]; then
-    mv "/root/.cloudflared/${TUNNEL_ID}.json" "$VPN_DIR/" && \
-    chmod 600 "$VPN_DIR/${TUNNEL_ID}.json" && \
-    success "隧道凭证已保存到：${green}$VPN_DIR/${TUNNEL_ID}.json${reset}"
+if [[ -f /root/.cloudflared/${TUNNEL_ID}.json ]]; then
+    mv /root/.cloudflared/${TUNNEL_ID}.json "$VPN_DIR/${TUNNEL_ID}.json"
+    [[ $? -eq 0 ]] && success "隧道凭证已保存到 ${green}$VPN_DIR/${TUNNEL_ID}.json${reset}" || { error "移动凭证文件失败"; exit 1; }
 else
-    error "凭证文件不存在：/root/.cloudflared/${TUNNEL_ID}.json"
+    error "未找到隧道凭证文件 /root/.cloudflared/${TUNNEL_ID}.json"
     exit 1
 fi
 
