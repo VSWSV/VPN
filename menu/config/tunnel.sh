@@ -180,12 +180,26 @@ create_dns_records() {
 authorize_and_create_tunnel() {
     show_header
     info "🧩 开始 Cloudflare 隧道授权..."
-    TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel login
+    $CFD_BIN tunnel login
     if [[ $? -ne 0 ]]; then
         error "授权失败，请检查 Cloudflared 登录"
         exit 1
     fi
-    success "授权成功"
+
+    if [[ -f /root/.cloudflared/cert.pem ]]; then
+        mv /root/.cloudflared/cert.pem "$CERT_FILE"
+        if [[ $? -eq 0 ]]; then
+            success "已剪贴授权证书到 ${green}$CERT_FILE${reset}"
+        else
+            error "剪贴证书失败，请检查权限或路径"
+            exit 1
+        fi
+    else
+        error "未找到默认授权证书 /root/.cloudflared/cert.pem"
+        exit 1
+    fi
+
+    success "授权成功，使用证书路径：${green}$CERT_FILE${reset}"
 
     TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel create "$TUNNEL_NAME"
     if [[ $? -ne 0 ]]; then
@@ -210,6 +224,7 @@ final_info() {
     show_header
     info "📦 所有步骤已完成，以下为生成的配置信息："
     cat "$CONFIG_FILE"
+    info "📄 当前证书存放路径：${green}$CERT_FILE${reset}"
     show_footer
 }
 
