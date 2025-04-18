@@ -42,8 +42,10 @@ error() {
 
 check_config_and_cert() {
     if [[ -f "$CONFIG_FILE" ]]; then
-        info "检测到已有配置文件：$CONFIG_FILE"
-        info "生成时间：$(stat -c %y $CONFIG_FILE)"
+        echo -e "${yellow}🔹 检测到已有配置文件：${reset}"
+        printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
+        printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "生成时间：" "$(stat -c %y $CONFIG_FILE)"
+        echo -e "${lightpink}%-12s${reset}" "配置信息："
         cat "$CONFIG_FILE"
         while true; do
             read -p "是否覆盖现有配置文件？(Y/n): " choice
@@ -135,13 +137,16 @@ input_info() {
     info "子域名: ${green}$SUB_DOMAIN${reset}"
     info "隧道名称: ${green}$TUNNEL_NAME${reset}"
 
-    echo "CF_EMAIL=$CF_EMAIL" > "$CONFIG_FILE"
-    echo "CF_API_TOKEN=$CF_API_TOKEN" >> "$CONFIG_FILE"
-    echo "CF_ZONE=$CF_ZONE" >> "$CONFIG_FILE"
-    echo "SUB_DOMAIN=$SUB_DOMAIN" >> "$CONFIG_FILE"
-    echo "TUNNEL_NAME=$TUNNEL_NAME" >> "$CONFIG_FILE"
-    echo "IPV4=$IPV4" >> "$CONFIG_FILE"
-    echo "IPV6=$IPV6" >> "$CONFIG_FILE"
+    {
+      echo "账户邮箱：$CF_EMAIL"
+      echo "API令牌：$CF_API_TOKEN"
+      echo "顶级域名：$CF_ZONE"
+      echo "子域前缀：$SUB_DOMAIN"
+      echo "隧道名称：$TUNNEL_NAME"
+      echo "公网 IPv4：$IPV4"
+      echo "公网 IPv6：$IPV6"
+      echo "证书路径：$CERT_FILE"
+    } > "$CONFIG_FILE"
 }
 
 create_dns_records() {
@@ -165,8 +170,8 @@ create_dns_records() {
         -H "Content-Type: application/json" \
         --data "{\"type\":\"AAAA\",\"name\":\"@\",\"content\":\"$IPV6\",\"ttl\":1,\"proxied\":false}")
 
-    echo "$A_RECORD" | grep -q '\"success\":true' && success "A记录创建成功" || error "A记录创建失败"
-    echo "$AAAA_RECORD" | grep -q '\"success\":true' && success "AAAA记录创建成功" || error "AAAA记录创建失败"
+    echo "$A_RECORD" | grep -q '"success":true' && success "A记录创建成功" || error "A记录创建失败"
+    echo "$AAAA_RECORD" | grep -q '"success":true' && success "AAAA记录创建成功" || error "AAAA记录创建失败"
 }
 
 authorize_and_create_tunnel() {
@@ -207,7 +212,7 @@ authorize_and_create_tunnel() {
         -H "Content-Type: application/json" \
         --data "{\"type\":\"CNAME\",\"name\":\"$SUB_DOMAIN\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
 
-    echo "$CNAME_RESULT" | grep -q '\"success\":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
+    echo "$CNAME_RESULT" | grep -q '"success":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
 }
 
 final_info() {
