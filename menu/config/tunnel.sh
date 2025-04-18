@@ -63,21 +63,24 @@ check_config_and_cert() {
             printf "${lightpink}%-$(($max_len+3))s${reset}${green}%s${reset}\n" "${key}：" "$value"
         done < "$CONFIG_FILE"
         echo
-        read -p "是否删除现有配置并重新设置？(Y/n): " delchoice
-        case "$delchoice" in
-            Y|y)
-                TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
-                rm -f "$CONFIG_FILE"
-                [[ -n "$TUNNEL_ID" ]] && rm -f "$VPN_DIR/${TUNNEL_ID}.json"
-                success "已删除旧配置文件及对应隧道 JSON：$TUNNEL_ID"
-                ;;
-            N|n)
-                info "保留现有配置，继续执行"
-                ;;
-            *)
-                info "未选择有效操作，默认保留配置继续执行"
-                ;;
-        esac
+        
+        while true; do
+            read -p "是否删除现有配置并重新设置？(Y/n): " delchoice
+            case "$delchoice" in
+                Y|y)
+                    TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+                    rm -f "$CONFIG_FILE"
+                    [[ -n "$TUNNEL_ID" ]] && rm -f "$VPN_DIR/${TUNNEL_ID}.json"
+                    success "已删除旧配置文件及对应隧道 JSON：$TUNNEL_ID"
+                    break ;;
+                N|n)
+                    info "保留现有配置，继续执行"
+                    break ;;
+                *)
+                    error "无效输入，请输入 Y/y 或 N/n"
+                    ;;
+            esac
+        done
     fi
 
     if [[ -f "$CERT_FILE" ]]; then
@@ -92,7 +95,9 @@ check_config_and_cert() {
                 N|n)
                     info "保留旧证书，继续执行"
                     break ;;
-                *) error "无效输入，请输入 Y/y 或 N/n。" ;;
+                *) 
+                    error "无效输入，请输入 Y/y 或 N/n"
+                    ;;
             esac
         done
     fi
