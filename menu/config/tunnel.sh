@@ -219,6 +219,7 @@ authorize_and_create_tunnel() {
     echo "$CNAME_RESULT" | grep -q '"success":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
 }
 
+
 final_info() {
     info "📦 所有步骤已完成，以下为生成的配置信息："
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
@@ -231,17 +232,26 @@ final_info() {
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 
-    # 自动查找 tunnel 凭证并输出运行命令
-    CREDENTIAL_FILE=$(find ~/.cloudflared -name "${TUNNEL_ID}.json" 2>/dev/null)
+    # 改进的凭证文件查找逻辑
+    CREDENTIAL_FILE=$(find /root/.cloudflared -name "*.json" -print -quit 2>/dev/null)
+    if [[ -z "$CREDENTIAL_FILE" ]]; then
+        CREDENTIAL_FILE=$(find ~/.cloudflared -name "*.json" -print -quit 2>/dev/null)
+    fi
+
     if [[ -f "$CREDENTIAL_FILE" ]]; then
         cp "$CREDENTIAL_FILE" "$VPN_DIR/"
-        success "已保存隧道凭证到：$VPN_DIR/$(basename "$CREDENTIAL_FILE")"
+        JSON_FILE="$VPN_DIR/$(basename "$CREDENTIAL_FILE")"
+        success "已保存隧道凭证到：${green}$JSON_FILE${reset}"
         echo -e "${yellow}👉 启动命令如下：${reset}"
-        echo -e "${green}TUNNEL_ORIGIN_CERT=$CERT_FILE $CFD_BIN tunnel run --cred-file $VPN_DIR/$(basename "$CREDENTIAL_FILE") $TUNNEL_NAME${reset}"
+        echo -e "${green}TUNNEL_ORIGIN_CERT=$CERT_FILE $CFD_BIN tunnel run --cred-file $JSON_FILE $TUNNEL_NAME${reset}"
     else
-        error "未找到 ${TUNNEL_ID}.json 凭证文件，请检查 ~/.cloudflared 目录"
+        error "未找到隧道凭证文件，请手动检查以下位置："
+        echo -e "${yellow}1. /root/.cloudflared/"
+        echo -e "2. ~/.cloudflared/${reset}"
+        echo -e "\n${lightpink}Cloudflared 通常会自动保存凭证文件，请检查上述目录是否存在 .json 文件${reset}"
     fi
 }
+
 
 main() {
     clear
