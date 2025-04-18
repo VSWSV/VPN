@@ -47,7 +47,6 @@ check_config_and_cert() {
         printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
         echo -e "${lightpink}配置信息：${reset}"
         
-        # 预计算最大键长度（中文算2字符）
         max_len=0
         while IFS= read -r line; do
             line=${line//:/：}
@@ -56,7 +55,6 @@ check_config_and_cert() {
             (( key_len > max_len )) && max_len=$key_len
         done < "$CONFIG_FILE"
         
-        # 重新输出对齐的内容
         while IFS= read -r line; do
             line=${line//:/：}
             key=$(echo "$line" | awk -F '：' '{print $1}')
@@ -210,6 +208,16 @@ authorize_and_create_tunnel() {
     success "隧道 ID：$TUNNEL_ID"
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
 
+    # 显式移动凭证文件到 VPN_DIR
+    CREDENTIAL_FILE=$(find /root/.cloudflared -name "${TUNNEL_ID}.json" 2>/dev/null)
+    if [[ -f "$CREDENTIAL_FILE" ]]; then
+        mv "$CREDENTIAL_FILE" "$VPN_DIR/"
+        success "隧道凭证已保存到 ${green}$VPN_DIR/${TUNNEL_ID}.json${reset}"
+    else
+        error "未找到隧道凭证文件 ${TUNNEL_ID}.json"
+        exit 1
+    fi
+
     info "🔗 创建 CNAME 记录..."
     CNAME_RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
@@ -218,7 +226,6 @@ authorize_and_create_tunnel() {
 
     echo "$CNAME_RESULT" | grep -q '"success":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
 }
-
 
 final_info() {
     info "📦 所有步骤已完成，以下为生成的配置信息："
@@ -232,26 +239,16 @@ final_info() {
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 
-    # 改进的凭证文件查找逻辑
-    CREDENTIAL_FILE=$(find /root/.cloudflared -name "*.json" -print -quit 2>/dev/null)
-    if [[ -z "$CREDENTIAL_FILE" ]]; then
-        CREDENTIAL_FILE=$(find ~/.cloudflared -name "*.json" -print -quit 2>/dev/null)
-    fi
-
-    if [[ -f "$CREDENTIAL_FILE" ]]; then
-        cp "$CREDENTIAL_FILE" "$VPN_DIR/"
-        JSON_FILE="$VPN_DIR/$(basename "$CREDENTIAL_FILE")"
-        success "已保存隧道凭证到：${green}$JSON_FILE${reset}"
+    # 直接检查 VPN_DIR 中的凭证文件
+    JSON_FILE="$VPN_DIR/${TUNNEL_ID}.json"
+    if [[ -f "$JSON_FILE" ]]; then
+        success "隧道凭证文件已位于：${green}$JSON_FILE${reset}"
         echo -e "${yellow}👉 启动命令如下：${reset}"
         echo -e "${green}TUNNEL_ORIGIN_CERT=$CERT_FILE $CFD_BIN tunnel run --cred-file $JSON_FILE $TUNNEL_NAME${reset}"
     else
-        error "未找到隧道凭证文件，请手动检查以下位置："
-        echo -e "${yellow}1. /root/.cloudflared/"
-        echo -e "2. ~/.cloudflared/${reset}"
-        echo -e "\n${lightpink}Cloudflared 通常会自动保存凭证文件，请检查上述目录是否存在 .json 文件${reset}"
+        error "未找到隧道凭证文件 ${TUNNEL_ID}.json，请检查目录：${green}$VPN_DIR${reset}"
     fi
 }
-
 
 main() {
     clear
