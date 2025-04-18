@@ -46,7 +46,7 @@ check_config_and_cert() {
         printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
         printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
         echo -e "${lightpink}配置信息：${reset}"
-        
+
         max_len=0
         while IFS= read -r line; do
             line=${line//:/：}
@@ -54,7 +54,7 @@ check_config_and_cert() {
             key_len=$(echo -n "$key" | awk '{len=0; for(i=1;i<=length($0);i++){c=substr($0,i,1); len+=c~/[\x00-\x7F]/?1:2} print len}')
             (( key_len > max_len )) && max_len=$key_len
         done < "$CONFIG_FILE"
-        
+
         while IFS= read -r line; do
             line=${line//:/：}
             key=$(echo "$line" | awk -F '：' '{print $1}')
@@ -185,12 +185,7 @@ authorize_and_create_tunnel() {
 
     if [[ -f /root/.cloudflared/cert.pem ]]; then
         mv /root/.cloudflared/cert.pem "$CERT_FILE"
-        if [[ $? -eq 0 ]]; then
-            success "已剪贴授权证书到 ${green}$CERT_FILE${reset}"
-        else
-            error "剪贴证书失败，请检查权限或路径"
-            exit 1
-        fi
+        [[ $? -eq 0 ]] && success "已剪贴授权证书到 ${green}$CERT_FILE${reset}" || { error "剪贴证书失败"; exit 1; }
     else
         error "未找到默认授权证书 /root/.cloudflared/cert.pem"
         exit 1
@@ -198,17 +193,16 @@ authorize_and_create_tunnel() {
 
     success "授权成功，使用证书路径：${green}$CERT_FILE${reset}"
 
-    TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel create "$TUNNEL_NAME"
-    if [[ $? -ne 0 ]]; then
-        error "隧道创建失败"
-        exit 1
-    fi
+    TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel create "$TUNNEL_NAME" || { error "隧道创建失败"; exit 1; }
 
-    TUNNEL_ID=$(TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel list | grep "$TUNNEL_NAME" | awk '{print $1}')
+    # ✅ 修复点：使用精确匹配方式提取 TUNNEL_ID
+    TUNNEL_ID=$(TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel list | awk -v name="$TUNNEL_NAME" '$2 == name {print $1}')
+    echo "DEBUG: TUNNEL_ID=$TUNNEL_ID"
+    [[ -z "$TUNNEL_ID" ]] && { error "未正确获取到隧道 ID，请检查 tunnel list 输出"; exit 1; }
+
     success "隧道 ID：$TUNNEL_ID"
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
 
-    # 显式移动凭证文件到 VPN_DIR
     CREDENTIAL_FILE=$(find /root/.cloudflared -name "${TUNNEL_ID}.json" 2>/dev/null)
     if [[ -f "$CREDENTIAL_FILE" ]]; then
         mv "$CREDENTIAL_FILE" "$VPN_DIR/"
@@ -223,7 +217,6 @@ authorize_and_create_tunnel() {
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" \
         --data "{\"type\":\"CNAME\",\"name\":\"$SUB_DOMAIN\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
-
     echo "$CNAME_RESULT" | grep -q '"success":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
 }
 
@@ -239,7 +232,6 @@ final_info() {
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 
-    # 直接检查 VPN_DIR 中的凭证文件
     JSON_FILE="$VPN_DIR/${TUNNEL_ID}.json"
     if [[ -f "$JSON_FILE" ]]; then
         success "隧道凭证文件已位于：${green}$JSON_FILE${reset}"
