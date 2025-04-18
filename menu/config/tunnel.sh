@@ -103,13 +103,13 @@ input_info() {
     done
 
     while true; do
-        read -p "🌐 顶级域名 (如 example.com): " CF_ZONE
+        read -p "🌐 顶级域名: (如 xiaomi.com): " CF_ZONE
         info "输入为：${green}$CF_ZONE${reset}"
         validate_domain "$CF_ZONE" && break || error "顶级域名格式无效，请重新输入。"
     done
 
     while true; do
-        read -p "🔖 子域名前缀 (如 node1): " SUB_DOMAIN
+        read -p "🔖 子域名前缀: (如 www ): " SUB_DOMAIN
         info "输入为：${green}$SUB_DOMAIN${reset}"
         [[ "$SUB_DOMAIN" =~ ^[a-zA-Z0-9-]+$ ]] && break || error "子域名前缀无效，只能包含字母、数字和连字符。"
     done
