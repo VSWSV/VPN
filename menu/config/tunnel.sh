@@ -46,11 +46,10 @@ check_config_and_cert() {
         printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
         printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
         printf "${lightpink}%-12s${reset}\n" "配置信息："
-        while IFS= read -r line; do
-            key=$(echo "$line" | cut -d'：' -f1)
-            value=$(echo "$line" | cut -d'：' -f2-)
-            printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "$key" "$value"
-        done < "$CONFIG_FILE"
+    while IFS= read -r line; do
+        key=$(echo "$line" | awk -F '：' '{print $1}')
+        value=$(echo "$line" | awk -F '：' '{print $2}')
+        printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "$key" "$value"
         while true; do
             read -p "是否覆盖现有配置文件？(Y/n): " choice
             case "$choice" in
