@@ -54,27 +54,6 @@ check_config_and_cert() {
             key_len=$(echo -n "$key" | awk '{len=0; for(i=1;i<=length($0);i++){c=substr($0,i,1); len+=c~/[\x00-\x7F]/?1:2} print len}')
             (( key_len > max_len )) && max_len=$key_len
         done < "$CONFIG_FILE"
-        echo -e "${yellow}🔹 检测到已有配置文件：${reset}"
-        printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
-        printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
-        echo -e "${lightpink}配置信息：${reset}"
-
-        max_len=0
-        while IFS= read -r line; do
-            line=${line//:/：}
-            key=$(echo "$line" | awk -F '：' '{print $1}')
-            key_len=$(echo -n "$key" | awk '{len=0; for(i=1;i<=length($0);i++){c=substr($0,i,1); len+=c~/[\x00-\x7F]/?1:2} print len}')
-            (( key_len > max_len )) && max_len=$key_len
-        done < "$CONFIG_FILE"
-
-        while IFS= read -r line; do
-            line=${line//:/：}
-            key=$(echo "$line" | awk -F '：' '{print $1}')
-            value=$(echo "$line" | awk -F '：' '{print $2}')
-            key_len=$(echo -n "$key" | awk '{len=0; for(i=1;i<=length($0);i++){c=substr($0,i,1); len+=c~/[\x00-\x7F]/?1:2} print len}')
-            printf "${lightpink}%-$(($max_len+3))s${reset}${green}%s${reset}\n" "${key}：" "$value"
-        done < "$CONFIG_FILE"
-
         echo
         read -p "是否删除现有配置并重新设置？(Y/n): " delchoice
         case "$delchoice" in
@@ -100,6 +79,23 @@ check_config_and_cert() {
             key_len=$(echo -n "$key" | awk '{len=0; for(i=1;i<=length($0);i++){c=substr($0,i,1); len+=c~/[\x00-\x7F]/?1:2} print len}')
             printf "${lightpink}%-$(($max_len+3))s${reset}${green}%s${reset}\n" "${key}：" "$value"
         done < "$CONFIG_FILE"
+        echo
+        read -p "是否删除现有配置并重新设置？(Y/n): " delchoice
+        case "$delchoice" in
+            Y|y)
+                TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+                rm -f "$CONFIG_FILE"
+                [[ -n "$TUNNEL_ID" ]] && rm -f "$VPN_DIR/${TUNNEL_ID}.json"
+                success "已删除旧配置文件及对应隧道 JSON：$TUNNEL_ID"
+                ;;
+            N|n)
+                info "保留现有配置，继续执行"
+                ;;
+            *)
+                info "未选择有效操作，默认保留配置继续执行"
+                ;;
+        esac
+
     fi
 
     if [[ -f "$CERT_FILE" ]]; then
