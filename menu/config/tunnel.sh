@@ -135,14 +135,14 @@ input_info() {
     info "子域名: ${green}$SUB_DOMAIN${reset}"
     info "隧道名称: ${green}$TUNNEL_NAME${reset}"
 
-    echo "CF_EMAIL=$CF_EMAIL" > "$CONFIG_FILE"
-    echo "CF_API_TOKEN=$CF_API_TOKEN" >> "$CONFIG_FILE"
-    echo "CF_ZONE=$CF_ZONE" >> "$CONFIG_FILE"
-    echo "SUB_DOMAIN=$SUB_DOMAIN" >> "$CONFIG_FILE"
-    echo "TUNNEL_NAME=$TUNNEL_NAME" >> "$CONFIG_FILE"
-    echo "IPV4=$IPV4" >> "$CONFIG_FILE"
-    echo "IPV6=$IPV6" >> "$CONFIG_FILE"
-}
+    printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "账户邮箱：" "$CF_EMAIL"
+    printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "API令牌：" "$CF_API_TOKEN"
+    printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "顶级域名：" "$CF_ZONE"
+    printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "子域前缀：" "$SUB_DOMAIN"
+    printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "隧道名称：" "$TUNNEL_NAME"
+    printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "公网 IPv4：" "$IPV4"
+    printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "公网 IPv6：" "$IPV6"
+} > "$CONFIG_FILE"
 
 create_dns_records() {
     info "📡 开始创建 DNS 记录..."
