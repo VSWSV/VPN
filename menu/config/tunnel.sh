@@ -202,7 +202,6 @@ authorize_and_create_tunnel() {
     success "隧道 ID：$TUNNEL_ID"
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
 
-    # ✅ 增强：检查 mv 是否成功，赋予权限
     if mv "/root/.cloudflared/${TUNNEL_ID}.json" "$VPN_DIR/"; then
         chmod 777 "$VPN_DIR/${TUNNEL_ID}.json"
         success "隧道凭证已保存并赋权到：${green}$VPN_DIR/${TUNNEL_ID}.json${reset}"
