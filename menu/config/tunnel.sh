@@ -223,13 +223,14 @@ authorize_and_create_tunnel() {
     success "隧道 ID：$TUNNEL_ID"
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
 
-    if mv "/root/.cloudflared/${TUNNEL_ID}.json" "$VPN_DIR/"; then
-        chmod 777 "$VPN_DIR/${TUNNEL_ID}.json"
-        success "隧道凭证已保存并赋权到：${green}$VPN_DIR/${TUNNEL_ID}.json${reset}"
-    else
-        error "移动凭证文件失败，请检查权限或路径"
-        exit 1
-    fi
+if [[ -f "/root/.cloudflared/${TUNNEL_ID}.json" ]]; then
+    mv "/root/.cloudflared/${TUNNEL_ID}.json" "$VPN_DIR/" && \
+    chmod 600 "$VPN_DIR/${TUNNEL_ID}.json" && \
+    success "隧道凭证已保存到：${green}$VPN_DIR/${TUNNEL_ID}.json${reset}"
+else
+    error "凭证文件不存在：/root/.cloudflared/${TUNNEL_ID}.json"
+    exit 1
+fi
 
     info "🔗 创建 CNAME 记录..."
     CNAME_RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
