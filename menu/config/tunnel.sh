@@ -195,7 +195,6 @@ authorize_and_create_tunnel() {
 
     TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel create "$TUNNEL_NAME" || { error "隧道创建失败"; exit 1; }
 
-    # ✅ 修复点：使用精确匹配方式提取 TUNNEL_ID
     TUNNEL_ID=$(TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel list | awk -v name="$TUNNEL_NAME" '$2 == name {print $1}')
     echo "DEBUG: TUNNEL_ID=$TUNNEL_ID"
     [[ -z "$TUNNEL_ID" ]] && { error "未正确获取到隧道 ID，请检查 tunnel list 输出"; exit 1; }
@@ -203,12 +202,12 @@ authorize_and_create_tunnel() {
     success "隧道 ID：$TUNNEL_ID"
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
 
-    CREDENTIAL_FILE=$(find /root/.cloudflared -name "${TUNNEL_ID}.json" 2>/dev/null)
-    if [[ -f "$CREDENTIAL_FILE" ]]; then
-        mv "$CREDENTIAL_FILE" "$VPN_DIR/"
-        success "隧道凭证已保存到 ${green}$VPN_DIR/${TUNNEL_ID}.json${reset}"
+    # ✅ 增强：检查 mv 是否成功，赋予权限
+    if mv "$CREDENTIAL_FILE" "$VPN_DIR/${TUNNEL_ID}.json"; then
+        chmod 777 "$VPN_DIR/${TUNNEL_ID}.json"
+        success "隧道凭证已保存并赋权到：${green}$VPN_DIR/${TUNNEL_ID}.json${reset}"
     else
-        error "未找到隧道凭证文件 ${TUNNEL_ID}.json"
+        error "移动凭证文件失败，请检查权限或路径"
         exit 1
     fi
 
