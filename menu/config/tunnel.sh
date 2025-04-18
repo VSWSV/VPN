@@ -174,7 +174,7 @@ authorize_and_create_tunnel() {
     CNAME_RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" \
-        --data '{"type":"CNAME","name":"'"$SUB_DOMAIN"'","content":"'"$TUNNEL_ID'.cfargotunnel.com'" ,"ttl":1,"proxied":true}')
+        --data "{\"type\":\"CNAME\",\"name\":\"$SUB_DOMAIN\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
 
     echo "$CNAME_RESULT" | grep -q '"success":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
     show_footer
