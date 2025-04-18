@@ -44,9 +44,11 @@ check_config_and_cert() {
     if [[ -f "$CONFIG_FILE" ]]; then
         echo -e "${yellow}🔹 检测到已有配置文件：${reset}"
         printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
-        printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "生成时间：" "$(stat -c %y $CONFIG_FILE)"
+        printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "生成时间：" "$(stat -c '%y' "$CONFIG_FILE" | cut -d'.' -f1)"
         echo -e "${lightpink}%-12s${reset}" "配置信息："
-        cat "$CONFIG_FILE"
+        while IFS='：' read -r key value; do
+            [[ -n "$key" ]] && printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "$key：" "$value"
+        done < "$CONFIG_FILE"
         while true; do
             read -p "是否覆盖现有配置文件？(Y/n): " choice
             case "$choice" in
@@ -206,6 +208,8 @@ authorize_and_create_tunnel() {
     TUNNEL_ID=$(TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel list | grep "$TUNNEL_NAME" | awk '{print $1}')
     success "隧道 ID：$TUNNEL_ID"
 
+    echo "隧道 ID：$TUNNEL_ID" >> "$CONFIG_FILE"
+
     info "🔗 创建 CNAME 记录..."
     CNAME_RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
@@ -217,14 +221,9 @@ authorize_and_create_tunnel() {
 
 final_info() {
     info "📦 所有步骤已完成，以下为生成的配置信息："
-    echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
-    echo -e "${lightpink}API 令牌：${green}$CF_API_TOKEN${reset}"
-    echo -e "${lightpink}顶级域名：${green}$CF_ZONE${reset}"
-    echo -e "${lightpink}子域名前缀：${green}$SUB_DOMAIN${reset}"
-    echo -e "${lightpink}隧道名称：${green}$TUNNEL_NAME${reset}"
-    echo -e "${lightpink}公网 IPv4：${green}$IPV4${reset}"
-    echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
-    echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
+    while IFS='：' read -r key value; do
+        [[ -n "$key" ]] && printf "${lightpink}%-12s${reset}${green}%s${reset}\n" "$key：" "$value"
+    done < "$CONFIG_FILE"
 }
 
 main() {
