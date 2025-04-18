@@ -4,6 +4,7 @@ cyan='\033[1;36m'
 yellow='\033[1;33m'
 orange='\033[38;5;208m'
 lightpink='\033[38;5;218m'
+green='\033[1;32m'
 reset='\033[0m'
 
 VPN_DIR="/root/VPN"
@@ -46,26 +47,37 @@ check_config_and_cert() {
         info "检测到已有配置文件：$CONFIG_FILE"
         info "生成时间：$(stat -c %y $CONFIG_FILE)"
         cat "$CONFIG_FILE"
-        read -p "是否覆盖现有配置文件？(Y/n): " choice
-        if [[ $choice == [Yy] ]]; then
-            info "删除旧配置..."
-            rm -f "$CONFIG_FILE"
-        else
-            info "保留旧配置，返回菜单"
-            bash "$VPN_DIR/menu/config_node.sh"
-            exit 0
-        fi
+        while true; do
+            read -p "是否覆盖现有配置文件？(Y/n): " choice
+            case "$choice" in
+                Y|y)
+                    info "删除旧配置..."
+                    rm -f "$CONFIG_FILE"
+                    break ;;
+                N|n)
+                    info "保留旧配置，返回菜单"
+                    bash "$VPN_DIR/menu/config_node.sh"
+                    exit 0 ;;
+                *) error "无效输入，请输入 Y/y 或 N/n。" ;;
+            esac
+        done
     fi
 
     if [[ -f "$CERT_FILE" ]]; then
         info "检测到残留的 Cloudflare 授权证书：$CERT_FILE"
-        read -p "是否删除旧证书？(Y/n): " certchoice
-        if [[ $certchoice == [Yy] ]]; then
-            rm -f "$CERT_FILE"
-            success "已删除旧 Cloudflare 授权证书"
-        else
-            info "保留旧证书，继续执行"
-        fi
+        while true; do
+            read -p "是否删除旧证书？(Y/n): " certchoice
+            case "$certchoice" in
+                Y|y)
+                    rm -f "$CERT_FILE"
+                    success "已删除旧 Cloudflare 授权证书"
+                    break ;;
+                N|n)
+                    info "保留旧证书，继续执行"
+                    break ;;
+                *) error "无效输入，请输入 Y/y 或 N/n。" ;;
+            esac
+        done
     fi
 
     show_footer
@@ -75,8 +87,8 @@ get_ip_addresses() {
     IPV4=$(curl -s4 ifconfig.co)
     IPV6=$(curl -s6 ifconfig.co)
 
-    info "📶 当前公网 IPv4：$IPV4"
-    info "📶 当前公网 IPv6：$IPV6"
+    info "📶 当前公网 IPv4：${green}$IPV4${reset}"
+    info "📶 当前公网 IPv6：${green}$IPV6${reset}"
 }
 
 validate_email() {
@@ -93,40 +105,40 @@ input_info() {
 
     while true; do
         read -p "📧 账户邮箱: " CF_EMAIL
-        info "输入为：$CF_EMAIL"
+        info "输入为：${green}$CF_EMAIL${reset}"
         validate_email "$CF_EMAIL" && break || error "邮箱格式无效，请重新输入。"
     done
 
     while true; do
         read -p "🔑 API 令牌: " CF_API_TOKEN
-        info "输入为：$CF_API_TOKEN"
+        info "输入为：${green}$CF_API_TOKEN${reset}"
         [[ -n "$CF_API_TOKEN" ]] && break || error "API 令牌不能为空，请重新输入。"
     done
 
     while true; do
         read -p "🌐 顶级域名 (如 example.com): " CF_ZONE
-        info "输入为：$CF_ZONE"
+        info "输入为：${green}$CF_ZONE${reset}"
         validate_domain "$CF_ZONE" && break || error "顶级域名格式无效，请重新输入。"
     done
 
     while true; do
         read -p "🔖 子域名前缀 (如 node1): " SUB_DOMAIN
-        info "输入为：$SUB_DOMAIN"
+        info "输入为：${green}$SUB_DOMAIN${reset}"
         [[ "$SUB_DOMAIN" =~ ^[a-zA-Z0-9-]+$ ]] && break || error "子域名前缀无效，只能包含字母、数字和连字符。"
     done
 
     while true; do
         read -p "🚇 隧道名称: " TUNNEL_NAME
-        info "输入为：$TUNNEL_NAME"
+        info "输入为：${green}$TUNNEL_NAME${reset}"
         [[ "$TUNNEL_NAME" =~ ^[a-zA-Z0-9_-]+$ ]] && break || error "隧道名称无效，只能包含字母、数字、下划线或连字符。"
     done
 
     info "📋 配置信息确认："
-    info "账户邮箱: $CF_EMAIL"
-    info "API Token: $CF_API_TOKEN"
-    info "顶级域名: $CF_ZONE"
-    info "子域名: $SUB_DOMAIN"
-    info "隧道名称: $TUNNEL_NAME"
+    info "账户邮箱: ${green}$CF_EMAIL${reset}"
+    info "API Token: ${green}$CF_API_TOKEN${reset}"
+    info "顶级域名: ${green}$CF_ZONE${reset}"
+    info "子域名: ${green}$SUB_DOMAIN${reset}"
+    info "隧道名称: ${green}$TUNNEL_NAME${reset}"
 
     echo "CF_EMAIL=$CF_EMAIL" > "$CONFIG_FILE"
     echo "CF_API_TOKEN=$CF_API_TOKEN" >> "$CONFIG_FILE"
@@ -168,20 +180,20 @@ create_dns_records() {
 authorize_and_create_tunnel() {
     show_header
     info "🧩 开始 Cloudflare 隧道授权..."
-    $CFD_BIN tunnel login --origincert "$CERT_FILE"
+    TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel login
     if [[ $? -ne 0 ]]; then
         error "授权失败，请检查 Cloudflared 登录"
         exit 1
     fi
     success "授权成功"
 
-    $CFD_BIN tunnel create "$TUNNEL_NAME" --origincert "$CERT_FILE"
+    TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel create "$TUNNEL_NAME"
     if [[ $? -ne 0 ]]; then
         error "隧道创建失败"
         exit 1
     fi
 
-    TUNNEL_ID=$($CFD_BIN tunnel list --origincert "$CERT_FILE" | grep "$TUNNEL_NAME" | awk '{print $1}')
+    TUNNEL_ID=$(TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel list | grep "$TUNNEL_NAME" | awk '{print $1}')
     success "隧道 ID：$TUNNEL_ID"
 
     info "🔗 创建 CNAME 记录..."
