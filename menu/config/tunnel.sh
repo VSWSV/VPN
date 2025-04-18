@@ -19,8 +19,9 @@ CONFIG_DIR="$VPN_DIR"
 CONFIG_FILE="$CONFIG_DIR/config_info.txt"
 
 show_header() {
+    local title="$1"
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
-    printf "${orange}%*s配置隧道 - DNS%*s\n" $(( (83 - 18) / 2 )) "" $(( (83 - 18 + 1) / 2 )) ""
+    printf "${orange}%*s${title}%*s\n" $(( (83 - ${#title}) / 2 )) "" $(( (83 - ${#title} + 1) / 2 )) ""
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -41,7 +42,7 @@ error() {
 }
 
 check_config_and_cert() {
-    show_header
+    show_header "检查配置信息"
 
     if [[ -f "$CONFIG_FILE" ]]; then
         info "检测到已有配置文件：$CONFIG_FILE"
@@ -84,11 +85,13 @@ check_config_and_cert() {
 }
 
 get_ip_addresses() {
+    show_header "获取公网 IP"
     IPV4=$(curl -s4 ifconfig.co)
     IPV6=$(curl -s6 ifconfig.co)
 
     info "📶 当前公网 IPv4：${green}$IPV4${reset}"
     info "📶 当前公网 IPv6：${green}$IPV6${reset}"
+    show_footer
 }
 
 validate_email() {
@@ -100,7 +103,8 @@ validate_domain() {
 }
 
 input_info() {
-    show_header
+    show_header "输入 Cloudflare 配置"
+
     info "📝 请输入 Cloudflare 配置信息："
 
     while true; do
@@ -151,7 +155,7 @@ input_info() {
 }
 
 create_dns_records() {
-    show_header
+    show_header "创建 DNS 记录"
     info "📡 开始创建 DNS 记录..."
     ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CF_ZONE" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
@@ -178,7 +182,7 @@ create_dns_records() {
 }
 
 authorize_and_create_tunnel() {
-    show_header
+    show_header "Cloudflare 隧道授权"
     info "🧩 开始 Cloudflare 隧道授权..."
     $CFD_BIN tunnel login
     if [[ $? -ne 0 ]]; then
@@ -221,7 +225,7 @@ authorize_and_create_tunnel() {
 }
 
 final_info() {
-    show_header
+    show_header "最终配置信息"
     info "📦 所有步骤已完成，以下为生成的配置信息："
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
     echo -e "${lightpink}API 令牌：${green}$CF_API_TOKEN${reset}"
