@@ -217,7 +217,6 @@ final_info() {
     echo -e "${lightpink}公网 IPv4：${green}$IPV4${reset}"
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
-}
 
     # ➕ 自动查找 tunnel 凭证并输出运行命令
     CREDENTIAL_FILE=$(find ~/.cloudflared -name "${TUNNEL_ID}.json" 2>/dev/null)
@@ -229,6 +228,7 @@ final_info() {
     else
         error "未找到 ${TUNNEL_ID}.json 凭证文件，请检查 ~/.cloudflared 目录"
     fi
+}
 
 main() {
     clear
