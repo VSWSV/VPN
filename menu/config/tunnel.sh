@@ -223,12 +223,19 @@ authorize_and_create_tunnel() {
 final_info() {
     show_header
     info "📦 所有步骤已完成，以下为生成的配置信息："
-    cat "$CONFIG_FILE"
-    info "📄 当前证书存放路径：${green}$CERT_FILE${reset}"
+    echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
+    echo -e "${lightpink}API 令牌：${green}$CF_API_TOKEN${reset}"
+    echo -e "${lightpink}顶级域名：${green}$CF_ZONE${reset}"
+    echo -e "${lightpink}子域名前缀：${green}$SUB_DOMAIN${reset}"
+    echo -e "${lightpink}隧道名称：${green}$TUNNEL_NAME${reset}"
+    echo -e "${lightpink}公网 IPv4：${green}$IPV4${reset}"
+    echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
+    echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
     show_footer
 }
 
 main() {
+    clear
     check_config_and_cert
     get_ip_addresses
     input_info
@@ -236,6 +243,8 @@ main() {
     authorize_and_create_tunnel
     final_info
     chmod +x "$0"
+    read -p "按回车键返回主菜单..." dummy
+    bash "$VPN_DIR/menu/config_node.sh"
 }
 
 main
