@@ -5,6 +5,7 @@ yellow='\033[1;33m'
 orange='\033[38;5;208m'
 lightpink='\033[38;5;218m'
 green='\033[1;32m'
+red='\033[1;31m'
 reset='\033[0m'
 
 # 路径配置
@@ -32,7 +33,7 @@ success() {
 }
 
 error() {
-    echo -e "\033[1;31m❌ $1${reset}"
+    echo -e "${red}❌ $1${reset}"
 }
 
 validate_email() {
@@ -71,7 +72,7 @@ check_config_and_cert() {
         echo
         
         while true; do
-            read -p "是否删除现有配置并重新设置？(Y/n): " delchoice
+            read -p "$(echo -e "${yellow}是否删除现有配置并重新设置？(Y/n): ${reset}")" delchoice
             case "$delchoice" in
                 Y|y)
                     TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
@@ -92,7 +93,7 @@ check_config_and_cert() {
     if [[ -f "$CERT_FILE" ]]; then
         info "检测到残留的 Cloudflare 授权证书：$CERT_FILE"
         while true; do
-            read -p "是否删除旧证书？(Y/n): " certchoice
+            read -p "$(echo -e "${yellow}是否删除旧证书？(Y/n): ${reset}")" certchoice
             case "$certchoice" in
                 Y|y)
                     rm -f "$CERT_FILE"
@@ -119,7 +120,7 @@ get_ip_addresses() {
 
 input_info() {
     if [[ -f "$CONFIG_FILE" ]]; then
-        info "📝 正在读取现有配置（可直接按回车使用当前值）："
+        info "📝 正在读取现有配置（绿色为当前值，直接回车即可保留）："
         
         CURRENT_CF_EMAIL=$(grep "账户邮箱：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_CF_API_TOKEN=$(grep "API令牌：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
@@ -127,45 +128,66 @@ input_info() {
         CURRENT_SUB_DOMAIN=$(grep "子域前缀：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_TUNNEL_NAME=$(grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+        
+        # 带颜色提示函数（有默认值）
+        prompt_default() {
+            echo -ne "${yellow}$1 [${green}$2${yellow}]: ${reset}"
+        }
     else
         info "📝 请输入 Cloudflare 配置信息："
+        
+        # 普通提示函数（无默认值）
+        prompt_default() {
+            echo -ne "${yellow}$1: ${reset}"
+        }
     fi
 
+    # 邮箱输入
     while true; do
-        read -p "📧 账户邮箱 [${green}${CURRENT_CF_EMAIL:-无}${reset}]: " CF_EMAIL
+        prompt_default "📧 账户邮箱" "${CURRENT_CF_EMAIL:-}"
+        read -r CF_EMAIL
         CF_EMAIL=${CF_EMAIL:-$CURRENT_CF_EMAIL}
         info "输入为：${green}$CF_EMAIL${reset}"
         validate_email "$CF_EMAIL" && break || error "邮箱格式无效，请重新输入。"
     done
 
+    # API令牌输入
     while true; do
-        read -p "🔑 API 令牌 [${green}${CURRENT_CF_API_TOKEN:-无}${reset}]: " CF_API_TOKEN
+        prompt_default "🔑 API 令牌" "${CURRENT_CF_API_TOKEN:-}"
+        read -r CF_API_TOKEN
         CF_API_TOKEN=${CF_API_TOKEN:-$CURRENT_CF_API_TOKEN}
         info "输入为：${green}$CF_API_TOKEN${reset}"
         [[ -n "$CF_API_TOKEN" ]] && break || error "API 令牌不能为空，请重新输入。"
     done
 
+    # 域名输入
     while true; do
-        read -p "🌐 顶级域名 [${green}${CURRENT_CF_ZONE:-无}${reset}]: " CF_ZONE
+        prompt_default "🌐 顶级域名" "${CURRENT_CF_ZONE:-}"
+        read -r CF_ZONE
         CF_ZONE=${CF_ZONE:-$CURRENT_CF_ZONE}
         info "输入为：${green}$CF_ZONE${reset}"
         validate_domain "$CF_ZONE" && break || error "顶级域名格式无效，请重新输入。"
     done
 
+    # 子域名输入
     while true; do
-        read -p "🔖 子域名前缀 [${green}${CURRENT_SUB_DOMAIN:-无}${reset}]: " SUB_DOMAIN
+        prompt_default "🔖 子域名前缀" "${CURRENT_SUB_DOMAIN:-}"
+        read -r SUB_DOMAIN
         SUB_DOMAIN=${SUB_DOMAIN:-$CURRENT_SUB_DOMAIN}
         info "输入为：${green}$SUB_DOMAIN${reset}"
         [[ "$SUB_DOMAIN" =~ ^[a-zA-Z0-9-]+$ ]] && break || error "子域名前缀无效，只能包含字母、数字和连字符。"
     done
 
+    # 隧道名称输入
     while true; do
-        read -p "🚇 隧道名称 [${green}${CURRENT_TUNNEL_NAME:-无}${reset}]: " TUNNEL_NAME
+        prompt_default "🚇 隧道名称" "${CURRENT_TUNNEL_NAME:-}"
+        read -r TUNNEL_NAME
         TUNNEL_NAME=${TUNNEL_NAME:-$CURRENT_TUNNEL_NAME}
         info "输入为：${green}$TUNNEL_NAME${reset}"
         [[ "$TUNNEL_NAME" =~ ^[a-zA-Z0-9_-]+$ ]] && break || error "隧道名称无效，只能包含字母、数字、下划线或连字符。"
     done
 
+    # 信息确认
     info "📋 配置信息确认："
     info "账户邮箱: ${green}$CF_EMAIL${reset}"
     info "API Token: ${green}$CF_API_TOKEN${reset}"
@@ -173,6 +195,7 @@ input_info() {
     info "子域名: ${green}$SUB_DOMAIN${reset}"
     info "隧道名称: ${green}$TUNNEL_NAME${reset}"
 
+    # 保存配置
     {
       echo "账户邮箱：$CF_EMAIL"
       echo "API令牌：$CF_API_TOKEN"
@@ -193,8 +216,10 @@ create_dns_records() {
         -H "Content-Type: application/json" | jq -r '.result[0].id')
 
     if [[ -z "$ZONE_ID" || "$ZONE_ID" == "null" ]]; then
-        error "获取 Zone ID 失败"
-        return
+        error "获取 Zone ID 失败，请检查："
+        error "1. 域名是否正确"
+        error "2. API令牌权限是否足够"
+        return 1
     fi
 
     A_RECORD=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
@@ -212,29 +237,64 @@ create_dns_records() {
 }
 
 authorize_and_create_tunnel() {
+    # 处理证书冲突
+    if [[ -f "$CERT_FILE" ]]; then
+        read -p "$(echo -e "${yellow}检测到已有证书文件，是否删除后重新登录？(Y/n): ${reset}")" cert_choice
+        if [[ "$cert_choice" =~ ^[Yy]$ ]]; then
+            rm -f "$CERT_FILE"
+            info "已删除旧证书，准备重新登录..."
+        fi
+    fi
+
     info "🧩 开始 Cloudflare 隧道授权..."
-    $CFD_BIN tunnel login
-    if [[ $? -ne 0 ]]; then
-        error "授权失败，请检查 Cloudflared 登录"
+    if ! $CFD_BIN tunnel login; then
+        error "授权失败，请检查："
+        error "1. 网络连接是否正常"
+        error "2. 账户邮箱和API令牌是否正确"
         exit 1
     fi
 
     success "授权成功，使用证书路径：${green}$CERT_FILE${reset}"
 
-    $CFD_BIN tunnel create "$TUNNEL_NAME" || { error "隧道创建失败"; exit 1; }
+    # 处理隧道已存在的情况
+    if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
+        read -p "$(echo -e "${yellow}隧道 '$TUNNEL_NAME' 已存在，是否删除后重新创建？(Y/n): ${reset}")" recreate
+        if [[ "$recreate" =~ ^[Yy]$ ]]; then
+            $CFD_BIN tunnel delete "$TUNNEL_NAME"
+            info "已删除旧隧道，准备重新创建..."
+        else
+            info "使用现有隧道继续操作..."
+        fi
+    fi
+
+    # 创建隧道
+    info "正在创建隧道: ${green}$TUNNEL_NAME${reset}"
+    if ! $CFD_BIN tunnel create "$TUNNEL_NAME"; then
+        error "隧道创建失败，请检查："
+        error "1. 隧道名称是否唯一"
+        error "2. Cloudflare账户权限"
+        exit 1
+    fi
 
     TUNNEL_ID=$($CFD_BIN tunnel list | awk -v name="$TUNNEL_NAME" '$2 == name {print $1}')
-    [[ -z "$TUNNEL_ID" ]] && { error "未正确获取到隧道 ID，请检查 tunnel list 输出"; exit 1; }
+    [[ -z "$TUNNEL_ID" ]] && { error "未获取到隧道ID"; exit 1; }
 
-    success "隧道 ID：$TUNNEL_ID"
+    success "隧道创建成功，ID: ${green}$TUNNEL_ID${reset}"
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
 
-    info "🔗 创建 CNAME 记录..."
+    # 创建CNAME记录
+    info "🔗 正在创建 CNAME 记录..."
     CNAME_RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" \
         --data "{\"type\":\"CNAME\",\"name\":\"$SUB_DOMAIN\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
-    echo "$CNAME_RESULT" | grep -q '"success":true' && success "CNAME记录创建成功" || error "CNAME记录创建失败"
+    
+    if echo "$CNAME_RESULT" | grep -q '"success":true'; then
+        success "CNAME记录创建成功: ${green}$SUB_DOMAIN.$CF_ZONE → $TUNNEL_ID.cfargotunnel.com${reset}"
+    else
+        error "CNAME记录创建失败"
+        error "响应结果: $CNAME_RESULT"
+    fi
 }
 
 final_info() {
@@ -262,7 +322,7 @@ final_info() {
             echo -e "${green}方式2 (使用隧道名启动):${reset}"
             echo -e "$CFD_BIN tunnel run $TUNNEL_NAME\n"
             
-            echo -e "${yellow}💡 提示：如果token启动失败，请尝试使用隧道名启动方式${reset}"
+            echo -e "${yellow}💡 提示：推荐使用方式2，如果token启动失败请使用隧道名启动${reset}"
         else
             error "令牌提取失败，JSON文件格式可能不正确"
             echo -e "${green}备用启动方式:${reset}"
@@ -270,8 +330,8 @@ final_info() {
         fi
     else
         error "未找到隧道凭证文件 ${TUNNEL_ID}.json"
-        echo -e "${yellow}请尝试手动创建隧道后使用:${reset}"
-        echo -e "$CFD_BIN tunnel run <隧道名称>"
+        echo -e "${yellow}请尝试使用隧道名启动:${reset}"
+        echo -e "$CFD_BIN tunnel run $TUNNEL_NAME"
     fi
     
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
@@ -284,12 +344,12 @@ main() {
     check_config_and_cert
     get_ip_addresses
     input_info
-    create_dns_records
+    create_dns_records || return 1
     authorize_and_create_tunnel
     final_info
     show_bottom_line
     chmod +x "$0"
-    read -p "按回车键返回主菜单..." dummy
+    read -p "$(echo -e "${yellow}按回车键返回主菜单...${reset}")" dummy
     bash "/root/VPN/menu/config_node.sh"
 }
 
