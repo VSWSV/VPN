@@ -14,6 +14,7 @@ CLOUDFLARED_DIR="/root/.cloudflared"
 CERT_FILE="$CLOUDFLARED_DIR/cert.pem"
 CFD_BIN="/root/VPN/cloudflared"
 CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"
+CONFIG_YML="$CLOUDFLARED_DIR/config.yml"
 
 # 显示顶部标题
 show_top_title() {
@@ -22,27 +23,22 @@ show_top_title() {
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-
 show_bottom_line() {
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
-
 
 info() { echo -e "${yellow}🔹 $1${reset}"; }
 success() { echo -e "${lightpink}✅ $1${reset}"; }
 error() { echo -e "${red}❌ $1${reset}"; }
 warning() { echo -e "\033[38;5;226m⚠️ $1${reset}"; }
 
-
 validate_email() {
     [[ "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
 }
 
-
 validate_domain() {
     [[ "$1" =~ ^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$ ]]
 }
-
 
 check_config_and_cert() {
     mkdir -p "$CLOUDFLARED_DIR"
@@ -72,44 +68,38 @@ check_config_and_cert() {
         echo
 
         while true; do
-    read -p "$(echo -e "${yellow}❓ 是否删除现有配置并重新设置？(Y/n): ${reset}")" delchoice
-    case "$delchoice" in
-        Y|y)
-            rm -f "$CONFIG_FILE"
-
-            info "🧹 开始清理非证书文件（保留 *.pem）..."
-            deleted_files=$(find "$CLOUDFLARED_DIR" -type f ! -name "*.pem")
-
-            if [[ -n "$deleted_files" ]]; then
-                while IFS= read -r file; do
-                    rm -f "$file"
-                    echo -e "${red}🗑️ 已删除：${reset}${file}"
-                done <<< "$deleted_files"
-                success " 非证书文件清理完成"
-            else
-                warning " 未找到需删除的非证书文件"
-            fi
-
-            success " 已删除旧配置文件并完成隧道文件清理"
-            break ;;
-        N|n)
-            info " 保留现有配置，继续执行"
-            break ;;
-        *)
-            error " 无效输入，请输入 Y/y 或 N/n" ;;
-    esac
-done
-
+            read -p "$(echo -e "${yellow}❓ 是否删除现有配置并重新设置？(Y/n): ${reset}")" delchoice
+            case "$delchoice" in
+                Y|y)
+                    rm -f "$CONFIG_FILE"
+                    info "🧹 开始清理非证书文件（保留 *.pem）..."
+                    deleted_files=$(find "$CLOUDFLARED_DIR" -type f ! -name "*.pem")
+                    if [[ -n "$deleted_files" ]]; then
+                        while IFS= read -r file; do
+                            rm -f "$file"
+                            echo -e "${red}🗑️ 已删除：${reset}${file}"
+                        done <<< "$deleted_files"
+                        success " 非证书文件清理完成"
+                    else
+                        warning " 未找到需删除的非证书文件"
+                    fi
+                    success " 已删除旧配置文件并完成隧道文件清理"
+                    break ;;
+                N|n)
+                    info " 保留现有配置，继续执行"
+                    break ;;
+                *)
+                    error " 无效输入，请输入 Y/y 或 N/n" ;;
+            esac
+        done
     fi
-
 }
 
 get_ip_addresses() {
     IPV4=$(curl -s4 ifconfig.co)
     IPV6=$(curl -s6 ifconfig.co)
-
-     info "📶 当前公网 IPv4：${green}$IPV4${reset}"
-     info "📶 当前公网 IPv6：${green}$IPV6${reset}"
+    info "📶 当前公网 IPv4：${green}$IPV4${reset}"
+    info "📶 当前公网 IPv6：${green}$IPV6${reset}"
 }
 
 input_info() {
@@ -121,9 +111,10 @@ input_info() {
         CURRENT_SUB_DOMAIN=$(grep "子域前缀：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_TUNNEL_NAME=$(grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+        CURRENT_PORT=$(grep "本地端口：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         prompt_default() { echo -ne "${yellow}$1 [${green}$2${yellow}]: ${reset}"; }
     else
-          info "📝 请输入 Cloudflare 配置信息："
+        info "📝 请输入 Cloudflare 配置信息："
         prompt_default() { echo -ne "${yellow}$1: ${reset}"; }
     fi
 
@@ -167,12 +158,29 @@ input_info() {
         [[ "$TUNNEL_NAME" =~ ^[a-zA-Z0-9_-]+$ ]] && break || error "隧道名称无效，只能包含字母、数字、下划线或连字符。"
     done
 
-         info "📋 配置信息确认："
+    # 自动处理端口号
+    if [[ -n "$CURRENT_PORT" ]]; then
+        PORT="$CURRENT_PORT"
+        info "使用现有端口：${green}$PORT${reset}"
+    else
+        for i in {1..20}; do
+            rand_port=$((RANDOM % 10000 + 20000))
+            if ! lsof -i:"$rand_port" &>/dev/null; then
+                PORT="$rand_port"
+                break
+            fi
+        done
+        [[ -z "$PORT" ]] && { error "无法生成可用端口，请检查端口占用"; return 1; }
+        info "自动生成端口：${green}$PORT${reset}"
+    fi
+
+    info "📋 配置信息确认："
     info "账户邮箱: ${green}$CF_EMAIL${reset}"
     info "API Token: ${green}$CF_API_TOKEN${reset}"
     info "顶级域名: ${green}$CF_ZONE${reset}"
     info "子域名: ${green}${SUB_DOMAIN}.${CF_ZONE}${reset}"
     info "隧道名称: ${green}$TUNNEL_NAME${reset}"
+    info "本地端口: ${green}$PORT${reset}"
 
     {
         echo "账户邮箱：$CF_EMAIL"
@@ -180,6 +188,7 @@ input_info() {
         echo "顶级域名：$CF_ZONE"
         echo "子域前缀：$SUB_DOMAIN"
         echo "隧道名称：$TUNNEL_NAME"
+        echo "本地端口：$PORT"
         echo "公网 IPv4：$IPV4"
         echo "公网 IPv6：$IPV6"
         echo "证书路径：$CERT_FILE"
@@ -187,7 +196,6 @@ input_info() {
     } > "$CONFIG_FILE"
     check_root_dns_records
 }
-
 
 check_root_dns_records() {
     local ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CF_ZONE" \
@@ -280,8 +288,19 @@ create_dns_records() {
     echo && handle_dns_record "AAAA" "@" "$IPV6"
 }
 
-handle_tunnel() {
+generate_config_yml() {
+    cat > "$CONFIG_YML" <<EOF
+url: http://localhost:$PORT
+logfile: /root/.cloudflared/tunnel.log
+tunnel: $TUNNEL_ID
+credentials-file: $CLOUDFLARED_DIR/$TUNNEL_ID.json
+EOF
 
+    success "📄 已生成配置文件：${green}$CONFIG_YML${reset}"
+    info "🚪 隧道将转发至本地端口：${green}$PORT${reset}"
+}
+
+handle_tunnel() {
     if [[ ! -f "$CERT_FILE" ]]; then
         warning "未检测到授权证书，准备进行 Cloudflare 授权登录..."
     else
@@ -334,11 +353,12 @@ handle_tunnel() {
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
         echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
     else
-             error "隧道创建失败"
-             return 1
-      fi
-}
+        error "隧道创建失败"
+        return 1
+    fi
 
+    generate_config_yml
+}
 
 handle_cname_record() {
     info "🔗 正在处理CNAME记录..."
@@ -394,7 +414,7 @@ handle_cname_record() {
 }
 
 final_info() {
-     info "📦 所有步骤已完成，以下为生成的配置信息："
+    info "📦 所有步骤已完成，以下为生成的配置信息："
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
     echo -e "${lightpink}API 令牌：${green}$CF_API_TOKEN${reset}"
     echo -e "${lightpink}顶级域名：${green}$CF_ZONE${reset}"
@@ -403,13 +423,15 @@ final_info() {
     [[ -n "$TUNNEL_ID" ]] && echo -e "${lightpink}隧道ID：${green}$TUNNEL_ID${reset}"
     echo -e "${lightpink}公网 IPv4：${green}$IPV4${reset}"
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
+    echo -e "${lightpink}本地端口：${green}$PORT${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
+    echo -e "${lightpink}配置文件：${green}$CONFIG_YML${reset}"
 
     echo -e "\n${green}🚀 启动隧道命令：${reset}"
     echo -e "${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
 
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
-    ls -lh "$CLOUDFLARED_DIR" | grep -E "cert.pem|$TUNNEL_ID.json|config_info.txt" 2>/dev/null
+    ls -lh "$CLOUDFLARED_DIR" | grep -E "cert.pem|$TUNNEL_ID.json|config_info.txt|config.yml" 2>/dev/null
 }
 
 main() {
@@ -434,6 +456,5 @@ main() {
     read -p "$(echo -e "${yellow}按回车键返回主菜单...${reset}")" dummy
     bash "/root/VPN/menu/config_node.sh"
 }
- 
-main
 
+main
