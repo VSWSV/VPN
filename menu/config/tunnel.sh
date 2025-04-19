@@ -88,17 +88,6 @@ check_config_and_cert() {
         done
     fi
 
-    if [[ -f "$CERT_FILE" ]]; then
-        info "检测到残留的 Cloudflare 授权证书：$CERT_FILE"
-        while true; do
-            read -p "$(echo -e "${yellow}是否删除旧证书？(Y/n): ${reset}")" certchoice
-            case "$certchoice" in
-                Y|y) rm -f "$CERT_FILE"; success "已删除旧证书"; break ;;
-                N|n) info "保留旧证书"; break ;;
-                *) error "无效输入，请输入 Y/y 或 N/n" ;;
-            esac
-        done
-    fi
 }
 
 get_ip_addresses() {
