@@ -108,8 +108,8 @@ get_ip_addresses() {
     IPV4=$(curl -s4 ifconfig.co)
     IPV6=$(curl -s6 ifconfig.co)
 
-     "📶 当前公网 IPv4：${green}$IPV4${reset}"
-     "📶 当前公网 IPv6：${green}$IPV6${reset}"
+     info "📶 当前公网 IPv4：${green}$IPV4${reset}"
+     info "📶 当前公网 IPv6：${green}$IPV6${reset}"
 }
 
 input_info() {
@@ -123,7 +123,7 @@ input_info() {
         CURRENT_TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         prompt_default() { echo -ne "${yellow}$1 [${green}$2${yellow}]: ${reset}"; }
     else
-          "📝 请输入 Cloudflare 配置信息："
+          info "📝 请输入 Cloudflare 配置信息："
         prompt_default() { echo -ne "${yellow}$1: ${reset}"; }
     fi
 
@@ -167,7 +167,7 @@ input_info() {
         [[ "$TUNNEL_NAME" =~ ^[a-zA-Z0-9_-]+$ ]] && break || error "隧道名称无效，只能包含字母、数字、下划线或连字符。"
     done
 
-         "📋 配置信息确认："
+         info "📋 配置信息确认："
     info "账户邮箱: ${green}$CF_EMAIL${reset}"
     info "API Token: ${green}$CF_API_TOKEN${reset}"
     info "顶级域名: ${green}$CF_ZONE${reset}"
@@ -285,16 +285,16 @@ handle_tunnel() {
     if [[ ! -f "$CERT_FILE" ]]; then
         warning " 未检测到授权证书，准备进行 Cloudflare 授权登录..."
     else
-         "🔐 已检测到授权证书：$CERT_FILE"
+         info "🔐 已检测到授权证书：$CERT_FILE"
         read -p "$(echo -e "${yellow}❓检测到已有证书文件，是否删除后重新登录？(Y/n): ${reset}")" cert_choice
         if [[ "$cert_choice" =~ ^[Yy]$ ]]; then
             rm -f "$CERT_FILE"
-            "✅ 已删除旧证书，准备重新登录..."
+            info "✅ 已删除旧证书，准备重新登录..."
         fi
     fi
 
     if [[ ! -f "$CERT_FILE" ]]; then
-         "🧩 开始 Cloudflare 隧道授权..."
+         info "🧩 开始 Cloudflare 隧道授权..."
         if ! $CFD_BIN tunnel login; then
             error "❌ 授权失败，请检查以下事项："
             error "1. 网络连接是否正常"
@@ -307,7 +307,7 @@ handle_tunnel() {
 
     if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
-          "🔍 检测到已存在的隧道："
+         info "🔍 检测到已存在的隧道："
         echo -e "${lightpink}├─ 隧道名: ${green}$TUNNEL_NAME${reset}"
         echo -e "${lightpink}└─ 隧道ID: ${green}$TUNNEL_ID${reset}"
 
@@ -348,7 +348,7 @@ handle_tunnel() {
 
 
 handle_cname_record() {
-     "🔗 正在处理CNAME记录..."
+    info "🔗 正在处理CNAME记录..."
 
     local cname_full="${SUB_DOMAIN}.${CF_ZONE}"
     cname_full="${cname_full%.}"
@@ -401,7 +401,7 @@ handle_cname_record() {
 }
 
 final_info() {
-      "📦 所有步骤已完成，以下为生成的配置信息："
+     info "📦 所有步骤已完成，以下为生成的配置信息："
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
     echo -e "${lightpink}API 令牌：${green}$CF_API_TOKEN${reset}"
     echo -e "${lightpink}顶级域名：${green}$CF_ZONE${reset}"
