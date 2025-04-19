@@ -11,8 +11,7 @@ reset="\033[0m"
 CONFIG_PATH="/root/VPN/config/vless.json"
 LOG_PATH="/root/VPN/logs/vless.log"
 PID_PATH="/root/VPN/pids/vless.pid"
-SUBSCRIPTION_DIR="/root/VPN/subscriptions"
-SUBSCRIPTION_FILE="$SUBSCRIPTION_DIR/vless_sub.txt"
+CLOUDFLARED_CERT_DIR="/root/.cloudflared"  # Cloudflare 证书路径
 
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
@@ -24,16 +23,33 @@ function footer() {
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
+function check_certificates() {
+    if [ -f "$CLOUDFLARED_CERT_DIR/cert.pem" ] && [ -f "$CLOUDFLARED_CERT_DIR/private.key" ]; then
+        echo -e "${green}✔️  检测到 Cloudflare 证书文件${reset}"
+        return 0
+    else
+        echo -e "${red}❌ 错误: 未找到证书文件${reset}"
+        echo -e "${yellow}请确保以下文件存在:"
+        echo -e "  - ${lightpink}$CLOUDFLARED_CERT_DIR/cert.pem${reset}"
+        echo -e "  - ${lightpink}$CLOUDFLARED_CERT_DIR/private.key${reset}"
+        footer
+        exit 1
+    fi
+}
+
 clear
 header
 
 # 检查配置文件
 if [ ! -f "$CONFIG_PATH" ]; then
     echo -e "${red}❌ 错误: 未找到 VLESS 配置文件${reset}"
-    echo -e "${yellow}请先运行配置脚本创建配置文件: ${lightpink}bash /root/VPN/menu/config/config_vless.sh${reset}"
+    echo -e "${yellow}请先运行配置脚本: ${lightpink}bash /root/VPN/menu/config/config_vless.sh${reset}"
     footer
     exit 1
 fi
+
+# 检查证书
+check_certificates
 
 # 检查是否已在运行
 if [ -f "$PID_PATH" ]; then
@@ -46,12 +62,12 @@ if [ -f "$PID_PATH" ]; then
 fi
 
 # 创建必要目录
-mkdir -p /root/VPN/logs /root/VPN/pids /root/VPN/client_configs $SUBSCRIPTION_DIR
+mkdir -p /root/VPN/{logs,pids,client_configs,subscriptions}
 
 # 获取配置信息
-PORT=$(grep "listen:" "$CONFIG_PATH" | awk '{print $2}' | tr -d ':')
-UUID=$(grep "password:" "$CONFIG_PATH" | awk -F'"' '{print $2}')
-SNI=$(grep "sni:" "$CONFIG_PATH" | awk '{print $2}')
+PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
+UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
+SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName' "$CONFIG_PATH")
 IPV4=$(curl -s4 ifconfig.co || echo "未知")
 IPV6=$(curl -s6 ifconfig.co || echo "未知")
 
@@ -92,30 +108,33 @@ if ps -p "$VLESS_PID" > /dev/null; then
   "path": "",
   "tls": "tls",
   "sni": "$SNI",
-  "alpn": "h3",
+  "alpn": "h2",
   "fp": "chrome"
 }
 EOF
 
     # 生成订阅链接
-    BASE64_CONFIG=$(base64 -w 0 "$CLIENT_CONFIG")
-    SUBSCRIPTION_LINK="vless://$(echo "$UUID@$IPV4:$PORT?type=tcp&security=tls&sni=$SNI&alpn=h3&fp=chrome#VLESS_$SNI" | base64 -w 0)"
-    echo "$SUBSCRIPTION_LINK" > "$SUBSCRIPTION_FILE"
+    SUBSCRIPTION_LINK="vless://${UUID}@${IPV4}:${PORT}?type=tcp&security=tls&sni=${SNI}&alpn=h2&fp=chrome#VLESS_${SNI}"
+    BASE64_LINK=$(echo -n "$SUBSCRIPTION_LINK" | base64 -w 0)
+    echo "$BASE64_LINK" > "/root/VPN/subscriptions/vless_sub.txt"
     
     echo -e "\n${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
     echo -e "${cyan}                              📋 客户端配置信息                                  ${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-    echo -e "${green}✔️  客户端配置文件已生成: ${lightpink}$CLIENT_CONFIG${reset}"
+    echo -e "${green}✔️  客户端配置文件: ${lightpink}$CLIENT_CONFIG${reset}"
     echo -e "${green}🔗 IPv4 连接地址: ${lightpink}$IPV4:$PORT${reset}"
     echo -e "${green}🔗 IPv6 连接地址: ${lightpink}$IPV6:$PORT${reset}"
     echo -e "${green}🔑 UUID: ${lightpink}$UUID${reset}"
     echo -e "${green}🌐 SNI 域名: ${lightpink}$SNI${reset}"
-    echo -e "${green}📡 订阅链接: ${lightpink}$SUBSCRIPTION_LINK${reset}"
-    echo -e "${yellow}📄 订阅文件路径: ${lightpink}$SUBSCRIPTION_FILE${reset}"
+    echo -e "${green}📡 订阅链接 (Base64): ${lightpink}$BASE64_LINK${reset}"
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 else
     echo -e "\n${red}❌ VLESS 服务启动失败!${reset}"
     echo -e "${yellow}请检查日志文件: ${lightpink}$LOG_PATH${reset}"
+    echo -e "${yellow}常见问题:"
+    echo -e "1. 证书路径错误 → 检查 ${lightpink}$CLOUDFLARED_CERT_DIR/cert.pem${reset}"
+    echo -e "2. 端口冲突 → 运行 ${lightpink}ss -tulnp | grep $PORT${reset}"
+    echo -e "3. Xray 权限不足 → 运行 ${lightpink}chmod +x /root/VPN/xray/xray${reset}"
     footer
     exit 1
 fi
