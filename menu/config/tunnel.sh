@@ -85,18 +85,18 @@ check_config_and_cert() {
                     rm -f "$file"
                     echo -e "${red}🗑️ 已删除：${reset}${file}"
                 done <<< "$deleted_files"
-                success "✅ 非证书文件清理完成"
+                success " 非证书文件清理完成"
             else
-                warning "⚠️ 未找到需删除的非证书文件"
+                warning " 未找到需删除的非证书文件"
             fi
 
-            success "✅ 已删除旧配置文件并完成隧道文件清理"
+            success " 已删除旧配置文件并完成隧道文件清理"
             break ;;
         N|n)
-            info "🔹 保留现有配置，继续执行"
+            info " 保留现有配置，继续执行"
             break ;;
         *)
-            error "❌ 无效输入，请输入 Y/y 或 N/n" ;;
+            error " 无效输入，请输入 Y/y 或 N/n" ;;
     esac
 done
 
@@ -108,8 +108,8 @@ get_ip_addresses() {
     IPV4=$(curl -s4 ifconfig.co)
     IPV6=$(curl -s6 ifconfig.co)
 
-    info "📶 当前公网 IPv4：${green}$IPV4${reset}"
-    info "📶 当前公网 IPv6：${green}$IPV6${reset}"
+     "📶 当前公网 IPv4：${green}$IPV4${reset}"
+     "📶 当前公网 IPv6：${green}$IPV6${reset}"
 }
 
 input_info() {
@@ -167,7 +167,7 @@ input_info() {
         [[ "$TUNNEL_NAME" =~ ^[a-zA-Z0-9_-]+$ ]] && break || error "隧道名称无效，只能包含字母、数字、下划线或连字符。"
     done
 
-    info "📋 配置信息确认："
+         "📋 配置信息确认："
     info "账户邮箱: ${green}$CF_EMAIL${reset}"
     info "API Token: ${green}$CF_API_TOKEN${reset}"
     info "顶级域名: ${green}$CF_ZONE${reset}"
@@ -283,18 +283,18 @@ create_dns_records() {
 handle_tunnel() {
   
     if [[ ! -f "$CERT_FILE" ]]; then
-        warning "⚠️ 未检测到授权证书，准备进行 Cloudflare 授权登录..."
+        warning " 未检测到授权证书，准备进行 Cloudflare 授权登录..."
     else
-        info "🔐 已检测到授权证书：$CERT_FILE"
+         "🔐 已检测到授权证书：$CERT_FILE"
         read -p "$(echo -e "${yellow}❓检测到已有证书文件，是否删除后重新登录？(Y/n): ${reset}")" cert_choice
         if [[ "$cert_choice" =~ ^[Yy]$ ]]; then
             rm -f "$CERT_FILE"
-            info "✅ 已删除旧证书，准备重新登录..."
+            "✅ 已删除旧证书，准备重新登录..."
         fi
     fi
 
     if [[ ! -f "$CERT_FILE" ]]; then
-        info "🧩 开始 Cloudflare 隧道授权..."
+         "🧩 开始 Cloudflare 隧道授权..."
         if ! $CFD_BIN tunnel login; then
             error "❌ 授权失败，请检查以下事项："
             error "1. 网络连接是否正常"
@@ -307,7 +307,7 @@ handle_tunnel() {
 
     if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
-        info "🔍 检测到已存在的隧道："
+          "🔍 检测到已存在的隧道："
         echo -e "${lightpink}├─ 隧道名: ${green}$TUNNEL_NAME${reset}"
         echo -e "${lightpink}└─ 隧道ID: ${green}$TUNNEL_ID${reset}"
 
@@ -320,7 +320,7 @@ handle_tunnel() {
                    success " 旧隧道删除成功"
 
                     else
-                        error "❌ 隧道删除失败"
+                        error " 隧道删除失败"
                         return 1
                 fi
                     break ;;
@@ -329,7 +329,7 @@ handle_tunnel() {
             
                     TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
                     return 0 ;;
-                *) error "❌ 无效输入，请输入 Y/y 或 N/n" ;;
+                *) error " 无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
     fi
@@ -341,14 +341,14 @@ handle_tunnel() {
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
         echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
     else
-        error "❌ 隧道创建失败"
+        error " 隧道创建失败"
         return 1
     fi
 }
 
 
 handle_cname_record() {
-    info "🔗 正在处理CNAME记录..."
+     "🔗 正在处理CNAME记录..."
 
     local cname_full="${SUB_DOMAIN}.${CF_ZONE}"
     cname_full="${cname_full%.}"
@@ -401,7 +401,7 @@ handle_cname_record() {
 }
 
 final_info() {
-    info "📦 所有步骤已完成，以下为生成的配置信息："
+      "📦 所有步骤已完成，以下为生成的配置信息："
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
     echo -e "${lightpink}API 令牌：${green}$CF_API_TOKEN${reset}"
     echo -e "${lightpink}顶级域名：${green}$CF_ZONE${reset}"
