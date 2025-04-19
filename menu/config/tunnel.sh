@@ -72,20 +72,34 @@ check_config_and_cert() {
         echo
 
         while true; do
-            read -p "$(echo -e "${yellow}是否删除现有配置并重新设置？(Y/n): ${reset}")" delchoice
-            case "$delchoice" in
-                Y|y)
-                    TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
-                    rm -f "$CONFIG_FILE"
-                    [[ -n "$TUNNEL_ID" ]] && rm -f "$CLOUDFLARED_DIR/${TUNNEL_ID}.json"
-                    success "已删除旧配置文件及对应隧道 JSON：$TUNNEL_ID"
-                    break ;;
-                N|n)
-                    info "保留现有配置，继续执行"
-                    break ;;
-                *) error "无效输入，请输入 Y/y 或 N/n" ;;
-            esac
-        done
+    read -p "$(echo -e "${yellow}❓ 是否删除现有配置并重新设置？(Y/n): ${reset}")" delchoice
+    case "$delchoice" in
+        Y|y)
+            rm -f "$CONFIG_FILE"
+
+            info "🧹 开始清理非证书文件（保留 *.pem）..."
+            deleted_files=$(find "$CLOUDFLARED_DIR" -type f ! -name "*.pem")
+
+            if [[ -n "$deleted_files" ]]; then
+                while IFS= read -r file; do
+                    rm -f "$file"
+                    echo -e "${red}🗑️ 已删除：${reset}${file}"
+                done <<< "$deleted_files"
+                success "✅ 非证书文件清理完成"
+            else
+                warning "⚠️ 未找到需删除的非证书文件"
+            fi
+
+            success "✅ 已删除旧配置文件并完成隧道文件清理"
+            break ;;
+        N|n)
+            info "🔹 保留现有配置，继续执行"
+            break ;;
+        *)
+            error "❌ 无效输入，请输入 Y/y 或 N/n" ;;
+    esac
+done
+
     fi
 
 }
