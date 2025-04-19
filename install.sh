@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 # 定义颜色
 green="\033[1;32m"
 yellow="\033[1;33m"
@@ -21,7 +21,7 @@ echo -e "      ${green}3.${reset} 克隆或覆盖 GITHUB 仓库到 /ROOT/VPN"
 echo -e "      ${green}4.${reset} 设置 'vpn' 命令来快速启动菜单"
 echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
-
+show_top_banner
 read -p "$(echo -e ${yellow}是否继续安装？请输入 [Y/N]：${reset}) " answer
 
 if [[ "$answer" != "Y" && "$answer" != "y" ]]; then
