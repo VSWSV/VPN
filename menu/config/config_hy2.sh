@@ -1,174 +1,179 @@
 #!/bin/bash
 
 # 颜色定义
-cyan="\033[1;36m"
-green="\033[1;32m"
-yellow="\033[1;33m"
-red="\033[1;31m"
-lightpink="\033[38;5;213m"
-reset="\033[0m"
+cyan="\033[1;36m"; green="\033[1;32m"; yellow="\033[1;33m"
+red="\033[1;31m"; lightpink="\033[38;5;213m"; reset="\033[0m"
 
-CONFIG_PATH="/root/VPN/config/hysteria.yaml"
-mkdir -p /root/VPN/config
+# 目录配置
+HY2_DIR="/root/VPN/HY2"
+CONFIG_PATH="$HY2_DIR/config/hysteria.yaml"
+CERTS_DIR="$HY2_DIR/certs"
 
 function header() {
-echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-echo -e "${cyan}                              🌐 配置 HY2 节点参数                              ${reset}"
-echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+    echo -e "${cyan}                              🌐 配置 HY2 节点参数                              ${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
 function footer() {
-echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+    echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-function validate_uuid() {
-  [[ "$1" =~ ^[0-9a-fA-F-]{36}$ ]]
+function validate_input() {
+    case $1 in
+        uuid) [[ "$2" =~ ^[0-9a-fA-F-]{36}$ ]] ;;
+        port) [[ "$2" =~ ^[0-9]{2,5}$ ]] && [ "$2" -ge 1 ] && [ "$2" -le 65535 ] ;;
+        domain) [[ "$2" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]] ;;
+        alpn) [[ "$2" =~ ^(h2|h3|http/1\.1)$ ]] ;;
+    esac
 }
 
-function validate_port() {
-  [[ "$1" =~ ^[0-9]{2,5}$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
+function generate_certs() {
+    echo -e "${yellow}🔄 正在为 $1 生成自签名证书...${reset}"
+    mkdir -p "$CERTS_DIR"
+    openssl ecparam -genkey -name prime256v1 -out "$CERTS_DIR/private.key"
+    openssl req -x509 -new -key "$CERTS_DIR/private.key" -out "$CERTS_DIR/cert.pem" \
+        -days 365 -subj "/CN=$1"
+    chmod 600 "$CERTS_DIR/"{cert.pem,private.key}
+    echo -e "${green}✔️ 证书已生成到 $CERTS_DIR${reset}"
 }
 
-function validate_domain() {
-  [[ "$1" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]
+function show_current_config() {
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${cyan}                              🌐 当前 HY2 节点配置预览                          ${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e " ${lightpink}UUID：     ${reset}${green}$1${reset}"
+    echo -e " ${lightpink}端口号：   ${reset}${green}$2${reset}"
+    echo -e " ${lightpink}SNI 域名： ${reset}${green}$3${reset}"
+    echo -e " ${lightpink}ALPN 协议：${reset}${green}$4${reset}"
+    echo -e " ${lightpink}IPv4：     ${reset}${green}$5${reset}"
+    echo -e " ${lightpink}IPv6：     ${reset}${green}$6${reset}"
 }
 
-function validate_alpn() {
-  [[ "$1" =~ ^(h2|h3|http/1\.1|stun\.turn|webrtc|custom|http/1\.0|spdy/3\.1)$ ]]
-}
-
-function format_file_time() {
-  stat -c %y "$1" 2>/dev/null | awk -F'.' '{print $1}' | sed 's/-/年/;s/-/月/;s/ /日  /;s/:/时/;s/:/分/;s/$/秒/'
-}
+# 初始化目录结构
+mkdir -p "$HY2_DIR"/{config,certs,logs,pids,client_configs,subscriptions}
+chmod 700 "$HY2_DIR" "$HY2_DIR"/{config,certs,logs,pids}
 
 clear
 header
 
+# 现有配置检测
 if [ -f "$CONFIG_PATH" ]; then
-  echo -e "\n${yellow}⚠️  检测到已有 HY2 配置文件${reset}"
-  echo -e "${cyan}📂 配置路径: ${lightpink}$CONFIG_PATH${reset}"
-  echo -e "${cyan}🕒 生成时间: ${lightpink}$(format_file_time "$CONFIG_PATH")${reset}\n"
-
-  config_content=$(cat "$CONFIG_PATH" 2>/dev/null)
-  UUID=$(echo "$config_content" | grep "password:" | awk -F'"' '{print $2}' || echo "获取失败")
-  PORT=$(echo "$config_content" | grep "listen:" | awk '{print $2}' | tr -d ':')
-  SNI=$(echo "$config_content" | grep "sni:" | awk '{print $2}' || echo "未设置")
-  ALPN=$(echo "$config_content" | grep -A1 "alpn:" | tail -1 | tr -d ' -' || echo "h3")
-  IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
-  IPV6=$(curl -s6 ifconfig.co || echo "获取失败")
-
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-  echo -e "${cyan}                              🌐 当前 HY2 节点配置预览                          ${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-  echo -e " ${lightpink}UUID：     ${reset}${green}$UUID${reset}"
-  echo -e " ${lightpink}端口号：   ${reset}${green}$PORT${reset}"
-  echo -e " ${lightpink}SNI 域名： ${reset}${green}$SNI${reset}"
-  echo -e " ${lightpink}ALPN 协议：${reset}${green}$ALPN${reset}"
-  echo -e " ${lightpink}IPv4：     ${reset}${green}$IPV4${reset}"
-  echo -e " ${lightpink}IPv6：     ${reset}${green}$IPV6${reset}"
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-
-  while true; do
-    read -p "$(echo -e "\n${yellow}是否覆盖现有配置？(y/n): ${reset}")" -n 1 overwrite
-    echo ""
-    case $overwrite in
-      [yY]) break ;;
-      [nN]) 
-        echo -e "${red}❌ 已取消操作${reset}"
-        footer
-        bash /root/VPN/menu/config_node.sh
-        exit 0
-        ;;
-      *) echo -e "${red}❌ 无效输入，请输入 y 或 n${reset}" ;;
-    esac
-  done
+    echo -e "${yellow}⚠️ 检测到现有配置:${reset}"
+    current_uuid=$(grep "password:" "$CONFIG_PATH" | awk -F'"' '{print $2}')
+    current_port=$(grep "listen:" "$CONFIG_PATH" | awk '{print $2}' | tr -d ':')
+    current_sni=$(grep "sni:" "$CONFIG_PATH" | awk '{print $2}')
+    current_alpn=$(grep -A1 "alpn:" "$CONFIG_PATH" | tail -1 | tr -d ' -')
+    current_ipv4=$(curl -s4 ifconfig.co || echo "获取失败")
+    current_ipv6=$(curl -s6 ifconfig.co || echo "获取失败")
+    
+    show_current_config "$current_uuid" "$current_port" "$current_sni" "$current_alpn" "$current_ipv4" "$current_ipv6"
+    
+    read -p "$(echo -e "\n${yellow}是否覆盖现有配置？(y/N): ${reset}")" -n 1 overwrite
+    [[ ! $overwrite =~ ^[Yy]$ ]] && footer && exit 0
 fi
 
+# 用户输入
 while true; do
-  read -p "$(echo -e "\n${cyan}请输入 UUID（留空自动生成）: ${reset}")" UUID
-  if [ -z "$UUID" ]; then
-    UUID=$(cat /proc/sys/kernel/random/uuid)
-    echo -e "${green}✔️  UUID：${lightpink}$UUID${reset}"
-    break
-  elif validate_uuid "$UUID"; then
-    echo -e "${green}✔️  UUID：${lightpink}$UUID${reset}"
-    break
-  else
-    echo -e "${red}❌ UUID 格式无效，请重新输入${reset}"
-  fi
-done
-
-while true; do
-  read -p "$(echo -e "\n${cyan}请输入监听端口（1024-65535，留空自动生成）: ${reset}")" PORT
-  if [ -z "$PORT" ]; then
-
-    while true; do
-      PORT=$((RANDOM%30000+10000))
-      ss -tuln | grep -q ":$PORT " || break
-    done
-    echo -e "${green}✔️  自动生成未被占用端口：${lightpink}$PORT${reset}"
-    break
-  elif validate_port "$PORT"; then
-    if ss -tuln | grep -q ":$PORT "; then
-      echo -e "${red}❌ 该端口已被占用，请换一个${reset}"
+    read -p "$(echo -e "\n${cyan}请输入监听端口 [443]: ${reset}")" port
+    port=${port:-443}
+    if validate_input "port" "$port"; then
+        if ! ss -tuln | grep -q ":$port "; then
+            break
+        else
+            echo -e "${red}❌ 端口已被占用，请重新输入${reset}"
+        fi
     else
-      echo -e "${green}✔️  端口号：${lightpink}$PORT${reset}"
-      break
+        echo -e "${red}❌ 无效端口号${reset}"
     fi
-  else
-    echo -e "${red}❌ 端口无效，请重新输入${reset}"
-  fi
 done
 
+uuid=$(cat /proc/sys/kernel/random/uuid)
+echo -e "${green}✔️ 自动生成UUID: ${lightpink}$uuid${reset}"
 
 while true; do
-  read -p "$(echo -e "\n${cyan}请输入 SNI 域名（如：www.bing.com）: ${reset}")" SNI
-  if [ -z "$SNI" ]; then
-    echo -e "${red}❌ SNI 不能为空，请重新输入${reset}"
-  elif validate_domain "$SNI"; then
-    echo -e "${green}✔️  SNI 域名：${lightpink}$SNI${reset}"
-    break
-  else
-    echo -e "${red}❌ 域名格式无效，请重新输入（示例：example.com）${reset}"
-  fi
+    read -p "$(echo -e "${cyan}请输入SNI域名 (必需): ${reset}")" sni
+    if validate_input "domain" "$sni"; then break; fi
+    echo -e "${red}❌ 无效域名格式${reset}"
 done
 
-while true; do
-  read -p "$(echo -e "\n${cyan}请输入 ALPN 协议（默认 h3，直接回车使用）: ${reset}")" ALPN
-  [ -z "$ALPN" ] && ALPN="h3"
-  if validate_alpn "$ALPN"; then
-    echo -e "${green}✔️  ALPN 协议：${lightpink}$ALPN${reset}"
-    break
-  else
-    echo -e "${red}❌ 无效协议，支持：h2, h3, http/1.1${reset}"
-  fi
-done
+read -p "$(echo -e "${cyan}请输入ALPN协议 [h3]: ${reset}")" alpn
+alpn=${alpn:-h3}
 
-echo -e "\n${yellow}📡 正在获取网络信息..."
-IPV4=$(curl -s4 ifconfig.co || echo "获取失败")
-IPV6=$(curl -s6 ifconfig.co || echo "获取失败")
-echo -e "${yellow}📶 当前公网 IPv4：${lightpink}$IPV4${reset}"
-echo -e "${yellow}📶 当前公网 IPv6：${lightpink}$IPV6${reset}"
+# TLS配置选项
+echo -e "\n${cyan}请选择TLS配置:${reset}"
+echo "1) 使用自签名证书 (自动生成)"
+echo "2) 使用现有证书 (手动指定路径)"
+echo "3) 禁用TLS (不推荐)"
+read -p "选择 [1-3]: " tls_choice
 
+case $tls_choice in
+    1)
+        generate_certs "$sni"
+        tls_config="  cert: $CERTS_DIR/cert.pem
+  key: $CERTS_DIR/private.key
+  sni: $sni
+  alpn:
+    - $alpn"
+        ;;
+    2)
+        while true; do
+            read -p "$(echo -e "${cyan}请输入证书路径: ${reset}")" cert_path
+            read -p "$(echo -e "${cyan}请输入私钥路径: ${reset}")" key_path
+            [ -f "$cert_path" ] && [ -f "$key_path" ] && break
+            echo -e "${red}❌ 证书文件不存在，请重新输入${reset}"
+        done
+        tls_config="  cert: $cert_path
+  key: $key_path
+  sni: $sni
+  alpn:
+    - $alpn"
+        ;;
+    3)
+        tls_config="  enabled: false"
+        ;;
+    *)
+        echo -e "${red}❌ 无效选择，默认使用自签名证书${reset}"
+        generate_certs "$sni"
+        tls_config="  cert: $CERTS_DIR/cert.pem
+  key: $CERTS_DIR/private.key
+  sni: $sni
+  alpn:
+    - $alpn"
+        ;;
+esac
+
+# 生成配置文件
 cat > "$CONFIG_PATH" <<EOF
-listen: :$PORT
+listen: :$port
 protocol: hysteria2
 auth:
   type: password
-  password: "$UUID"
+  password: "$uuid"
 tls:
-  sni: $SNI
-  alpn:
-    - $ALPN
-  insecure: true
+$tls_config
 EOF
 
-chmod 777 "$CONFIG_PATH"
-echo -e "\n${green}✅ HY2 配置已生成: ${lightpink}$CONFIG_PATH${reset}"
-echo -e "${green}🔓 已开放完整权限${reset}"
+chmod 600 "$CONFIG_PATH"
+echo -e "\n${green}✅ 配置已保存到: ${lightpink}$CONFIG_PATH${reset}"
+
+# 显示网络信息
+ipv4=$(curl -s4 ifconfig.co || echo "获取失败")
+ipv6=$(curl -s6 ifconfig.co || echo "获取失败")
+echo -e "\n${yellow}📶 当前网络信息:${reset}"
+echo -e "  ${lightpink}IPv4: ${green}$ipv4${reset}"
+echo -e "  ${lightpink}IPv6: ${green}$ipv6${reset}"
+
+# 显示客户端配置提示
+echo -e "\n${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+echo -e "${cyan}                              📋 客户端配置指引                                  ${reset}"
+echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+echo -e "${green}🔗 连接地址: ${lightpink}$sni:$port${reset}"
+echo -e "${green}🔑 认证密码: ${lightpink}$uuid${reset}"
+echo -e "${green}🔐 加密方式: ${lightpink}$alpn${reset}"
+[ $tls_choice -eq 1 ] && echo -e "${yellow}⚠️ 注意: 使用自签名证书需在客户端启用 insecure 选项${reset}"
+echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
 footer
-
-echo ""
-read -p "$(echo -e "${cyan}返回配置菜单，按任意键继续${reset}")" -n 1
+read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
 bash /root/VPN/menu/config_node.sh
