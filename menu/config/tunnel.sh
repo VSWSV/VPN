@@ -431,5 +431,3 @@ main() {
     read -p "$(echo -e "${yellow}按回车键返回主菜单...${reset}")" dummy
     bash "/root/VPN/menu/config_node.sh"
 }
-
-main
