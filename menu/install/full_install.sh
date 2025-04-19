@@ -65,7 +65,7 @@ info "⬇️ 下载 Cloudflared..."
 wget -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && chmod +x cloudflared && success "Cloudflared 下载并赋权完成" || error_exit "Cloudflared 下载失败"
 
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-success "🎉 所有组件和依赖已成功安装并保存在 /root/VPN 中"
+     "🎉 所有组件和依赖已成功安装并保存在 /root/VPN 中"
 echo -e "${yellow}📌 示例运行命令：${reset}"
 echo -e "${yellow}▶ /root/VPN/xray/xray run -config /root/VPN/xray/config.json${reset}"
 echo -e "${yellow}▶ /root/VPN/hysteria --config /root/VPN/hysteria.yaml${reset}"
