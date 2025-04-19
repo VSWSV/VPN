@@ -1,20 +1,14 @@
 #!/bin/bash
 
-# 配置区
-HY2_DIR="/root/VPN/HY2"
-CONFIG_PATH="$HY2_DIR/config/hysteria.yaml"
-LOG_PATH="$HY2_DIR/logs/hysteria.log"
-PID_PATH="$HY2_DIR/pids/hysteria.pid"
-CERTS_DIR="$HY2_DIR/certs"
-DEFAULT_SNI="hy2.example.com"  # 默认域名，如果配置文件不存在时使用
-
 # 颜色定义
 cyan="\033[1;36m"; green="\033[1;32m"; yellow="\033[1;33m"
 red="\033[1;31m"; reset="\033[0m"
 
-# 自动创建目录结构
-mkdir -p "$HY2_DIR"/{config,logs,pids,certs,client_configs,subscriptions}
-chmod -R 700 "$HY2_DIR"
+# 固定路径
+HY2_DIR="/root/VPN/HY2"
+CONFIG_PATH="$HY2_DIR/config/hysteria.yaml"
+LOG_PATH="$HY2_DIR/logs/hysteria.log"
+PID_PATH="$HY2_DIR/pids/hysteria.pid"
 
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
@@ -22,50 +16,35 @@ function header() {
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-function generate_config() {
-    echo -e "${yellow}🔄 自动生成配置文件...${reset}"
-    cat > "$CONFIG_PATH" <<EOF
-listen: :443
-protocol: hysteria2
-auth:
-  type: password
-  password: "$(cat /proc/sys/kernel/random/uuid)"
-tls:
-  cert: $CERTS_DIR/cert.pem
-  key: $CERTS_DIR/private.key
-  sni: $DEFAULT_SNI
-  alpn:
-    - h3
-EOF
-}
-
-function generate_certs() {
-    local sni=${1:-$DEFAULT_SNI}
-    echo -e "${yellow}🔄 自动生成自签名证书 (SNI: $sni)...${reset}"
-    openssl ecparam -genkey -name prime256v1 -out "$CERTS_DIR/private.key"
-    openssl req -x509 -new -key "$CERTS_DIR/private.key" -out "$CERTS_DIR/cert.pem" \
-        -days 365 -subj "/CN=$sni"
-    chmod 600 "$CERTS_DIR/"{cert.pem,private.key}
+function verify_config() {
+    [ -f "$CONFIG_PATH" ] || { echo -e "${red}❌ 配置文件不存在"; return 1; }
+    grep -q "password:" "$CONFIG_PATH" || { echo -e "${red}❌ 配置缺少password字段"; return 1; }
+    
+    if grep -q "tls:" "$CONFIG_PATH"; then
+        grep -q "cert:" "$CONFIG_PATH" || { echo -e "${red}❌ 缺少cert路径"; return 1; }
+        grep -q "key:" "$CONFIG_PATH" || { echo -e "${red}❌ 缺少key路径"; return 1; }
+    fi
+    return 0
 }
 
 # 主流程
-clear
 header
 
-# 配置文件检查
-if [ ! -f "$CONFIG_PATH" ]; then
-    generate_config
-    generate_certs "$DEFAULT_SNI"
-    echo -e "${yellow}⚠️ 已生成默认配置，请编辑 $CONFIG_PATH 修改参数${reset}"
+# 配置验证
+if ! verify_config; then
+    echo -e "${yellow}请先运行配置脚本: ${lightpink}bash /root/VPN/menu/config/config_hy2.sh${reset}"
+    exit 1
 fi
 
-# 证书检查（从配置文件中读取SNI）
-SNI=$(grep "sni:" "$CONFIG_PATH" 2>/dev/null | awk '{print $2}' || echo "$DEFAULT_SNI")
-if [ ! -f "$CERTS_DIR/cert.pem" ] || [ ! -f "$CERTS_DIR/private.key" ]; then
-    generate_certs "$SNI"
-    # 更新配置文件中的证书路径
-    sed -i "/tls:/,/^[^ ]/ {/cert:\|key:/d}" "$CONFIG_PATH"
-    sed -i "/tls:/a \  cert: $CERTS_DIR/cert.pem\n  key: $CERTS_DIR/private.key" "$CONFIG_PATH"
+# 提取配置参数
+PORT=$(grep "listen:" "$CONFIG_PATH" | awk '{print $2}' | tr -d ':')
+UUID=$(grep "password:" "$CONFIG_PATH" | awk -F'"' '{print $2}')
+SNI=$(grep "sni:" "$CONFIG_PATH" | awk '{print $2}')
+
+# 端口检查
+if ss -tulnp | grep -q ":$PORT "; then
+    echo -e "${red}❌ 端口 $PORT 已被占用${reset}"
+    exit 1
 fi
 
 # 启动服务
@@ -75,16 +54,23 @@ echo $! > "$PID_PATH"
 sleep 1
 
 # 状态检查
-if ps -p $(cat "$PID_PATH" 2>/dev/null) >/dev/null 2>&1; then
+if ps -p $(cat "$PID_PATH") >/dev/null; then
     echo -e "${green}✅ 启动成功! PID: $(cat "$PID_PATH")${reset}"
-    echo -e "${green}🔗 配置目录: $HY2_DIR${reset}"
+    
+    # 生成订阅
+    SUB_FILE="$HY2_DIR/subscriptions/hy2_sub.txt"
+    cat > "$SUB_FILE" <<EOF
+hy2://$UUID@$(curl -s4 ifconfig.co):$PORT/?sni=$SNI&insecure=1#HY2_$SNI
+EOF
+    echo -e "${green}📡 订阅链接已生成: ${lightpink}$SUB_FILE${reset}"
 else
-    echo -e "${red}❌ 启动失败! 可能原因:"
-    echo -e "1. 端口冲突 (运行: ss -tulnp | grep 443)"
-    echo -e "2. 二进制文件缺失 (检查: ls /root/VPN/hysteria)"
-    echo -e "3. 查看详细日志: tail -n 20 $LOG_PATH${reset}"
+    echo -e "${red}❌ 启动失败! 查看日志: ${lightpink}$LOG_PATH${reset}"
 fi
 
-echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+footer() {
+    echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+}
+footer
+
 read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
 bash /root/VPN/menu/start_service.sh
