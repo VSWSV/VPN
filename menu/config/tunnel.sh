@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# 颜色定义
 cyan='\033[1;36m'
 yellow='\033[1;33m'
 orange='\033[38;5;208m'
@@ -14,40 +15,49 @@ CERT_FILE="$CLOUDFLARED_DIR/cert.pem"
 CFD_BIN="/root/VPN/cloudflared"
 CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"
 
+# 显示顶部标题
 show_top_title() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
     printf "${orange}%*s🌐 配置隧道-DNS%*s\n" $(( (83 - 14) / 2 )) "" $(( (83 - 14 + 1) / 2 )) ""
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
+# 显示底部线条
 show_bottom_line() {
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-warning() {
-    echo -e "\033[38;5;226m⚠️ $1${reset}"
-}
-
+# 信息显示函数
 info() {
     echo -e "${yellow}🔹 $1${reset}"
 }
 
+# 成功显示函数
 success() {
     echo -e "${lightpink}✅ $1${reset}"
 }
 
+# 错误显示函数
 error() {
     echo -e "${red}❌ $1${reset}"
 }
 
+# 警告显示函数
+warning() {
+    echo -e "\033[38;5;226m⚠️ $1${reset}"
+}
+
+# 邮箱验证
 validate_email() {
     [[ "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
 }
 
+# 域名验证
 validate_domain() {
     [[ "$1" =~ ^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$ ]]
 }
 
+# 检查配置和证书
 check_config_and_cert() {
     mkdir -p "$CLOUDFLARED_DIR"
     chmod 700 "$CLOUDFLARED_DIR"
@@ -114,6 +124,7 @@ check_config_and_cert() {
     fi
 }
 
+# 获取IP地址
 get_ip_addresses() {
     IPV4=$(curl -s4 ifconfig.co)
     IPV6=$(curl -s6 ifconfig.co)
@@ -122,6 +133,7 @@ get_ip_addresses() {
     info "📶 当前公网 IPv6：${green}$IPV6${reset}"
 }
 
+# 输入信息
 input_info() {
     if [[ -f "$CONFIG_FILE" ]]; then
         info "📝 正在读取现有配置（绿色为当前值，直接回车即可保留）："
@@ -204,7 +216,8 @@ input_info() {
     } > "$CONFIG_FILE"
 }
 
-check_dns_record() {
+# 处理DNS记录
+handle_dns_record() {
     local record_type=$1
     local record_name=$2
     local content=$3
@@ -212,15 +225,14 @@ check_dns_record() {
     existing_record=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=$record_type&name=$record_name" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json")
-        
+
     if echo "$existing_record" | jq -e '.result[0]' >/dev/null; then
         info "检测到已存在的${record_type}记录："
         echo -e "${lightpink}├─ 记录名: ${green}$record_name${reset}"
-        echo -e "${lightpink}├─ 记录值: ${green}$(echo "$existing_record" | jq -r '.result[0].content')${reset}"
-        echo -e "${lightpink}└─ 记录ID: ${green}$(echo "$existing_record" | jq -r '.result[0].id')${reset}"
+        echo -e "${lightpink}└─ 记录值: ${green}$(echo "$existing_record" | jq -r '.result[0].content')${reset}"
         
         while true; do
-            read -p "$(echo -e "${yellow}是否删除并重建此记录？(Y/n): ${reset}")" choice
+            read -p "$(echo -e "${yellow}是否删除并重建？(Y/n): ${reset}")" choice
             case "$choice" in
                 Y|y)
                     record_id=$(echo "$existing_record" | jq -r '.result[0].id')
@@ -228,57 +240,85 @@ check_dns_record() {
                         -H "Authorization: Bearer $CF_API_TOKEN" \
                         -H "Content-Type: application/json")
                     if echo "$delete_result" | grep -q '"success":true'; then
-                        success "记录删除成功"
-                        return 0
+                        success "旧记录删除成功"
                     else
                         error "记录删除失败"
                         return 1
-                    fi ;;
+                    fi
+                    break ;;
                 N|n)
-                    info "将使用现有${record_type}记录继续操作"
-                    return 1 ;;
+                    success "已保留现有${record_type}记录"
+                    return 0 ;;
                 *)
                     error "无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
+    fi
+
+    # 创建新记录
+    info "正在创建${record_type}记录..."
+    create_result=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+        -H "Authorization: Bearer $CF_API_TOKEN" \
+        -H "Content-Type: application/json" \
+        --data "{\"type\":\"$record_type\",\"name\":\"$record_name\",\"content\":\"$content\",\"ttl\":1,\"proxied\":false}")
+    
+    if echo "$create_result" | grep -q '"success":true'; then
+        success "${record_type}记录创建成功"
     else
-        return 0
+        error "${record_type}记录创建失败"
+        error "响应结果：$(echo "$create_result" | jq -r '.errors[0].message')"
+        return 1
     fi
 }
 
+# 创建DNS记录
 create_dns_records() {
-    info "📡 开始处理 DNS 记录..."
+    info "📡 开始处理DNS记录..."
+    
+    # 获取Zone ID
     ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CF_ZONE" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" | jq -r '.result[0].id')
-
-    if [[ -z "$ZONE_ID" || "$ZONE_ID" == "null" ]]; then
-        error "获取 Zone ID 失败，请检查："
-        error "1. 域名是否正确"
-        error "2. API令牌权限是否足够"
-        return 1
-    fi
+    
+    [[ "$ZONE_ID" == "null" || -z "$ZONE_ID" ]] && { error "获取Zone ID失败"; return 1; }
 
     # 处理A记录
-    if check_dns_record "A" "@" "$IPV4"; then
-        A_RECORD=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-            -H "Authorization: Bearer $CF_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data "{\"type\":\"A\",\"name\":\"@\",\"content\":\"$IPV4\",\"ttl\":1,\"proxied\":false}")
-        echo "$A_RECORD" | grep -q '"success":true' && success "A记录创建成功" || error "A记录创建失败"
-    fi
+    echo && handle_dns_record "A" "@" "$IPV4"
 
     # 处理AAAA记录
-    if check_dns_record "AAAA" "@" "$IPV6"; then
-        AAAA_RECORD=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-            -H "Authorization: Bearer $CF_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data "{\"type\":\"AAAA\",\"name\":\"@\",\"content\":\"$IPV6\",\"ttl\":1,\"proxied\":false}")
-        echo "$AAAA_RECORD" | grep -q '"success":true' && success "AAAA记录创建成功" || error "AAAA记录创建失败"
-    fi
+    echo && handle_dns_record "AAAA" "@" "$IPV6"
 }
 
-authorize_and_create_tunnel() {
+# 处理隧道
+handle_tunnel() {
+    # 检查隧道是否存在
+    if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
+        info "检测到已存在的隧道："
+        echo -e "${lightpink}├─ 隧道名: ${green}$TUNNEL_NAME${reset}"
+        echo -e "${lightpink}└─ 隧道ID: ${green}$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')${reset}"
+        
+        while true; do
+            read -p "$(echo -e "${yellow}是否删除并重建？(Y/n): ${reset}")" choice
+            case "$choice" in
+                Y|y)
+                    $CFD_BIN tunnel delete "$TUNNEL_NAME" >/dev/null 2>&1
+                    if [ $? -eq 0 ]; then
+                        success "旧隧道删除成功"
+                    else
+                        error "隧道删除失败"
+                        return 1
+                    fi
+                    break ;;
+                N|n)
+                    success "已使用现有隧道"
+                    TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
+                    return 0 ;;
+                *)
+                    error "无效输入，请输入 Y/y 或 N/n" ;;
+            esac
+        done
+    fi
+
     # 处理证书冲突
     if [[ -f "$CERT_FILE" ]]; then
         read -p "$(echo -e "${yellow}检测到已有证书文件，是否删除后重新登录？(Y/n): ${reset}")" cert_choice
@@ -298,18 +338,49 @@ authorize_and_create_tunnel() {
 
     success "授权成功，使用证书路径：${green}$CERT_FILE${reset}"
 
-    # 处理隧道已存在的情况
-    if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
+    # 创建新隧道
+    info "正在创建隧道..."
+    if $CFD_BIN tunnel create "$TUNNEL_NAME" >/dev/null 2>&1; then
+        success "隧道创建成功"
+        TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
+        echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
+    else
+        error "隧道创建失败"
+        return 1
+    fi
+}
+
+# 处理CNAME记录
+handle_cname_record() {
+    info "🔗 正在处理CNAME记录..."
+    
+    # 检查CNAME记录是否存在
+    existing_cname=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=CNAME&name=$SUB_DOMAIN" \
+        -H "Authorization: Bearer $CF_API_TOKEN" \
+        -H "Content-Type: application/json")
+
+    if echo "$existing_cname" | jq -e '.result[0]' >/dev/null; then
+        info "检测到已存在的CNAME记录："
+        echo -e "${lightpink}├─ 记录名: ${green}$SUB_DOMAIN${reset}"
+        echo -e "${lightpink}└─ 记录值: ${green}$(echo "$existing_cname" | jq -r '.result[0].content')${reset}"
+        
         while true; do
-            read -p "$(echo -e "${yellow}隧道 '$TUNNEL_NAME' 已存在，是否删除后重新创建？(Y/n): ${reset}")" recreate
-            case "$recreate" in
+            read -p "$(echo -e "${yellow}是否删除并重建？(Y/n): ${reset}")" choice
+            case "$choice" in
                 Y|y)
-                    $CFD_BIN tunnel delete "$TUNNEL_NAME"
-                    info "已删除旧隧道，准备重新创建..."
+                    record_id=$(echo "$existing_cname" | jq -r '.result[0].id')
+                    delete_result=$(curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$record_id" \
+                        -H "Authorization: Bearer $CF_API_TOKEN" \
+                        -H "Content-Type: application/json")
+                    if echo "$delete_result" | grep -q '"success":true'; then
+                        success "旧记录删除成功"
+                    else
+                        error "记录删除失败"
+                        return 1
+                    fi
                     break ;;
                 N|n)
-                    info "使用现有隧道继续操作..."
-                    TUNNEL_ID=$($CFD_BIN tunnel list | awk -v name="$TUNNEL_NAME" '$2 == name {print $1}')
+                    success "已保留现有CNAME记录"
                     return 0 ;;
                 *)
                     error "无效输入，请输入 Y/y 或 N/n" ;;
@@ -317,39 +388,23 @@ authorize_and_create_tunnel() {
         done
     fi
 
-    # 创建隧道
-    info "正在创建隧道: ${green}$TUNNEL_NAME${reset}"
-    if ! $CFD_BIN tunnel create "$TUNNEL_NAME"; then
-        error "隧道创建失败，请检查："
-        error "1. 隧道名称是否唯一"
-        error "2. Cloudflare账户权限"
-        exit 1
-    fi
-
-    TUNNEL_ID=$($CFD_BIN tunnel list | awk -v name="$TUNNEL_NAME" '$2 == name {print $1}')
-    [[ -z "$TUNNEL_ID" ]] && { error "未获取到隧道ID"; exit 1; }
-
-    success "隧道创建成功，ID: ${green}$TUNNEL_ID${reset}"
-    echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
-}
-
-create_cname_record() {
-    info "🔗 正在处理 CNAME 记录..."
-    if check_dns_record "CNAME" "$SUB_DOMAIN" "$TUNNEL_ID.cfargotunnel.com"; then
-        CNAME_RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-            -H "Authorization: Bearer $CF_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data "{\"type\":\"CNAME\",\"name\":\"$SUB_DOMAIN\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
-        
-        if echo "$CNAME_RESULT" | grep -q '"success":true'; then
-            success "CNAME记录创建成功: ${green}$SUB_DOMAIN.$CF_ZONE → $TUNNEL_ID.cfargotunnel.com${reset}"
-        else
-            error "CNAME记录创建失败"
-            error "响应结果: $CNAME_RESULT"
-        fi
+    # 创建新记录
+    info "正在创建CNAME记录..."
+    create_result=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+        -H "Authorization: Bearer $CF_API_TOKEN" \
+        -H "Content-Type: application/json" \
+        --data "{\"type\":\"CNAME\",\"name\":\"$SUB_DOMAIN\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
+    
+    if echo "$create_result" | grep -q '"success":true'; then
+        success "CNAME记录创建成功：${green}$SUB_DOMAIN → $TUNNEL_ID.cfargotunnel.com${reset}"
+    else
+        error "CNAME记录创建失败"
+        error "错误信息：$(echo "$create_result" | jq -r '.errors[0].message')"
+        return 1
     fi
 }
 
+# 显示最终信息
 final_info() {
     info "📦 所有步骤已完成，以下为生成的配置信息："
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
@@ -369,15 +424,27 @@ final_info() {
     ls -lh "$CLOUDFLARED_DIR" | grep -E "cert.pem|$TUNNEL_ID.json|config_info.txt" 2>/dev/null
 }
 
+# 主流程
 main() {
     clear
     show_top_title
     check_config_and_cert
     get_ip_addresses
     input_info
-    create_dns_records || return 1
-    authorize_and_create_tunnel
-    create_cname_record
+    
+    # 第一部分：处理DNS记录
+    echo -e "\n${cyan}═════════ 开始处理DNS记录 ═════════${reset}"
+    create_dns_records
+    
+    # 第二部分：处理隧道
+    echo -e "\n${cyan}═════════ 开始处理隧道 ═════════${reset}"
+    handle_tunnel
+    
+    # 第三部分：处理CNAME记录
+    echo -e "\n${cyan}═════════ 开始处理CNAME记录 ═════════${reset}"
+    handle_cname_record
+    
+    # 显示最终信息
     final_info
     show_bottom_line
     chmod +x "$0"
