@@ -23,7 +23,9 @@ show_top_title() {
 show_bottom_line() {
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
-
+warning() {
+    echo -e "\033[38;5;226m⚠️ $1${reset}"
+}
 info() {
     echo -e "${yellow}🔹 $1${reset}"
 }
@@ -314,47 +316,47 @@ final_info() {
     
     if [[ -f "$JSON_FILE" ]]; then
      
-        JSON_TUNNEL_NAME=$(jq -r '.tunnel_name' "$JSON_FILE" 2>/dev/null)
-        if [[ "$JSON_TUNNEL_NAME" != "$TUNNEL_NAME" ]]; then
-            warning "隧道名称不匹配："
-            echo -e "配置名称: ${green}$TUNNEL_NAME${reset}"
-            echo -e "凭证文件: ${red}$JSON_TUNNEL_NAME${reset}"
-        fi
-
-        TOKEN=$(jq -e -r '.credentials_file // .Token' "$JSON_FILE" 2>/dev/null)
-        
-        if [[ $? -eq 0 && -n "$TOKEN" && "$TOKEN" != "null" ]]; then
-            echo -e "${green}✅ 凭证验证通过${reset}"
-            echo -e "${lightpink}├─ 隧道ID: ${green}$TUNNEL_ID${reset}"
-            echo -e "${lightpink}├─ 隧道名称: ${green}$TUNNEL_NAME${reset}"
-            echo -e "${lightpink}└─ 凭证文件: ${green}$JSON_FILE${reset}"
-            
-            echo -e "\n${yellow}🚀 启动方式：${reset}"
-            echo -e "${green}1. 使用令牌启动：${reset}"
-            echo -e "   ${cyan}$CFD_BIN tunnel run --token $TOKEN${reset}"
-            
-            echo -e "\n${green}2. 使用隧道名启动（推荐）：${reset}"
-            echo -e "   ${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
+        JSON_FILE="$CLOUDFLARED_DIR/${TUNNEL_ID}.json"
+    echo -e "\n${yellow}🔍 隧道凭证验证：${reset}"
+    
+    if [[ -f "$JSON_FILE" ]]; then
+        if ! jq -e . "$JSON_FILE" >/dev/null 2>&1; then
+            error "凭证文件损坏或格式错误"
+            echo -e "${cyan}建议删除后重新创建："
+            echo -e "rm -f $JSON_FILE && $CFD_BIN tunnel create $TUNNEL_NAME${reset}"
         else
-            error "凭证提取失败，但隧道已创建成功"
-            echo -e "${yellow}🛠️ 解决方案：${reset}"
-            echo -e "1. 直接使用隧道名启动："
-            echo -e "   ${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
+            JSON_DATA=$(jq '.' "$JSON_FILE")
+            JSON_TUNNEL_NAME=$(echo "$JSON_DATA" | jq -r '.tunnel_name // .TunnelName // .TunnelID // "unknown"')
+            TOKEN=$(echo "$JSON_DATA" | jq -r '.credentials_file // .Token // .token // empty')
             
-            echo -e "\n2. 重新生成凭证："
-            echo -e "   ${cyan}rm -f $JSON_FILE && $CFD_BIN tunnel create $TUNNEL_NAME${reset}"
+            echo -e "${lightpink}├─ 配置名称: ${green}$TUNNEL_NAME${reset}"
+            echo -e "${lightpink}├─ 凭证文件: ${green}$JSON_TUNNEL_NAME${reset}"
+            
+            if [[ -n "$TOKEN" && "$TOKEN" != "null" ]]; then
+                echo -e "${lightpink}└─ 令牌状态: ${green}有效${reset}\n"
+                
+                echo -e "${green}✅ 推荐启动方式：${reset}"
+                echo -e "${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
+                
+                echo -e "\n${yellow}备用启动方式：${reset}"
+                echo -e "${cyan}$CFD_BIN tunnel run --token $TOKEN${reset}"
+            else
+                warning "令牌字段不存在或为空"
+                echo -e "${green}✅ 请使用隧道名启动：${reset}"
+                echo -e "${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
+                
+                echo -e "\n${yellow}调试建议：${reset}"
+                echo -e "查看凭证内容：${cyan}jq . $JSON_FILE${reset}"
+            fi
         fi
     else
-        error "未找到凭证文件，但隧道已创建成功"
-        echo -e "${yellow}🛠️ 您可以：${reset}"
-        echo -e "1. 尝试列出所有隧道："
-        echo -e "   ${cyan}$CFD_BIN tunnel list${reset}"
+        error "未找到凭证文件"
+        echo -e "${green}✅ 请使用隧道名启动：${reset}"
+        echo -e "${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
         
-        echo -e "\n2. 使用隧道名启动："
-        echo -e "   ${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
-        
-        echo -e "\n3. 重新创建隧道："
-        echo -e "   ${cyan}$CFD_BIN tunnel delete $TUNNEL_NAME && $CFD_BIN tunnel create $TUNNEL_NAME${reset}"
+        echo -e "\n${yellow}重建建议：${reset}"
+        echo -e "1. 列出所有隧道：${cyan}$CFD_BIN tunnel list${reset}"
+        echo -e "2. 删除重建：${cyan}$CFD_BIN tunnel delete $TUNNEL_NAME && $CFD_BIN tunnel create $TUNNEL_NAME${reset}"
     fi
     
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
