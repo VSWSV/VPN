@@ -286,7 +286,7 @@ handle_tunnel() {
         warning " 未检测到授权证书，准备进行 Cloudflare 授权登录..."
     else
          info "🔐 已检测到授权证书：$CERT_FILE"
-        read -p "$(echo -e "${yellow}❓检测到已有证书文件，是否删除后重新登录？(Y/n): ${reset}")" cert_choice
+        read -p "$(echo -e "${yellow}❓检测到已有证书文件，是否删除后重授权？(Y/n): ${reset}")" cert_choice
         if [[ "$cert_choice" =~ ^[Yy]$ ]]; then
             rm -f "$CERT_FILE"
             info "✅ 已删除旧证书，准备重新登录..."
