@@ -123,7 +123,7 @@ input_info() {
         CURRENT_TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         prompt_default() { echo -ne "${yellow}$1 [${green}$2${yellow}]: ${reset}"; }
     else
-        info "📝 请输入 Cloudflare 配置信息："
+          "📝 请输入 Cloudflare 配置信息："
         prompt_default() { echo -ne "${yellow}$1: ${reset}"; }
     fi
 
