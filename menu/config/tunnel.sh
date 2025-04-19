@@ -217,29 +217,37 @@ check_dns_record() {
         info "检测到已存在的${record_type}记录："
         echo -e "${lightpink}├─ 记录名: ${green}$record_name${reset}"
         echo -e "${lightpink}├─ 记录值: ${green}$(echo "$existing_record" | jq -r '.result[0].content')${reset}"
+        echo -e "${lightpink}└─ 记录ID: ${green}$(echo "$existing_record" | jq -r '.result[0].id')${reset}"
         
         while true; do
-            read -p "$(echo -e "${yellow}是否重新创建此记录？(Y/n): ${reset}")" choice
+            read -p "$(echo -e "${yellow}是否删除并重建此记录？(Y/n): ${reset}")" choice
             case "$choice" in
                 Y|y)
                     record_id=$(echo "$existing_record" | jq -r '.result[0].id')
                     delete_result=$(curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$record_id" \
                         -H "Authorization: Bearer $CF_API_TOKEN" \
                         -H "Content-Type: application/json")
-                    return 0 ;;
+                    if echo "$delete_result" | grep -q '"success":true'; then
+                        success "记录删除成功"
+                        return 0
+                    else
+                        error "记录删除失败"
+                        return 1
+                    fi ;;
                 N|n)
-                    info "已跳过${record_type}记录创建"
+                    info "将使用现有${record_type}记录继续操作"
                     return 1 ;;
                 *)
                     error "无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
+    else
+        return 0
     fi
-    return 0
 }
 
 create_dns_records() {
-    info "📡 开始创建 DNS 记录..."
+    info "📡 开始处理 DNS 记录..."
     ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CF_ZONE" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" | jq -r '.result[0].id')
@@ -325,39 +333,9 @@ authorize_and_create_tunnel() {
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
 }
 
-check_cname_record() {
-    existing_cname=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=CNAME&name=$SUB_DOMAIN" \
-        -H "Authorization: Bearer $CF_API_TOKEN" \
-        -H "Content-Type: application/json")
-        
-    if echo "$existing_cname" | jq -e '.result[0]' >/dev/null; then
-        info "检测到已存在的CNAME记录："
-        echo -e "${lightpink}├─ 记录名: ${green}$SUB_DOMAIN${reset}"
-        echo -e "${lightpink}├─ 记录值: ${green}$(echo "$existing_cname" | jq -r '.result[0].content')${reset}"
-        
-        while true; do
-            read -p "$(echo -e "${yellow}是否重新创建此记录？(Y/n): ${reset}")" choice
-            case "$choice" in
-                Y|y)
-                    record_id=$(echo "$existing_cname" | jq -r '.result[0].id')
-                    delete_result=$(curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$record_id" \
-                        -H "Authorization: Bearer $CF_API_TOKEN" \
-                        -H "Content-Type: application/json")
-                    return 0 ;;
-                N|n)
-                    info "已跳过CNAME记录创建"
-                    return 1 ;;
-                *)
-                    error "无效输入，请输入 Y/y 或 N/n" ;;
-            esac
-        done
-    fi
-    return 0
-}
-
 create_cname_record() {
-    info "🔗 正在创建 CNAME 记录..."
-    if check_cname_record; then
+    info "🔗 正在处理 CNAME 记录..."
+    if check_dns_record "CNAME" "$SUB_DOMAIN" "$TUNNEL_ID.cfargotunnel.com"; then
         CNAME_RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
             -H "Authorization: Bearer $CF_API_TOKEN" \
             -H "Content-Type: application/json" \
