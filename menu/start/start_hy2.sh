@@ -6,6 +6,7 @@ red="\033[1;31m"; lightpink="\033[38;5;213m"; reset="\033[0m"
 
 # 固定路径
 HY2_DIR="/root/VPN/HY2"
+HYSTERIA_BIN="/root/VPN/hysteria"  # 修正路径
 CONFIG_PATH="$HY2_DIR/config/hysteria.yaml"
 LOG_PATH="$HY2_DIR/logs/hysteria.log"
 PID_PATH="$HY2_DIR/pids/hysteria.pid"
@@ -14,6 +15,19 @@ function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
     echo -e "${cyan}                              🚀 启动 Hysteria 2 服务                          ${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+}
+
+function verify_binary() {
+    [ -f "$HYSTERIA_BIN" ] || {
+        echo -e "${red}❌ Hysteria 可执行文件不存在于: $HYSTERIA_BIN${reset}"
+        echo -e "${yellow}请确保已正确安装Hysteria核心文件${reset}"
+        exit 1
+    }
+    [ -x "$HYSTERIA_BIN" ] || {
+        echo -e "${red}❌ 缺少执行权限: $HYSTERIA_BIN${reset}"
+        echo -e "${yellow}尝试执行: chmod +x $HYSTERIA_BIN${reset}"
+        exit 1
+    }
 }
 
 function verify_config() {
@@ -42,6 +56,9 @@ function generate_subscription() {
 # 主流程
 header
 
+# 二进制文件验证
+verify_binary
+
 # 配置验证
 if ! verify_config; then
     echo -e "${yellow}请先运行配置脚本: ${lightpink}bash /root/VPN/menu/config/config_hy2.sh${reset}"
@@ -62,9 +79,9 @@ fi
 
 # 启动服务
 echo -e "${yellow}🔄 正在启动服务...${reset}"
-nohup /root/VPN/hysteria/hysteria server --config "$CONFIG_PATH" > "$LOG_PATH" 2>&1 &
+nohup "$HYSTERIA_BIN" server --config "$CONFIG_PATH" > "$LOG_PATH" 2>&1 &
 echo $! > "$PID_PATH"
-sleep 1
+sleep 2  # 增加等待时间
 
 # 状态检查
 if ps -p $(cat "$PID_PATH") >/dev/null; then
@@ -79,6 +96,11 @@ if ps -p $(cat "$PID_PATH") >/dev/null; then
     echo -e "${green}$(cat $SUB_FILE)${reset}"
 else
     echo -e "${red}❌ 启动失败! 查看日志: ${lightpink}$LOG_PATH${reset}"
+    echo -e "${yellow}可能原因:"
+    echo "1. 二进制文件执行失败"
+    echo "2. 配置文件格式错误"
+    echo "3. 系统资源不足"
+    echo -e "4. 端口权限问题${reset}"
 fi
 
 footer() {
