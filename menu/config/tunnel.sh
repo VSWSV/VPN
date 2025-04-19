@@ -301,6 +301,7 @@ authorize_and_create_tunnel() {
 
 final_info() {
     info "📦 所有步骤已完成，以下为生成的配置信息："
+    
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
     echo -e "${lightpink}API 令牌：${green}$CF_API_TOKEN${reset}"
     echo -e "${lightpink}顶级域名：${green}$CF_ZONE${reset}"
