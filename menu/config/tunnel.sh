@@ -395,6 +395,43 @@ handle_cname_record() {
     fi
 }
 
+generate_config_yml() {
+    while true; do
+        read -p "$(echo -e "${yellow}请输入本地代理端口（回车随机生成 20000-29999）：${reset}")" custom_port
+        if [[ -z "$custom_port" ]]; then
+            for i in {1..20}; do
+                rand_port=$((RANDOM % 10000 + 20000))
+                if ! lsof -i:"$rand_port" &>/dev/null; then
+                    PORT="$rand_port"
+                    break
+                fi
+            done
+            [[ -z "$PORT" ]] && { error "无法生成可用端口，请检查端口占用"; return 1; }
+            break
+        elif [[ "$custom_port" =~ ^[0-9]+$ ]] && ((custom_port >= 1 && custom_port <= 65535)); then
+            if ! lsof -i:"$custom_port" &>/dev/null; then
+                PORT="$custom_port"
+                break
+            else
+                warning "端口 ${custom_port} 被占用，请重新输入"
+            fi
+        else
+            warning "输入无效，请输入 1~65535 的端口号"
+        fi
+    done
+
+    CONFIG_YML="$CLOUDFLARED_DIR/config.yml"
+    cat > "$CONFIG_YML" <<EOF
+url: http://localhost:$PORT
+logfile: /root/.cloudflared/tunnel.log
+tunnel: $TUNNEL_ID
+credentials-file: $CLOUDFLARED_DIR/$TUNNEL_ID.json
+EOF
+
+    success "📄 已生成配置文件：${green}$CONFIG_YML${reset}"
+    info "🚪 隧道将转发至本地端口：${green}$PORT${reset}"
+}
+
 final_info() {
      info "📦 所有步骤已完成，以下为生成的配置信息："
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
