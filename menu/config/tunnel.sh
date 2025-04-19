@@ -301,7 +301,7 @@ handle_tunnel() {
             error "2. 邮箱和 API 令牌是否正确"
             exit 1
         fi
-        success "✅ 授权成功，使用证书路径：${green}$CERT_FILE${reset}"
+        success " 授权成功，使用证书路径：${green}$CERT_FILE${reset}"
     fi
 
 
@@ -317,8 +317,7 @@ handle_tunnel() {
                 Y|y)
                     $CFD_BIN tunnel delete "$TUNNEL_NAME" >/dev/null 2>&1
                     if [ $? -eq 0 ]; then
-                   success "✅ 旧隧道删除成功"
-                   echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
+                   success " 旧隧道删除成功"
 
                     else
                         error "❌ 隧道删除失败"
@@ -326,8 +325,8 @@ handle_tunnel() {
                 fi
                     break ;;
                 N|n)
-                    success "✅ 已使用现有隧道"
-                    echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
+                    success " 已使用现有隧道"
+            
                     TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
                     return 0 ;;
                 *) error "❌ 无效输入，请输入 Y/y 或 N/n" ;;
@@ -338,8 +337,7 @@ handle_tunnel() {
 
     info "🚧 正在创建隧道..."
     if $CFD_BIN tunnel create "$TUNNEL_NAME" >/dev/null 2>&1; then
-        success "✅ 隧道创建成功"
-        echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
+        success " 隧道创建成功"   
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
         echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
     else
