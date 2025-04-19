@@ -7,11 +7,11 @@ lightpink='\033[38;5;218m'
 green='\033[1;32m'
 reset='\033[0m'
 
-# 仅保留必要的路径变量
-VPN_DIR="/root/VPN"
-CERT_FILE="/root/.cloudflared/cert.pem"
-CFD_BIN="$VPN_DIR/cloudflared"
-CONFIG_FILE="$VPN_DIR/config_info.txt"
+# 修改后的路径变量（统一存放在.cloudflared目录）
+CLOUDFLARED_DIR="/root/.cloudflared"
+CERT_FILE="$CLOUDFLARED_DIR/cert.pem"
+CFD_BIN="/root/VPN/cloudflared"  # 二进制文件位置保持不变
+CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"  # 配置文件现在存放到.cloudflared目录
 
 show_top_title() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
@@ -36,6 +36,10 @@ error() {
 }
 
 check_config_and_cert() {
+    # 确保.cloudflared目录存在
+    mkdir -p "$CLOUDFLARED_DIR"
+    chmod 700 "$CLOUDFLARED_DIR"
+
     if [[ -f "$CONFIG_FILE" ]]; then
         echo -e "${yellow}🔹 检测到已有配置文件：${reset}"
         printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
@@ -65,7 +69,7 @@ check_config_and_cert() {
                 Y|y)
                     TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
                     rm -f "$CONFIG_FILE"
-                    [[ -n "$TUNNEL_ID" ]] && rm -f "/root/.cloudflared/${TUNNEL_ID}.json"
+                    [[ -n "$TUNNEL_ID" ]] && rm -f "$CLOUDFLARED_DIR/${TUNNEL_ID}.json"
                     success "已删除旧配置文件及对应隧道 JSON：$TUNNEL_ID"
                     break ;;
                 N|n)
@@ -230,18 +234,17 @@ final_info() {
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 
-    JSON_FILE="/root/.cloudflared/${TUNNEL_ID}.json"
+    JSON_FILE="$CLOUDFLARED_DIR/${TUNNEL_ID}.json"
     if [[ -f "$JSON_FILE" ]]; then
         success "隧道凭证文件已位于：${green}$JSON_FILE${reset}"
         echo -e "${yellow}👉 启动命令如下：${reset}"
-        echo -e "${green}$CFD_BIN tunnel run --token $(cat /root/.cloudflared/$TUNNEL_ID.json | jq -r '.Token')${reset}"
+        echo -e "${green}$CFD_BIN tunnel run --token $(cat $JSON_FILE | jq -r '.Token')${reset}"
     else
-        error "未找到隧道凭证文件 ${TUNNEL_ID}.json，请检查目录：${green}/root/.cloudflared/${reset}"
+        error "未找到隧道凭证文件 ${TUNNEL_ID}.json，请检查目录：${green}$CLOUDFLARED_DIR/${reset}"
     fi
     
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
-    ls -lh /root/.cloudflared/ | grep -E "cert.pem|$TUNNEL_ID.json"
-    ls -lh "$CONFIG_FILE"
+    ls -lh "$CLOUDFLARED_DIR" | grep -E "cert.pem|$TUNNEL_ID.json|config_info.txt"
 }
 
 main() {
@@ -256,7 +259,7 @@ main() {
     show_bottom_line
     chmod +x "$0"
     read -p "按回车键返回主菜单..." dummy
-    bash "$VPN_DIR/menu/config_node.sh"
+    bash "/root/VPN/menu/config_node.sh"
 }
 
 main
