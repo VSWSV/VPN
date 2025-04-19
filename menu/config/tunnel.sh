@@ -336,9 +336,7 @@ handle_tunnel() {
     else
              error "隧道创建失败"
              return 1
-        esac
-    done
-fi
+      fi
 }
 
 
