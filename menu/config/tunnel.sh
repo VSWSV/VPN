@@ -281,11 +281,11 @@ create_dns_records() {
 }
 
 handle_tunnel() {
-  
+
     if [[ ! -f "$CERT_FILE" ]]; then
-        warning " 未检测到授权证书，准备进行 Cloudflare 授权登录..."
+        warning "未检测到授权证书，准备进行 Cloudflare 授权登录..."
     else
-         info "🔐 已检测到授权证书：$CERT_FILE"
+        info "🔐 已检测到授权证书：$CERT_FILE"
         read -p "$(echo -e "${yellow}❓检测到已有证书文件，是否删除后重授权？(Y/n): ${reset}")" cert_choice
         if [[ "$cert_choice" =~ ^[Yy]$ ]]; then
             rm -f "$CERT_FILE"
@@ -294,56 +294,84 @@ handle_tunnel() {
     fi
 
     if [[ ! -f "$CERT_FILE" ]]; then
-         info "🧩 开始 Cloudflare 隧道授权..."
+        info "🧩 开始 Cloudflare 隧道授权..."
         if ! $CFD_BIN tunnel login; then
-            error "❌ 授权失败，请检查以下事项："
-            error "1. 网络连接是否正常"
-            error "2. 邮箱和 API 令牌是否正确"
+            error "❌ 授权失败，请检查网络和凭证"
             exit 1
         fi
-        success " 授权成功，使用证书路径：${green}$CERT_FILE${reset}"
+        success "授权成功，使用证书路径：${green}$CERT_FILE${reset}"
     fi
-
 
     if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
-         info "🔍 检测到已存在的隧道："
+        info "🔍 检测到已存在的隧道："
         echo -e "${lightpink}├─ 隧道名: ${green}$TUNNEL_NAME${reset}"
         echo -e "${lightpink}└─ 隧道ID: ${green}$TUNNEL_ID${reset}"
-
         while true; do
             read -p "$(echo -e "${yellow}❓是否删除并重建？(Y/n): ${reset}")" choice
             case "$choice" in
                 Y|y)
                     $CFD_BIN tunnel delete "$TUNNEL_NAME" >/dev/null 2>&1
                     if [ $? -eq 0 ]; then
-                   success " 旧隧道删除成功"
-
+                        success "旧隧道删除成功"
                     else
-                        error " 隧道删除失败"
+                        error "隧道删除失败"
                         return 1
-                fi
+                    fi
                     break ;;
                 N|n)
-                    success " 已使用现有隧道"
-            
+                    success "已使用现有隧道"
                     TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
                     return 0 ;;
-                *) error " 无效输入，请输入 Y/y 或 N/n" ;;
+                *) error "无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
     fi
 
-
     info "🚧 正在创建隧道..."
     if $CFD_BIN tunnel create "$TUNNEL_NAME" >/dev/null 2>&1; then
-        success " 隧道创建成功"   
+        success "隧道创建成功"
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
         echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
     else
-        error " 隧道创建失败"
+        error "隧道创建失败"
         return 1
     fi
+
+    while true; do
+        read -p "$(echo -e "${yellow}请输入本地代理端口（回车随机生成 20000-29999）：${reset}")" custom_port
+        if [[ -z "$custom_port" ]]; then
+            for i in {1..20}; do
+                rand_port=$((RANDOM % 10000 + 20000))
+                if ! lsof -i:"$rand_port" &>/dev/null; then
+                    PORT="$rand_port"
+                    break
+                fi
+            done
+            [[ -z "$PORT" ]] && { error "无法生成可用端口，请检查端口占用"; return 1; }
+            break
+        elif [[ "$custom_port" =~ ^[0-9]+$ ]] && ((custom_port >= 1 && custom_port <= 65535)); then
+            if ! lsof -i:"$custom_port" &>/dev/null; then
+                PORT="$custom_port"
+                break
+            else
+                warning "端口 ${custom_port} 被占用，请重新输入"
+            fi
+        else
+            warning "输入无效，请输入 1~65535 的端口号"
+        fi
+    done
+
+    CONFIG_YML="$CLOUDFLARED_DIR/config.yml"
+    cat > "$CONFIG_YML" <<EOF
+url: http://localhost:$PORT
+logfile: /root/.cloudflared/tunnel.log
+tunnel: $TUNNEL_ID
+credentials-file: $CLOUDFLARED_DIR/$TUNNEL_ID.json
+EOF
+
+    success "📄 已生成配置文件：${green}$CONFIG_YML${reset}"
+    info "🚪 隧道将转发至本地端口：${green}$PORT${reset}"
 }
 
 
