@@ -2,7 +2,7 @@
 
 # 颜色定义
 cyan="\033[1;36m"; green="\033[1;32m"; yellow="\033[1;33m"
-red="\033[1;31m"; reset="\033[0m"
+red="\033[1;31m"; lightpink="\033[38;5;213m"; reset="\033[0m"
 
 # 固定路径
 HY2_DIR="/root/VPN/HY2"
@@ -12,7 +12,7 @@ PID_PATH="$HY2_DIR/pids/hysteria.pid"
 
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-    echo -e "${cyan}                              🚀 启动 Hysteria 2 服务                            ${reset}"
+    echo -e "${cyan}                              🚀 启动 Hysteria 2 服务                          ${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -21,10 +21,22 @@ function verify_config() {
     grep -q "password:" "$CONFIG_PATH" || { echo -e "${red}❌ 配置缺少password字段"; return 1; }
     
     if grep -q "tls:" "$CONFIG_PATH"; then
-        grep -q "cert:" "$CONFIG_PATH" || { echo -e "${red}❌ 缺少cert路径"; return 1; }
-        grep -q "key:" "$CONFIG_PATH" || { echo -e "${red}❌ 缺少key路径"; return 1; }
+        grep -q "sni:" "$CONFIG_PATH" || { echo -e "${red}❌ 缺少SNI配置"; return 1; }
     fi
     return 0
+}
+
+function generate_subscription() {
+    local uuid=$1
+    local port=$2
+    local sni=$3
+    local alpn=$4
+    
+    # 获取公网IP（优先IPv4）
+    local public_ip=$(curl -s4 ifconfig.co || curl -s6 ifconfig.co)
+    
+    # 生成标准Hysteria2订阅链接
+    echo "hysteria2://${uuid}@${public_ip}:${port}?sni=${sni}&alpn=${alpn}&insecure=1#${sni}-HY2"
 }
 
 # 主流程
@@ -40,6 +52,7 @@ fi
 PORT=$(grep "listen:" "$CONFIG_PATH" | awk '{print $2}' | tr -d ':')
 UUID=$(grep "password:" "$CONFIG_PATH" | awk -F'"' '{print $2}')
 SNI=$(grep "sni:" "$CONFIG_PATH" | awk '{print $2}')
+ALPN=$(grep -A1 "alpn:" "$CONFIG_PATH" | tail -1 | tr -d ' -' || echo "h3")
 
 # 端口检查
 if ss -tulnp | grep -q ":$PORT "; then
@@ -49,7 +62,7 @@ fi
 
 # 启动服务
 echo -e "${yellow}🔄 正在启动服务...${reset}"
-nohup /root/VPN/hysteria --config "$CONFIG_PATH" server > "$LOG_PATH" 2>&1 &
+nohup /root/VPN/hysteria/hysteria server --config "$CONFIG_PATH" > "$LOG_PATH" 2>&1 &
 echo $! > "$PID_PATH"
 sleep 1
 
@@ -59,10 +72,11 @@ if ps -p $(cat "$PID_PATH") >/dev/null; then
     
     # 生成订阅
     SUB_FILE="$HY2_DIR/subscriptions/hy2_sub.txt"
-    cat > "$SUB_FILE" <<EOF
-hy2://$UUID@$(curl -s4 ifconfig.co):$PORT/?sni=$SNI&insecure=1#HY2_$SNI
-EOF
+    generate_subscription "$UUID" "$PORT" "$SNI" "$ALPN" > "$SUB_FILE"
+    
     echo -e "${green}📡 订阅链接已生成: ${lightpink}$SUB_FILE${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${green}$(cat $SUB_FILE)${reset}"
 else
     echo -e "${red}❌ 启动失败! 查看日志: ${lightpink}$LOG_PATH${reset}"
 fi
