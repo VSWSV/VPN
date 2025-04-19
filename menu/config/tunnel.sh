@@ -7,10 +7,11 @@ lightpink='\033[38;5;218m'
 green='\033[1;32m'
 reset='\033[0m'
 
+# 路径配置
 CLOUDFLARED_DIR="/root/.cloudflared"
 CERT_FILE="$CLOUDFLARED_DIR/cert.pem"
-CFD_BIN="/root/VPN/cloudflared"  
-CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt" 
+CFD_BIN="/root/VPN/cloudflared"
+CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"
 
 show_top_title() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
@@ -32,6 +33,14 @@ success() {
 
 error() {
     echo -e "\033[1;31m❌ $1${reset}"
+}
+
+validate_email() {
+    [[ "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
+}
+
+validate_domain() {
+    [[ "$1" =~ ^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$ ]]
 }
 
 check_config_and_cert() {
@@ -108,43 +117,51 @@ get_ip_addresses() {
     info "📶 当前公网 IPv6：${green}$IPV6${reset}"
 }
 
-validate_email() {
-    [[ "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
-}
-
-validate_domain() {
-    [[ "$1" =~ ^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$ ]]
-}
-
 input_info() {
-    info "📝 请输入 Cloudflare 配置信息："
+    if [[ -f "$CONFIG_FILE" ]]; then
+        info "📝 正在读取现有配置（可直接按回车使用当前值）："
+        
+        CURRENT_CF_EMAIL=$(grep "账户邮箱：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+        CURRENT_CF_API_TOKEN=$(grep "API令牌：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+        CURRENT_CF_ZONE=$(grep "顶级域名：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+        CURRENT_SUB_DOMAIN=$(grep "子域前缀：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+        CURRENT_TUNNEL_NAME=$(grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+        CURRENT_TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
+    else
+        info "📝 请输入 Cloudflare 配置信息："
+    fi
 
     while true; do
-        read -p "📧 账户邮箱: " CF_EMAIL
+        read -p "📧 账户邮箱 [${green}${CURRENT_CF_EMAIL:-无}${reset}]: " CF_EMAIL
+        CF_EMAIL=${CF_EMAIL:-$CURRENT_CF_EMAIL}
         info "输入为：${green}$CF_EMAIL${reset}"
         validate_email "$CF_EMAIL" && break || error "邮箱格式无效，请重新输入。"
     done
 
     while true; do
-        read -p "🔑 API 令牌: " CF_API_TOKEN
+        read -p "🔑 API 令牌 [${green}${CURRENT_CF_API_TOKEN:-无}${reset}]: " CF_API_TOKEN
+        CF_API_TOKEN=${CF_API_TOKEN:-$CURRENT_CF_API_TOKEN}
         info "输入为：${green}$CF_API_TOKEN${reset}"
         [[ -n "$CF_API_TOKEN" ]] && break || error "API 令牌不能为空，请重新输入。"
     done
 
     while true; do
-        read -p "🌐 顶级域名: (如 xiaomi.com): " CF_ZONE
+        read -p "🌐 顶级域名 [${green}${CURRENT_CF_ZONE:-无}${reset}]: " CF_ZONE
+        CF_ZONE=${CF_ZONE:-$CURRENT_CF_ZONE}
         info "输入为：${green}$CF_ZONE${reset}"
         validate_domain "$CF_ZONE" && break || error "顶级域名格式无效，请重新输入。"
     done
 
     while true; do
-        read -p "🔖 子域名前缀: (如 www ): " SUB_DOMAIN
+        read -p "🔖 子域名前缀 [${green}${CURRENT_SUB_DOMAIN:-无}${reset}]: " SUB_DOMAIN
+        SUB_DOMAIN=${SUB_DOMAIN:-$CURRENT_SUB_DOMAIN}
         info "输入为：${green}$SUB_DOMAIN${reset}"
         [[ "$SUB_DOMAIN" =~ ^[a-zA-Z0-9-]+$ ]] && break || error "子域名前缀无效，只能包含字母、数字和连字符。"
     done
 
     while true; do
-        read -p "🚇 隧道名称: " TUNNEL_NAME
+        read -p "🚇 隧道名称 [${green}${CURRENT_TUNNEL_NAME:-无}${reset}]: " TUNNEL_NAME
+        TUNNEL_NAME=${TUNNEL_NAME:-$CURRENT_TUNNEL_NAME}
         info "输入为：${green}$TUNNEL_NAME${reset}"
         [[ "$TUNNEL_NAME" =~ ^[a-zA-Z0-9_-]+$ ]] && break || error "隧道名称无效，只能包含字母、数字、下划线或连字符。"
     done
@@ -165,6 +182,7 @@ input_info() {
       echo "公网 IPv4：$IPV4"
       echo "公网 IPv6：$IPV6"
       echo "证书路径：$CERT_FILE"
+      [[ -n "$CURRENT_TUNNEL_ID" ]] && echo "隧道ID：$CURRENT_TUNNEL_ID"
     } > "$CONFIG_FILE"
 }
 
@@ -206,7 +224,6 @@ authorize_and_create_tunnel() {
     $CFD_BIN tunnel create "$TUNNEL_NAME" || { error "隧道创建失败"; exit 1; }
 
     TUNNEL_ID=$($CFD_BIN tunnel list | awk -v name="$TUNNEL_NAME" '$2 == name {print $1}')
-    echo "DEBUG: TUNNEL_ID=$TUNNEL_ID"
     [[ -z "$TUNNEL_ID" ]] && { error "未正确获取到隧道 ID，请检查 tunnel list 输出"; exit 1; }
 
     success "隧道 ID：$TUNNEL_ID"
@@ -227,18 +244,34 @@ final_info() {
     echo -e "${lightpink}顶级域名：${green}$CF_ZONE${reset}"
     echo -e "${lightpink}子域名前缀：${green}$SUB_DOMAIN${reset}"
     echo -e "${lightpink}隧道名称：${green}$TUNNEL_NAME${reset}"
-    echo -e "${lightpink}隧道ID：${green}$TUNNEL_ID${reset}"
+    [[ -n "$TUNNEL_ID" ]] && echo -e "${lightpink}隧道ID：${green}$TUNNEL_ID${reset}"
     echo -e "${lightpink}公网 IPv4：${green}$IPV4${reset}"
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 
     JSON_FILE="$CLOUDFLARED_DIR/${TUNNEL_ID}.json"
+    echo -e "\n${yellow}👉 隧道启动方式：${reset}"
+    
     if [[ -f "$JSON_FILE" ]]; then
-        success "隧道凭证文件已位于：${green}$JSON_FILE${reset}"
-        echo -e "${yellow}👉 启动命令如下：${reset}"
-        echo -e "${green}$CFD_BIN tunnel run --token $(cat $JSON_FILE | jq -r '.Token')${reset}"
+        TOKEN=$(jq -e -r '.Token' "$JSON_FILE" 2>/dev/null)
+        
+        if [[ $? -eq 0 && -n "$TOKEN" && "$TOKEN" != "null" ]]; then
+            echo -e "${green}方式1 (使用token启动):${reset}"
+            echo -e "$CFD_BIN tunnel run --token $TOKEN\n"
+            
+            echo -e "${green}方式2 (使用隧道名启动):${reset}"
+            echo -e "$CFD_BIN tunnel run $TUNNEL_NAME\n"
+            
+            echo -e "${yellow}💡 提示：如果token启动失败，请尝试使用隧道名启动方式${reset}"
+        else
+            error "令牌提取失败，JSON文件格式可能不正确"
+            echo -e "${green}备用启动方式:${reset}"
+            echo -e "$CFD_BIN tunnel run $TUNNEL_NAME"
+        fi
     else
-        error "未找到隧道凭证文件 ${TUNNEL_ID}.json，请检查目录：${green}$CLOUDFLARED_DIR/${reset}"
+        error "未找到隧道凭证文件 ${TUNNEL_ID}.json"
+        echo -e "${yellow}请尝试手动创建隧道后使用:${reset}"
+        echo -e "$CFD_BIN tunnel run <隧道名称>"
     fi
     
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
