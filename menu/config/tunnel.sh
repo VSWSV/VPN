@@ -7,16 +7,11 @@ lightpink='\033[38;5;218m'
 green='\033[1;32m'
 reset='\033[0m'
 
+# 仅保留必要的路径变量
 VPN_DIR="/root/VPN"
-CERT_FILE="$VPN_DIR/cert.pem"
-XRAY_BIN="$VPN_DIR/xray/xray"
-XRAY_CONF="$VPN_DIR/xray/config.json"
-HYSTERIA_BIN="$VPN_DIR/hysteria"
-HYSTERIA_CONF="$VPN_DIR/hysteria.yaml"
+CERT_FILE="/root/.cloudflared/cert.pem"
 CFD_BIN="$VPN_DIR/cloudflared"
-
-CONFIG_DIR="$VPN_DIR"
-CONFIG_FILE="$CONFIG_DIR/config_info.txt"
+CONFIG_FILE="$VPN_DIR/config_info.txt"
 
 show_top_title() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
@@ -70,7 +65,7 @@ check_config_and_cert() {
                 Y|y)
                     TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
                     rm -f "$CONFIG_FILE"
-                    [[ -n "$TUNNEL_ID" ]] && rm -f "$VPN_DIR/${TUNNEL_ID}.json"
+                    [[ -n "$TUNNEL_ID" ]] && rm -f "/root/.cloudflared/${TUNNEL_ID}.json"
                     success "已删除旧配置文件及对应隧道 JSON：$TUNNEL_ID"
                     break ;;
                 N|n)
@@ -204,32 +199,16 @@ authorize_and_create_tunnel() {
         exit 1
     fi
 
-    if [[ -f /root/.cloudflared/cert.pem ]]; then
-        mv /root/.cloudflared/cert.pem "$CERT_FILE"
-        [[ $? -eq 0 ]] && success "已剪贴授权证书到 ${green}$CERT_FILE${reset}" || { error "剪贴证书失败"; exit 1; }
-    else
-        error "未找到默认授权证书 /root/.cloudflared/cert.pem"
-        exit 1
-    fi
-
     success "授权成功，使用证书路径：${green}$CERT_FILE${reset}"
 
-    TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel create "$TUNNEL_NAME" || { error "隧道创建失败"; exit 1; }
+    $CFD_BIN tunnel create "$TUNNEL_NAME" || { error "隧道创建失败"; exit 1; }
 
-    TUNNEL_ID=$(TUNNEL_ORIGIN_CERT="$CERT_FILE" $CFD_BIN tunnel list | awk -v name="$TUNNEL_NAME" '$2 == name {print $1}')
+    TUNNEL_ID=$($CFD_BIN tunnel list | awk -v name="$TUNNEL_NAME" '$2 == name {print $1}')
     echo "DEBUG: TUNNEL_ID=$TUNNEL_ID"
     [[ -z "$TUNNEL_ID" ]] && { error "未正确获取到隧道 ID，请检查 tunnel list 输出"; exit 1; }
 
     success "隧道 ID：$TUNNEL_ID"
     echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
-
-if [[ -f /root/.cloudflared/${TUNNEL_ID}.json ]]; then
-    mv /root/.cloudflared/${TUNNEL_ID}.json "$VPN_DIR/${TUNNEL_ID}.json"
-    [[ $? -eq 0 ]] && success "隧道凭证已保存到 ${green}$VPN_DIR/${TUNNEL_ID}.json${reset}" || { error "移动凭证文件失败"; exit 1; }
-else
-    error "未找到隧道凭证文件 /root/.cloudflared/${TUNNEL_ID}.json"
-    exit 1
-fi
 
     info "🔗 创建 CNAME 记录..."
     CNAME_RESULT=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
@@ -251,14 +230,18 @@ final_info() {
     echo -e "${lightpink}公网 IPv6：${green}$IPV6${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 
-    JSON_FILE="$VPN_DIR/${TUNNEL_ID}.json"
+    JSON_FILE="/root/.cloudflared/${TUNNEL_ID}.json"
     if [[ -f "$JSON_FILE" ]]; then
         success "隧道凭证文件已位于：${green}$JSON_FILE${reset}"
         echo -e "${yellow}👉 启动命令如下：${reset}"
-        echo -e "${green}TUNNEL_ORIGIN_CERT=$CERT_FILE $CFD_BIN tunnel run --cred-file $JSON_FILE $TUNNEL_NAME${reset}"
+        echo -e "${green}$CFD_BIN tunnel run --token $(cat /root/.cloudflared/$TUNNEL_ID.json | jq -r '.Token')${reset}"
     else
-        error "未找到隧道凭证文件 ${TUNNEL_ID}.json，请检查目录：${green}$VPN_DIR${reset}"
+        error "未找到隧道凭证文件 ${TUNNEL_ID}.json，请检查目录：${green}/root/.cloudflared/${reset}"
     fi
+    
+    echo -e "\n${lightpink}📁 生成的文件：${reset}"
+    ls -lh /root/.cloudflared/ | grep -E "cert.pem|$TUNNEL_ID.json"
+    ls -lh "$CONFIG_FILE"
 }
 
 main() {
