@@ -28,24 +28,10 @@ show_bottom_line() {
 }
 
 # 信息显示函数
-info() {
-    echo -e "${yellow}🔹 $1${reset}"
-}
-
-# 成功显示函数
-success() {
-    echo -e "${lightpink}✅ $1${reset}"
-}
-
-# 错误显示函数
-error() {
-    echo -e "${red}❌ $1${reset}"
-}
-
-# 警告显示函数
-warning() {
-    echo -e "\033[38;5;226m⚠️ $1${reset}"
-}
+info() { echo -e "${yellow}🔹 $1${reset}"; }
+success() { echo -e "${lightpink}✅ $1${reset}"; }
+error() { echo -e "${red}❌ $1${reset}"; }
+warning() { echo -e "\033[38;5;226m⚠️ $1${reset}"; }
 
 # 邮箱验证
 validate_email() {
@@ -57,7 +43,7 @@ validate_domain() {
     [[ "$1" =~ ^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$ ]]
 }
 
-# 检查配置和证书
+# 检查配置文件与证书
 check_config_and_cert() {
     mkdir -p "$CLOUDFLARED_DIR"
     chmod 700 "$CLOUDFLARED_DIR"
@@ -84,7 +70,7 @@ check_config_and_cert() {
             printf "${lightpink}%-$(($max_len+3))s${reset}${green}%s${reset}\n" "${key}：" "$value"
         done < "$CONFIG_FILE"
         echo
-        
+
         while true; do
             read -p "$(echo -e "${yellow}是否删除现有配置并重新设置？(Y/n): ${reset}")" delchoice
             case "$delchoice" in
@@ -97,9 +83,7 @@ check_config_and_cert() {
                 N|n)
                     info "保留现有配置，继续执行"
                     break ;;
-                *)
-                    error "无效输入，请输入 Y/y 或 N/n"
-                    ;;
+                *) error "无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
     fi
@@ -109,21 +93,13 @@ check_config_and_cert() {
         while true; do
             read -p "$(echo -e "${yellow}是否删除旧证书？(Y/n): ${reset}")" certchoice
             case "$certchoice" in
-                Y|y)
-                    rm -f "$CERT_FILE"
-                    success "已删除旧 Cloudflare 授权证书"
-                    break ;;
-                N|n)
-                    info "保留旧证书，继续执行"
-                    break ;;
-                *) 
-                    error "无效输入，请输入 Y/y 或 N/n"
-                    ;;
+                Y|y) rm -f "$CERT_FILE"; success "已删除旧证书"; break ;;
+                N|n) info "保留旧证书"; break ;;
+                *) error "无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
     fi
 }
-
 # 获取IP地址
 get_ip_addresses() {
     IPV4=$(curl -s4 ifconfig.co)
@@ -133,27 +109,20 @@ get_ip_addresses() {
     info "📶 当前公网 IPv6：${green}$IPV6${reset}"
 }
 
-# 输入信息
+# 输入配置信息
 input_info() {
     if [[ -f "$CONFIG_FILE" ]]; then
         info "📝 正在读取现有配置（绿色为当前值，直接回车即可保留）："
-        
         CURRENT_CF_EMAIL=$(grep "账户邮箱：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_CF_API_TOKEN=$(grep "API令牌：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_CF_ZONE=$(grep "顶级域名：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_SUB_DOMAIN=$(grep "子域前缀：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_TUNNEL_NAME=$(grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
         CURRENT_TUNNEL_ID=$(grep "隧道ID：" "$CONFIG_FILE" | awk -F '：' '{print $2}')
-        
-        prompt_default() {
-            echo -ne "${yellow}$1 [${green}$2${yellow}]: ${reset}"
-        }
+        prompt_default() { echo -ne "${yellow}$1 [${green}$2${yellow}]: ${reset}"; }
     else
         info "📝 请输入 Cloudflare 配置信息："
-        
-        prompt_default() {
-            echo -ne "${yellow}$1: ${reset}"
-        }
+        prompt_default() { echo -ne "${yellow}$1: ${reset}"; }
     fi
 
     while true; do
@@ -200,28 +169,54 @@ input_info() {
     info "账户邮箱: ${green}$CF_EMAIL${reset}"
     info "API Token: ${green}$CF_API_TOKEN${reset}"
     info "顶级域名: ${green}$CF_ZONE${reset}"
-    info "子域名: ${green}$SUB_DOMAIN${reset}"
+    info "子域名: ${green}${SUB_DOMAIN}.${CF_ZONE}${reset}"
     info "隧道名称: ${green}$TUNNEL_NAME${reset}"
 
     {
-      echo "账户邮箱：$CF_EMAIL"
-      echo "API令牌：$CF_API_TOKEN"
-      echo "顶级域名：$CF_ZONE"
-      echo "子域前缀：$SUB_DOMAIN"
-      echo "隧道名称：$TUNNEL_NAME"
-      echo "公网 IPv4：$IPV4"
-      echo "公网 IPv6：$IPV6"
-      echo "证书路径：$CERT_FILE"
-      [[ -n "$CURRENT_TUNNEL_ID" ]] && echo "隧道ID：$CURRENT_TUNNEL_ID"
+        echo "账户邮箱：$CF_EMAIL"
+        echo "API令牌：$CF_API_TOKEN"
+        echo "顶级域名：$CF_ZONE"
+        echo "子域前缀：$SUB_DOMAIN"
+        echo "隧道名称：$TUNNEL_NAME"
+        echo "公网 IPv4：$IPV4"
+        echo "公网 IPv6：$IPV6"
+        echo "证书路径：$CERT_FILE"
+        [[ -n "$CURRENT_TUNNEL_ID" ]] && echo "隧道ID：$CURRENT_TUNNEL_ID"
     } > "$CONFIG_FILE"
+    check_root_dns_records
 }
 
-# 处理DNS记录
+# 检查 A / AAAA 记录
+check_root_dns_records() {
+    local ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CF_ZONE" \
+        -H "Authorization: Bearer $CF_API_TOKEN" \
+        -H "Content-Type: application/json" | jq -r '.result[0].id')
+
+    [[ "$ZONE_ID" == "null" || -z "$ZONE_ID" ]] && { error "获取 Zone ID 失败"; return; }
+
+    echo -e "\n${cyan}╔═══════════════════════ DNS 记录检测 ═══════════════════════╗${reset}"
+
+    for record_type in A AAAA; do
+        local record=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=$record_type&name=$CF_ZONE" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
+        if echo "$record" | jq -e '.result[0]' >/dev/null; then
+            local content=$(echo "$record" | jq -r '.result[0].content')
+            echo -e "${lightpink}✅ ${record_type}记录存在：${green}$CF_ZONE → $content${reset}"
+        else
+            echo -e "${yellow}⚠️ ${record_type}记录不存在：${green}$CF_ZONE${reset}"
+        fi
+    done
+
+    echo -e "${cyan}╚═════════════════════════════════════════════════════════════╝${reset}\n"
+}
+# 处理单个 DNS 记录（通用）
 handle_dns_record() {
     local record_type=$1
     local record_name=$2
     local content=$3
-    
+
+    [[ "$record_name" == "@" ]] && record_name="$CF_ZONE"
+
     existing_record=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=$record_type&name=$record_name" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json")
@@ -230,7 +225,7 @@ handle_dns_record() {
         info "检测到已存在的${record_type}记录："
         echo -e "${lightpink}├─ 记录名: ${green}$record_name${reset}"
         echo -e "${lightpink}└─ 记录值: ${green}$(echo "$existing_record" | jq -r '.result[0].content')${reset}"
-        
+
         while true; do
             read -p "$(echo -e "${yellow}是否删除并重建？(Y/n): ${reset}")" choice
             case "$choice" in
@@ -255,15 +250,14 @@ handle_dns_record() {
         done
     fi
 
-    # 创建新记录
     info "正在创建${record_type}记录..."
     create_result=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" \
         --data "{\"type\":\"$record_type\",\"name\":\"$record_name\",\"content\":\"$content\",\"ttl\":1,\"proxied\":false}")
-    
+
     if echo "$create_result" | grep -q '"success":true'; then
-        success "${record_type}记录创建成功"
+        success "${record_type}记录创建成功：$record_name → $content"
     else
         error "${record_type}记录创建失败"
         error "响应结果：$(echo "$create_result" | jq -r '.errors[0].message')"
@@ -271,32 +265,27 @@ handle_dns_record() {
     fi
 }
 
-# 创建DNS记录
+# 创建 DNS（调用A、AAAA）
 create_dns_records() {
     info "📡 开始处理DNS记录..."
-    
-    # 获取Zone ID
+
     ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CF_ZONE" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" | jq -r '.result[0].id')
-    
+
     [[ "$ZONE_ID" == "null" || -z "$ZONE_ID" ]] && { error "获取Zone ID失败"; return 1; }
 
-    # 处理A记录
     echo && handle_dns_record "A" "@" "$IPV4"
-
-    # 处理AAAA记录
     echo && handle_dns_record "AAAA" "@" "$IPV6"
 }
 
-# 处理隧道
+# 隧道处理
 handle_tunnel() {
-    # 检查隧道是否存在
     if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
         info "检测到已存在的隧道："
         echo -e "${lightpink}├─ 隧道名: ${green}$TUNNEL_NAME${reset}"
-        echo -e "${lightpink}└─ 隧道ID: ${green}$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')${reset}"
-        
+        echo -e "${lightpink}└─ 隧道ID: ${green}$($CFD_BIN tunnel list | awk -v n=\"$TUNNEL_NAME\" '$2==n{print $1}')${reset}"
+
         while true; do
             read -p "$(echo -e "${yellow}是否删除并重建？(Y/n): ${reset}")" choice
             case "$choice" in
@@ -313,13 +302,11 @@ handle_tunnel() {
                     success "已使用现有隧道"
                     TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
                     return 0 ;;
-                *)
-                    error "无效输入，请输入 Y/y 或 N/n" ;;
+                *) error "无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
     fi
 
-    # 处理证书冲突
     if [[ -f "$CERT_FILE" ]]; then
         read -p "$(echo -e "${yellow}检测到已有证书文件，是否删除后重新登录？(Y/n): ${reset}")" cert_choice
         if [[ "$cert_choice" =~ ^[Yy]$ ]]; then
@@ -338,7 +325,6 @@ handle_tunnel() {
 
     success "授权成功，使用证书路径：${green}$CERT_FILE${reset}"
 
-    # 创建新隧道
     info "正在创建隧道..."
     if $CFD_BIN tunnel create "$TUNNEL_NAME" >/dev/null 2>&1; then
         success "隧道创建成功"
@@ -348,22 +334,22 @@ handle_tunnel() {
         error "隧道创建失败"
         return 1
     fi
-}
-
-# 处理CNAME记录
+}# 处理CNAME记录
 handle_cname_record() {
     info "🔗 正在处理CNAME记录..."
-    
-    # 检查CNAME记录是否存在
-    existing_cname=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=CNAME&name=$SUB_DOMAIN" \
+
+    local cname_full="${SUB_DOMAIN}.${CF_ZONE}"
+    cname_full="${cname_full%.}"
+
+    existing_cname=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=CNAME&name=$cname_full" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json")
 
     if echo "$existing_cname" | jq -e '.result[0]' >/dev/null; then
         info "检测到已存在的CNAME记录："
-        echo -e "${lightpink}├─ 记录名: ${green}$SUB_DOMAIN${reset}"
+        echo -e "${lightpink}├─ 记录名: ${green}$cname_full${reset}"
         echo -e "${lightpink}└─ 记录值: ${green}$(echo "$existing_cname" | jq -r '.result[0].content')${reset}"
-        
+
         while true; do
             read -p "$(echo -e "${yellow}是否删除并重建？(Y/n): ${reset}")" choice
             case "$choice" in
@@ -382,21 +368,19 @@ handle_cname_record() {
                 N|n)
                     success "已保留现有CNAME记录"
                     return 0 ;;
-                *)
-                    error "无效输入，请输入 Y/y 或 N/n" ;;
+                *) error "无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
     fi
 
-    # 创建新记录
     info "正在创建CNAME记录..."
     create_result=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" \
-        --data "{\"type\":\"CNAME\",\"name\":\"$SUB_DOMAIN\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
-    
+        --data "{\"type\":\"CNAME\",\"name\":\"$cname_full\",\"content\":\"$TUNNEL_ID.cfargotunnel.com\",\"ttl\":1,\"proxied\":true}")
+
     if echo "$create_result" | grep -q '"success":true'; then
-        success "CNAME记录创建成功：${green}$SUB_DOMAIN → $TUNNEL_ID.cfargotunnel.com${reset}"
+        success "CNAME记录创建成功：${green}$cname_full → $TUNNEL_ID.cfargotunnel.com${reset}"
     else
         error "CNAME记录创建失败"
         error "错误信息：$(echo "$create_result" | jq -r '.errors[0].message')"
@@ -419,7 +403,7 @@ final_info() {
 
     echo -e "\n${green}🚀 启动隧道命令：${reset}"
     echo -e "${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
-    
+
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
     ls -lh "$CLOUDFLARED_DIR" | grep -E "cert.pem|$TUNNEL_ID.json|config_info.txt" 2>/dev/null
 }
@@ -431,20 +415,16 @@ main() {
     check_config_and_cert
     get_ip_addresses
     input_info
-    
-    # 第一部分：处理DNS记录
+
     echo -e "\n${cyan}═════════ 开始处理DNS记录 ═════════${reset}"
     create_dns_records
-    
-    # 第二部分：处理隧道
+
     echo -e "\n${cyan}═════════ 开始处理隧道 ═════════${reset}"
     handle_tunnel
-    
-    # 第三部分：处理CNAME记录
+
     echo -e "\n${cyan}═════════ 开始处理CNAME记录 ═════════${reset}"
     handle_cname_record
-    
-    # 显示最终信息
+
     final_info
     show_bottom_line
     chmod +x "$0"
@@ -453,3 +433,4 @@ main() {
 }
 
 main
+
