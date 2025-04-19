@@ -229,7 +229,7 @@ handle_dns_record() {
         echo -e "${lightpink}└─ 记录值: ${green}$(echo "$existing_record" | jq -r '.result[0].content')${reset}"
 
         while true; do
-            read -p "$(echo -e "${yellow}是否删除并重建？(Y/n): ${reset}")" choice
+            read -p "$(echo -e "${yellow}❓是否删除并重建？(Y/n): ${reset}")" choice
             case "$choice" in
                 Y|y)
                     record_id=$(echo "$existing_record" | jq -r '.result[0].id')
@@ -281,60 +281,68 @@ create_dns_records() {
 }
 
 handle_tunnel() {
+  
+    if [[ ! -f "$CERT_FILE" ]]; then
+        warning "⚠️ 未检测到授权证书，准备进行 Cloudflare 授权登录..."
+    else
+        info "🔐 已检测到授权证书：$CERT_FILE"
+        read -p "$(echo -e "${yellow}❓检测到已有证书文件，是否删除后重新登录？(Y/n): ${reset}")" cert_choice
+        if [[ "$cert_choice" =~ ^[Yy]$ ]]; then
+            rm -f "$CERT_FILE"
+            info "✅ 已删除旧证书，准备重新登录..."
+        fi
+    fi
+
+    if [[ ! -f "$CERT_FILE" ]]; then
+        info "🧩 开始 Cloudflare 隧道授权..."
+        if ! $CFD_BIN tunnel login; then
+            error "❌ 授权失败，请检查以下事项："
+            error "1. 网络连接是否正常"
+            error "2. 邮箱和 API 令牌是否正确"
+            exit 1
+        fi
+        success "✅ 授权成功，使用证书路径：${green}$CERT_FILE${reset}"
+    fi
+
+
     if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
-        info "检测到已存在的隧道："
+        info "🔍 检测到已存在的隧道："
         echo -e "${lightpink}├─ 隧道名: ${green}$TUNNEL_NAME${reset}"
         echo -e "${lightpink}└─ 隧道ID: ${green}$($CFD_BIN tunnel list | awk -v n=\"$TUNNEL_NAME\" '$2==n{print $1}')${reset}"
 
         while true; do
-            read -p "$(echo -e "${yellow}是否删除并重建？(Y/n): ${reset}")" choice
+            read -p "$(echo -e "${yellow}❓是否删除并重建？(Y/n): ${reset}")" choice
             case "$choice" in
                 Y|y)
                     $CFD_BIN tunnel delete "$TUNNEL_NAME" >/dev/null 2>&1
                     if [ $? -eq 0 ]; then
-                        success "旧隧道删除成功"
+                        success "✅ 旧隧道删除成功"
                     else
-                        error "隧道删除失败"
+                        error "❌ 隧道删除失败"
                         return 1
                     fi
                     break ;;
                 N|n)
-                    success "已使用现有隧道"
+                    success "✅ 已使用现有隧道"
                     TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
                     return 0 ;;
-                *) error "无效输入，请输入 Y/y 或 N/n" ;;
+                *) error "❌ 无效输入，请输入 Y/y 或 N/n" ;;
             esac
         done
     fi
 
-    if [[ -f "$CERT_FILE" ]]; then
-        read -p "$(echo -e "${yellow}检测到已有证书文件，是否删除后重新登录？(Y/n): ${reset}")" cert_choice
-        if [[ "$cert_choice" =~ ^[Yy]$ ]]; then
-            rm -f "$CERT_FILE"
-            info "已删除旧证书，准备重新登录..."
-        fi
-    fi
 
-    info "🧩 开始 Cloudflare 隧道授权..."
-    if ! $CFD_BIN tunnel login; then
-        error "授权失败，请检查："
-        error "1. 网络连接是否正常"
-        error "2. 账户邮箱和API令牌是否正确"
-        exit 1
-    fi
-
-    success "授权成功，使用证书路径：${green}$CERT_FILE${reset}"
-
-    info "正在创建隧道..."
+    info "🚧 正在创建隧道..."
     if $CFD_BIN tunnel create "$TUNNEL_NAME" >/dev/null 2>&1; then
-        success "隧道创建成功"
+        success "✅ 隧道创建成功"
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
         echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
     else
-        error "隧道创建失败"
+        error "❌ 隧道创建失败"
         return 1
     fi
 }
+
 
 handle_cname_record() {
     info "🔗 正在处理CNAME记录..."
