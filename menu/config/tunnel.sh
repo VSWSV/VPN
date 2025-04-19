@@ -315,11 +315,6 @@ final_info() {
     echo -e "\n${yellow}🔍 隧道凭证验证：${reset}"
     
     if [[ -f "$JSON_FILE" ]]; then
-     
-        JSON_FILE="$CLOUDFLARED_DIR/${TUNNEL_ID}.json"
-    echo -e "\n${yellow}🔍 隧道凭证验证：${reset}"
-    
-    if [[ -f "$JSON_FILE" ]]; then
         if ! jq -e . "$JSON_FILE" >/dev/null 2>&1; then
             error "凭证文件损坏或格式错误"
             echo -e "${cyan}建议删除后重新创建："
