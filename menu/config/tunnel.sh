@@ -48,6 +48,7 @@ check_config_and_cert() {
         echo -e "${yellow}🔹 检测到已有配置文件：${reset}"
         printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
         printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
+        [[ -f "$CONFIG_YML" ]] && printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "配置文件：" "$CONFIG_YML"
         echo -e "${lightpink}配置信息：${reset}"
 
         max_len=0
@@ -71,7 +72,7 @@ check_config_and_cert() {
             read -p "$(echo -e "${yellow}❓ 是否删除现有配置并重新设置？(Y/n): ${reset}")" delchoice
             case "$delchoice" in
                 Y|y)
-                    rm -f "$CONFIG_FILE"
+                    rm -f "$CONFIG_FILE" "$CONFIG_YML"
                     info "🧹 开始清理非证书文件（保留 *.pem）..."
                     deleted_files=$(find "$CLOUDFLARED_DIR" -type f ! -name "*.pem")
                     if [[ -n "$deleted_files" ]]; then
@@ -158,21 +159,39 @@ input_info() {
         [[ "$TUNNEL_NAME" =~ ^[a-zA-Z0-9_-]+$ ]] && break || error "隧道名称无效，只能包含字母、数字、下划线或连字符。"
     done
 
-    # 自动处理端口号
+    # 端口号处理 - 现在与其他配置项一致
     if [[ -n "$CURRENT_PORT" ]]; then
-        PORT="$CURRENT_PORT"
-        info "使用现有端口：${green}$PORT${reset}"
+        DEFAULT_PORT="$CURRENT_PORT"
     else
         for i in {1..20}; do
             rand_port=$((RANDOM % 10000 + 20000))
             if ! lsof -i:"$rand_port" &>/dev/null; then
-                PORT="$rand_port"
+                DEFAULT_PORT="$rand_port"
                 break
             fi
         done
-        [[ -z "$PORT" ]] && { error "无法生成可用端口，请检查端口占用"; return 1; }
-        info "自动生成端口：${green}$PORT${reset}"
+        [[ -z "$DEFAULT_PORT" ]] && { error "无法生成可用端口，请检查端口占用"; return 1; }
     fi
+
+    while true; do
+        prompt_default "🔌 本地端口" "${DEFAULT_PORT:-}"
+        read -r custom_port
+        if [[ -z "$custom_port" ]]; then
+            PORT="$DEFAULT_PORT"
+            info "输入为：${green}使用默认端口 $PORT${reset}"
+            break
+        elif [[ "$custom_port" =~ ^[0-9]+$ ]] && ((custom_port >= 1 && custom_port <= 65535)); then
+            if ! lsof -i:"$custom_port" &>/dev/null; then
+                PORT="$custom_port"
+                info "输入为：${green}$PORT${reset}"
+                break
+            else
+                warning "端口 ${custom_port} 被占用，请重新输入"
+            fi
+        else
+            warning "输入无效，请输入 1~65535 的端口号"
+        fi
+    done
 
     info "📋 配置信息确认："
     info "账户邮箱: ${green}$CF_EMAIL${reset}"
