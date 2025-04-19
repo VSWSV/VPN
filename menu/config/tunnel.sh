@@ -7,11 +7,10 @@ lightpink='\033[38;5;218m'
 green='\033[1;32m'
 reset='\033[0m'
 
-# 修改后的路径变量（统一存放在.cloudflared目录）
 CLOUDFLARED_DIR="/root/.cloudflared"
 CERT_FILE="$CLOUDFLARED_DIR/cert.pem"
-CFD_BIN="/root/VPN/cloudflared"  # 二进制文件位置保持不变
-CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"  # 配置文件现在存放到.cloudflared目录
+CFD_BIN="/root/VPN/cloudflared"  
+CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt" 
 
 show_top_title() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
@@ -36,7 +35,6 @@ error() {
 }
 
 check_config_and_cert() {
-    # 确保.cloudflared目录存在
     mkdir -p "$CLOUDFLARED_DIR"
     chmod 700 "$CLOUDFLARED_DIR"
 
