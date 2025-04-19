@@ -66,7 +66,7 @@ fi
 
 # 启动服务
 echo -e "${yellow}🔄 正在启动服务...${reset}"
-nohup /root/VPN/xray/xray run -config "$CONFIG_PATH" > "$LOG_PATH" 2>&1 &
+nohup /root/VPN/xray run -config "$CONFIG_PATH" > "$LOG_PATH" 2>&1 &
 echo $! > "$PID_PATH"
 sleep 1
 
