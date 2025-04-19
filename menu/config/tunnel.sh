@@ -312,7 +312,7 @@ final_info() {
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
  
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
-    ls -lh "$CLOUDFLARED_DIR" | grep -E "cert.pem|$TUNNEL_ID.json|config_info.txt"
+    ls -lh /root/.cloudflared
 }
 
 main() {
