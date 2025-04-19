@@ -101,16 +101,25 @@ done
 while true; do
   read -p "$(echo -e "\n${cyan}请输入监听端口（1024-65535，留空自动生成）: ${reset}")" PORT
   if [ -z "$PORT" ]; then
-    PORT=$((RANDOM%30000+10000))
-    echo -e "${green}✔️  端口号：${lightpink}$PORT${reset}"
+
+    while true; do
+      PORT=$((RANDOM%30000+10000))
+      ss -tuln | grep -q ":$PORT " || break
+    done
+    echo -e "${green}✔️  自动生成未被占用端口：${lightpink}$PORT${reset}"
     break
   elif validate_port "$PORT"; then
-    echo -e "${green}✔️  端口号：${lightpink}$PORT${reset}"
-    break
+    if ss -tuln | grep -q ":$PORT "; then
+      echo -e "${red}❌ 该端口已被占用，请换一个${reset}"
+    else
+      echo -e "${green}✔️  端口号：${lightpink}$PORT${reset}"
+      break
+    fi
   else
     echo -e "${red}❌ 端口无效，请重新输入${reset}"
   fi
 done
+
 
 while true; do
   read -p "$(echo -e "\n${cyan}请输入 SNI 域名（如：www.bing.com）: ${reset}")" SNI
