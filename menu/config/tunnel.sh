@@ -22,28 +22,28 @@ show_top_title() {
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-# 显示底部线条
+
 show_bottom_line() {
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 信息显示函数
+
 info() { echo -e "${yellow}🔹 $1${reset}"; }
 success() { echo -e "${lightpink}✅ $1${reset}"; }
 error() { echo -e "${red}❌ $1${reset}"; }
 warning() { echo -e "\033[38;5;226m⚠️ $1${reset}"; }
 
-# 邮箱验证
+
 validate_email() {
     [[ "$1" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
 }
 
-# 域名验证
+
 validate_domain() {
     [[ "$1" =~ ^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$ ]]
 }
 
-# 检查配置文件与证书
+
 check_config_and_cert() {
     mkdir -p "$CLOUDFLARED_DIR"
     chmod 700 "$CLOUDFLARED_DIR"
@@ -100,7 +100,7 @@ check_config_and_cert() {
         done
     fi
 }
-# 获取IP地址
+
 get_ip_addresses() {
     IPV4=$(curl -s4 ifconfig.co)
     IPV6=$(curl -s6 ifconfig.co)
@@ -109,7 +109,6 @@ get_ip_addresses() {
     info "📶 当前公网 IPv6：${green}$IPV6${reset}"
 }
 
-# 输入配置信息
 input_info() {
     if [[ -f "$CONFIG_FILE" ]]; then
         info "📝 正在读取现有配置（绿色为当前值，直接回车即可保留）："
@@ -186,7 +185,7 @@ input_info() {
     check_root_dns_records
 }
 
-# 检查 A / AAAA 记录
+
 check_root_dns_records() {
     local ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$CF_ZONE" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
@@ -209,7 +208,7 @@ check_root_dns_records() {
 
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════╝${reset}\n"
 }
-# 处理单个 DNS 记录（通用）
+
 handle_dns_record() {
     local record_type=$1
     local record_name=$2
@@ -265,7 +264,6 @@ handle_dns_record() {
     fi
 }
 
-# 创建 DNS（调用A、AAAA）
 create_dns_records() {
     info "📡 开始处理DNS记录..."
 
@@ -279,7 +277,6 @@ create_dns_records() {
     echo && handle_dns_record "AAAA" "@" "$IPV6"
 }
 
-# 隧道处理
 handle_tunnel() {
     if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
         info "检测到已存在的隧道："
@@ -334,7 +331,8 @@ handle_tunnel() {
         error "隧道创建失败"
         return 1
     fi
-}# 处理CNAME记录
+}
+
 handle_cname_record() {
     info "🔗 正在处理CNAME记录..."
 
@@ -388,7 +386,6 @@ handle_cname_record() {
     fi
 }
 
-# 显示最终信息
 final_info() {
     info "📦 所有步骤已完成，以下为生成的配置信息："
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
@@ -408,7 +405,6 @@ final_info() {
     ls -lh "$CLOUDFLARED_DIR" | grep -E "cert.pem|$TUNNEL_ID.json|config_info.txt" 2>/dev/null
 }
 
-# 主流程
 main() {
     clear
     show_top_title
@@ -431,3 +427,6 @@ main() {
     read -p "$(echo -e "${yellow}按回车键返回主菜单...${reset}")" dummy
     bash "/root/VPN/menu/config_node.sh"
 }
+ 
+main
+
