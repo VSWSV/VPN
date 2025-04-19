@@ -196,7 +196,7 @@ check_root_dns_records() {
 
     [[ "$ZONE_ID" == "null" || -z "$ZONE_ID" ]] && { error "获取 Zone ID 失败"; return; }
 
-    echo -e "\n${cyan}╔═══════════════════════ DNS 记录检测 ═══════════════════════╗${reset}"
+    echo -e "\n${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 
     for record_type in A AAAA; do
         local record=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?type=$record_type&name=$CF_ZONE" \
@@ -209,7 +209,7 @@ check_root_dns_records() {
         fi
     done
 
-    echo -e "${cyan}╚═════════════════════════════════════════════════════════════╝${reset}\n"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}\n"
 }
 
 handle_dns_record() {
@@ -306,9 +306,10 @@ handle_tunnel() {
 
 
     if $CFD_BIN tunnel list | grep -q "$TUNNEL_NAME"; then
+        TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
         info "🔍 检测到已存在的隧道："
         echo -e "${lightpink}├─ 隧道名: ${green}$TUNNEL_NAME${reset}"
-        echo -e "${lightpink}└─ 隧道ID: ${green}$($CFD_BIN tunnel list | awk -v n=\"$TUNNEL_NAME\" '$2==n{print $1}')${reset}"
+        echo -e "${lightpink}└─ 隧道ID: ${green}$TUNNEL_ID${reset}"
 
         while true; do
             read -p "$(echo -e "${yellow}❓是否删除并重建？(Y/n): ${reset}")" choice
@@ -316,14 +317,17 @@ handle_tunnel() {
                 Y|y)
                     $CFD_BIN tunnel delete "$TUNNEL_NAME" >/dev/null 2>&1
                     if [ $? -eq 0 ]; then
-                        success "✅ 旧隧道删除成功"
+                   success "✅ 旧隧道删除成功"
+                   echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
+
                     else
                         error "❌ 隧道删除失败"
                         return 1
-                    fi
+                fi
                     break ;;
                 N|n)
                     success "✅ 已使用现有隧道"
+                    echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
                     TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
                     return 0 ;;
                 *) error "❌ 无效输入，请输入 Y/y 或 N/n" ;;
@@ -335,6 +339,7 @@ handle_tunnel() {
     info "🚧 正在创建隧道..."
     if $CFD_BIN tunnel create "$TUNNEL_NAME" >/dev/null 2>&1; then
         success "✅ 隧道创建成功"
+        echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
         TUNNEL_ID=$($CFD_BIN tunnel list | awk -v n="$TUNNEL_NAME" '$2==n{print $1}')
         echo "隧道ID：$TUNNEL_ID" >> "$CONFIG_FILE"
     else
@@ -423,13 +428,13 @@ main() {
     get_ip_addresses
     input_info
 
-    echo -e "\n${cyan}═════════ 开始处理DNS记录 ═════════${reset}"
+    echo -e "\n${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     create_dns_records
 
-    echo -e "\n${cyan}═════════ 开始处理隧道 ═════════${reset}"
+    echo -e "\n${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     handle_tunnel
 
-    echo -e "\n${cyan}═════════ 开始处理CNAME记录 ═════════${reset}"
+    echo -e "\n${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     handle_cname_record
 
     final_info
