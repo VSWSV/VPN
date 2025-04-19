@@ -310,28 +310,51 @@ final_info() {
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
 
     JSON_FILE="$CLOUDFLARED_DIR/${TUNNEL_ID}.json"
-    echo -e "\n${yellow}👉 隧道启动方式：${reset}"
+    echo -e "\n${yellow}🔍 隧道凭证验证：${reset}"
     
     if [[ -f "$JSON_FILE" ]]; then
-        TOKEN=$(jq -e -r '.Token' "$JSON_FILE" 2>/dev/null)
+     
+        JSON_TUNNEL_NAME=$(jq -r '.tunnel_name' "$JSON_FILE" 2>/dev/null)
+        if [[ "$JSON_TUNNEL_NAME" != "$TUNNEL_NAME" ]]; then
+            warning "隧道名称不匹配："
+            echo -e "配置名称: ${green}$TUNNEL_NAME${reset}"
+            echo -e "凭证文件: ${red}$JSON_TUNNEL_NAME${reset}"
+        fi
+
+        TOKEN=$(jq -e -r '.credentials_file // .Token' "$JSON_FILE" 2>/dev/null)
         
         if [[ $? -eq 0 && -n "$TOKEN" && "$TOKEN" != "null" ]]; then
-            echo -e "${green}方式1 (使用token启动):${reset}"
-            echo -e "$CFD_BIN tunnel run --token $TOKEN\n"
+            echo -e "${green}✅ 凭证验证通过${reset}"
+            echo -e "${lightpink}├─ 隧道ID: ${green}$TUNNEL_ID${reset}"
+            echo -e "${lightpink}├─ 隧道名称: ${green}$TUNNEL_NAME${reset}"
+            echo -e "${lightpink}└─ 凭证文件: ${green}$JSON_FILE${reset}"
             
-            echo -e "${green}方式2 (使用隧道名启动):${reset}"
-            echo -e "$CFD_BIN tunnel run $TUNNEL_NAME\n"
+            echo -e "\n${yellow}🚀 启动方式：${reset}"
+            echo -e "${green}1. 使用令牌启动：${reset}"
+            echo -e "   ${cyan}$CFD_BIN tunnel run --token $TOKEN${reset}"
             
-            echo -e "${yellow}💡 提示：推荐使用方式2，如果token启动失败请使用隧道名启动${reset}"
+            echo -e "\n${green}2. 使用隧道名启动（推荐）：${reset}"
+            echo -e "   ${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
         else
-            error "令牌提取失败，JSON文件格式可能不正确"
-            echo -e "${green}备用启动方式:${reset}"
-            echo -e "$CFD_BIN tunnel run $TUNNEL_NAME"
+            error "凭证提取失败，但隧道已创建成功"
+            echo -e "${yellow}🛠️ 解决方案：${reset}"
+            echo -e "1. 直接使用隧道名启动："
+            echo -e "   ${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
+            
+            echo -e "\n2. 重新生成凭证："
+            echo -e "   ${cyan}rm -f $JSON_FILE && $CFD_BIN tunnel create $TUNNEL_NAME${reset}"
         fi
     else
-        error "未找到隧道凭证文件 ${TUNNEL_ID}.json"
-        echo -e "${yellow}请尝试使用隧道名启动:${reset}"
-        echo -e "$CFD_BIN tunnel run $TUNNEL_NAME"
+        error "未找到凭证文件，但隧道已创建成功"
+        echo -e "${yellow}🛠️ 您可以：${reset}"
+        echo -e "1. 尝试列出所有隧道："
+        echo -e "   ${cyan}$CFD_BIN tunnel list${reset}"
+        
+        echo -e "\n2. 使用隧道名启动："
+        echo -e "   ${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
+        
+        echo -e "\n3. 重新创建隧道："
+        echo -e "   ${cyan}$CFD_BIN tunnel delete $TUNNEL_NAME && $CFD_BIN tunnel create $TUNNEL_NAME${reset}"
     fi
     
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
