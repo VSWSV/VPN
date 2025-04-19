@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 颜色定义
-cyan="\033[1;36m"; green="\033[1;32m"; yellow="\033[1;33m"
-red="\033[1;31m"; orange="\033[38;5;208m"; lightpink="\033[38;5;213m"; reset="\033[0m"
+cyan="\033[1;36m"; blue="\033[1;34m"; green="\033[1;32m"; yellow="\033[1;33m"
+red="\033[1;31m"; orange="\033[38;5;208m"; lightpink="\033[38;5;213m"; white="\033[1;37m"; reset="\033[0m"
 
 # 目录配置
 HY2_DIR="/root/VPN/HY2"
@@ -75,7 +75,7 @@ if [ -f "$CONFIG_PATH" ]; then
     current_ipv6=$(curl -s6 ifconfig.co || echo "获取失败")
 
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-    echo -e "${cyan}                              📝 当前配置预览                                  ${reset}"
+    echo -e "${orange}                              📝 当前配置预览                                  ${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e " ${lightpink}UUID：     ${reset}${green}$current_uuid${reset}"
     echo -e " ${lightpink}端口：     ${reset}${green}$current_port${reset}"
@@ -137,10 +137,10 @@ show_status "ALPN协议: ${lightpink}$alpn${reset}"
 # TLS配置
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 echo -e " ${lightpink}⇨ 请选择TLS配置:${reset}"
-echo -e "  ${green}1) 使用自签名证书 (推荐测试用)${reset}"
-echo -e "  ${green}2) 使用现有证书${reset}"
-echo -e "  ${yellow}3) 禁用TLS (不推荐)${reset}"
-read -p " 请选择 [1-3]: " tls_choice
+echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
+echo -e "  ${green}② 使用现有证书${reset}"
+echo -e "  ${yellow}③ 禁用TLS (不推荐)${reset}"
+read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
 
 case $tls_choice in
     1)
@@ -204,7 +204,8 @@ ipv6=$(curl -s6 ifconfig.co || echo "获取失败")
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 echo -e "${orange}                              🔗 客户端连接信息                                  ${reset}"
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-echo -e " ${lightpink}服务器地址: ${reset}${green}$sni:$port${reset}"
+echo -e " ${lightpink}服务器地址: ${reset}${green}$sni${reset}"
+echo -e " ${lightpink}连接端口:   ${reset}${green}$port${reset}"
 echo -e " ${lightpink}认证密码:   ${reset}${green}$uuid${reset}"
 echo -e " ${lightpink}加密协议:   ${reset}${green}$alpn${reset}"
 echo -e " ${lightpink}公网IPv4:   ${reset}${green}$ipv4${reset}"
@@ -212,5 +213,5 @@ echo -e " ${lightpink}公网IPv6:   ${reset}${green}$ipv6${reset}"
 [ $tls_choice -eq 1 ] && echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
 
 footer
-read -p "$(echo -e "${cyan}按任意键返回主菜单...${reset}")" -n 1
+read -p "$(echo -e "${white}按任意键返回主菜单...${reset}")" -n 1
 bash /root/VPN/menu/config_node.sh
