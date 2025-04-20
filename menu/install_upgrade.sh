@@ -25,17 +25,13 @@ while true; do
     read -p "请输入选项编号： " opt
     case $opt in
         1) bash /root/VPN/menu/install/full_install.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         2) bash /root/VPN/menu/install/upgrade_components.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         3) bash /root/VPN/menu/install/check_dependencies.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         4) bash /root/VPN/menu/install/verify_installation.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         0) bash /root/VPN/menu.sh
             break ;;
         *) echo -e "${red}❌ 无效输入!${reset}"
