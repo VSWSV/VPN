@@ -40,21 +40,27 @@ components=(
   "Hysteria|/root/VPN/hysteria --version|Version"
   "Cloudflared|cloudflared --version|cloudflared"
 )
+# 1. 验证组件版本
+components=(
+  "Xray|xray/xray --version|Xray"
+  "Hysteria|/root/VPN/hysteria version|Version:"
+  "Cloudflared|cloudflared --version|cloudflared"
+)
 
 for comp in "${components[@]}"; do
   IFS='|' read -r name cmd pattern <<< "$comp"
   check_path="${cmd%% *}" 
   if [ -f "$check_path" ]; then
-    version_output=$($cmd 2>&1 | head -n 1)
-    if [[ "$version_output" == *"$pattern"* ]]; then
-      success "$name 版本正常: ${green}$version_output${reset}"
+    version_output=$($cmd 2>&1 | grep -i "$pattern" | head -n 1)
+    if [[ -n "$version_output" ]]; then
+      success "$name 版本正常: ${green}$(echo "$version_output" | awk '{$1=$1;print}')${reset}"
     else
-      error "$name 版本异常: ${red}$version_output${reset}"
+      error "$name 版本异常: ${red}$($cmd 2>&1 | head -n 5 | tr '\n' ' ')${reset}"
     fi
   else
     error "$name 可执行文件不存在"
   fi
-done
+donee
 
 # 2. 验证端口监听
 info "📡 验证端口监听..."
