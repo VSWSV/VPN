@@ -281,5 +281,5 @@ else
 fi
 
 footer
-read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1 -r
+read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1 -r
 bash /root/VPN/menu/start_service.sh
