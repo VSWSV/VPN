@@ -135,7 +135,7 @@ info "📦 当前备份大小: $backup_size"
 # 查找所有备份目录
 all_backups=($(find /root/VPN -maxdepth 1 -type d -name "backup_*" | sort -r))
 if [ ${#all_backups[@]} -gt 1 ]; then
-  info "📅 现有备份列表(按时间排序):"
+  info "📅 现有备份列表（按时间排序）:"
   for ((i=0; i<${#all_backups[@]}; i++)); do
     backup_date=$(basename "${all_backups[$i]}" | cut -d'_' -f2-)
     size=$(du -sh "${all_backups[$i]}" | cut -f1)
@@ -144,7 +144,7 @@ if [ ${#all_backups[@]} -gt 1 ]; then
     else
       echo -e "${yellow}  [$i] ${all_backups[$i]} ($size)${reset}"
     fi
-  done
+  don
 
   echo -e "${cyan}可以选择删除多个旧备份(用空格分隔编号，最新备份[0]不会被删除)${reset}"
   read -p "$(echo -e "${cyan}输入要删除的备份编号(如:1 2 3)，或'n'跳过: ${reset}")" choice
