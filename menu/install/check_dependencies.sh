@@ -44,7 +44,7 @@ info "📂 检查目录结构..."
 
 # 2. 检查基本依赖
 info "📦 检查基本依赖..."
-dependencies=("dpkg" "curl" "wget" "unzip" "socat" "tar" "sudo" "git" "mtr-tiny" "traceroute" "bmon")
+dependencies=("dpkg" "curl" "wget" "unzip" "socat" "tar" "sudo" "git" "mtr" "traceroute" "bmon")
 missing_deps=0
 
 for dep in "${dependencies[@]}"; do
