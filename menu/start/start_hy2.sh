@@ -34,8 +34,12 @@ function verify_config() {
 function generate_uri() {
     local host=$1
     local type=$2
-    local insecure=$([ $tls_insecure -eq 1 ] && echo "&insecure=1" || echo "")
-    echo "hysteria2://${UUID}@${host}:${PORT}?sni=${SNI}&alpn=${ALPN}${insecure}#HY2 ${type}"
+    # 检测是否为自签名证书
+    if grep -q "insecure: true" "$CONFIG_PATH" || grep -q "$HY2_DIR/certs" "$CONFIG_PATH"; then
+        echo "hysteria2://${UUID}@${host}:${PORT}?sni=${SNI}&alpn=${ALPN}&insecure=1#HY2 ${type}"
+    else
+        echo "hysteria2://${UUID}@${host}:${PORT}?sni=${SNI}&alpn=${ALPN}#HY2 ${type}"
+    fi
 }
 
 function show_running_status() {
@@ -44,7 +48,6 @@ function show_running_status() {
     UUID=$(grep "password:" "$CONFIG_PATH" | awk -F'"' '{print $2}')
     SNI=$(grep "sni:" "$CONFIG_PATH" | awk '{print $2}')
     ALPN=$(grep -A1 "alpn:" "$CONFIG_PATH" | tail -1 | tr -d ' -' || echo "h3")
-    tls_insecure=$(grep -q "insecure: true" "$CONFIG_PATH" && echo 1 || echo 0)
     
     # 获取双栈IP
     read -r ipv4 ipv6 <<< "$(get_ips)"
@@ -111,7 +114,6 @@ PORT=$(grep "listen:" "$CONFIG_PATH" | awk '{print $2}' | tr -d ':')
 UUID=$(grep "password:" "$CONFIG_PATH" | awk -F'"' '{print $2}')
 SNI=$(grep "sni:" "$CONFIG_PATH" | awk '{print $2}')
 ALPN=$(grep -A1 "alpn:" "$CONFIG_PATH" | tail -1 | tr -d ' -' || echo "h3")
-tls_insecure=$(grep -q "insecure: true" "$CONFIG_PATH" && echo 1 || echo 0)
 
 # 获取双栈IP
 read -r ipv4 ipv6 <<< "$(get_ips)"
