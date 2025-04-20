@@ -47,6 +47,17 @@ fi
 
 cd /root/VPN || error_exit "无法进入 /root/VPN"
 
+# 安装基础依赖前，检查是否已安装 dpkg
+info "🔄 检查 dpkg 是否已安装..."
+if ! command -v dpkg &> /dev/null; then
+  info "dpkg 未安装，正在安装 dpkg..."
+  apt update && apt install -y dpkg || error_exit "❌ dpkg 安装失败"
+  success "dpkg 安装成功"
+else
+  success "dpkg 已安装"
+fi
+
+# 安装基础依赖（curl wget unzip socat tar sudo）
 info "🔧 安装基础依赖（curl wget unzip socat tar sudo）..."
 apt update && apt install -y curl wget unzip socat tar sudo && success "基础依赖安装完成" || error_exit "依赖安装失败"
 
