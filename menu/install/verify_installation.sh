@@ -93,7 +93,7 @@ done
 info "📄 验证配置文件..."
 configs=(
   "/root/VPN/VLESS/config.json|VLESS 配置文件"
-  "/root/VPN/HY2/hysteria.yaml|HY2 Hysteria 配置文件"
+  "/root/VPN/HY2/hysteria.yaml|HY2  配置文件"
   "/root/.cloudflared/config.yml|Cloudflared 配置文件"
   "/root/.cloudflared/cert.pem|Cloudflared 证书"
 )
