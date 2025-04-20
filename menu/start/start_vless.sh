@@ -4,12 +4,14 @@ clear
 cyan="\033[1;36m"; green="\033[1;32m"; yellow="\033[1;33m"
 red="\033[1;31m"; orange="\033[38;5;208m"; white="\033[1;37m"; lightpink="\033[38;5;213m"; reset="\033[0m"
 
-# 固定路径
+# 固定路径（完全匹配您的实际结构）
 VLESS_DIR="/root/VPN/VLESS"
 CONFIG_PATH="$VLESS_DIR/config/vless.json"
 LOG_PATH="$VLESS_DIR/logs/vless.log"
 PID_PATH="$VLESS_DIR/pids/vless.pid"
 SUB_FILE="$VLESS_DIR/subscriptions/vless_sub.txt"
+XRAY_BIN="/root/VPN/xray/xray"  # 精确匹配您的xray位置
+XRAY_DIR="/root/VPN/xray"       # xray资源文件目录
 
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
@@ -21,6 +23,44 @@ function footer() {
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
+function check_xray() {
+    # 检查二进制文件
+    if [ ! -f "$XRAY_BIN" ]; then
+        echo -e "${red}❌ Xray核心未找到: $XRAY_BIN${reset}"
+        echo -e "${yellow}请检查以下文件是否存在：${reset}"
+        ls -lh "$XRAY_DIR" || echo "无法列出xray目录"
+        return 1
+    fi
+    
+    # 检查执行权限
+    if [ ! -x "$XRAY_BIN" ]; then
+        echo -e "${yellow}⚠️ 尝试修复执行权限...${reset}"
+        if ! chmod +x "$XRAY_BIN"; then
+            echo -e "${red}❌ 无法添加执行权限${reset}"
+            echo -e "${yellow}尝试手动修复：sudo chmod +x $XRAY_BIN${reset}"
+            return 1
+        fi
+    fi
+    
+    # 验证版本
+    if ! "$XRAY_BIN" version &>/dev/null; then
+        echo -e "${red}❌ Xray二进制验证失败${reset}"
+        echo -e "${yellow}可能原因：架构不匹配或文件损坏${reset}"
+        return 1
+    fi
+    
+    # 检查资源文件
+    local required_files=("geoip.dat" "geosite.dat")
+    for file in "${required_files[@]}"; do
+        if [ ! -f "$XRAY_DIR/$file" ]; then
+            echo -e "${red}❌ 缺少必要资源文件: $file${reset}"
+            return 1
+        fi
+    done
+    
+    return 0
+}
+
 function get_ips() {
     local ipv4 ipv6
     ipv4=$(curl -s4m3 --connect-timeout 3 ifconfig.co 2>/dev/null || echo "未检测到")
@@ -29,8 +69,23 @@ function get_ips() {
 }
 
 function verify_config() {
-    [ -f "$CONFIG_PATH" ] || { echo -e "${red}❌ 配置文件不存在"; return 1; }
-    jq -e '.inbounds[0]' "$CONFIG_PATH" &>/dev/null || { echo -e "${red}❌ 配置文件格式错误"; return 1; }
+    [ -f "$CONFIG_PATH" ] || { echo -e "${red}❌ 配置文件不存在于: $CONFIG_PATH${reset}"; return 1; }
+    
+    if ! jq -e '.inbounds[0]' "$CONFIG_PATH" &>/dev/null; then
+        echo -e "${red}❌ 配置文件格式错误${reset}"
+        echo -e "${yellow}请检查配置文件: $CONFIG_PATH${reset}"
+        return 1
+    fi
+    
+    # 验证关键配置项
+    local required_fields=("port" "settings.clients[0].id")
+    for field in "${required_fields[@]}"; do
+        if ! jq -e ".inbounds[0].${field}" "$CONFIG_PATH" &>/dev/null; then
+            echo -e "${red}❌ 配置缺少必要字段: $field${reset}"
+            return 1
+        fi
+    done
+    
     return 0
 }
 
@@ -40,12 +95,12 @@ function config_prompt() {
         echo -e "${green}[Y] 是${reset} ${red}[N] 否${reset}"
         read -p "请输入选择 (Y/N): " choice
         
-        case $choice in
-            [Yy])
+        case "$choice" in
+            [Yy]|[Yy][Ee][Ss])
                 bash /root/VPN/menu/config/config_vless.sh
                 return $?
                 ;;
-            [Nn])
+            [Nn]|[Nn][Oo])
                 bash /root/VPN/menu/start_service.sh
                 return $?
                 ;;
@@ -57,13 +112,23 @@ function config_prompt() {
 }
 
 function generate_connection_links() {
-    local ipv4=$1
-    local ipv6=$2
+    local ipv4=$1 ipv6=$2
+    
+    # 从配置文件读取参数
+    local PORT UUID SNI FLOW
+    PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
+    UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
+    SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // empty' "$CONFIG_PATH")
+    FLOW=$(jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
     
     # 1. 域名连接
-    echo -e "${green}🌐 域名直连:${reset}"
-    echo "vless://${UUID}@${SNI}:${PORT}?type=tcp&security=xtls&sni=${SNI}&flow=${FLOW}#VLESS-域名直连"
-    echo ""
+    if [ -n "$SNI" ]; then
+        echo -e "${green}🌐 域名直连:${reset}"
+        echo "vless://${UUID}@${SNI}:${PORT}?type=tcp&security=xtls&sni=${SNI}&flow=${FLOW}#VLESS-域名直连"
+        echo ""
+    else
+        echo -e "${yellow}⚠️ 未配置域名(SNI)${reset}"
+    fi
     
     # 2. IPv4连接
     if [[ "$ipv4" != "未检测到" ]]; then
@@ -87,8 +152,17 @@ function generate_connection_links() {
 # 主流程
 header
 
+# 检查并创建必要目录
+mkdir -p "$(dirname "$LOG_PATH")" "$(dirname "$PID_PATH")" "$(dirname "$SUB_FILE")"
+
+# 检查Xray核心
+if ! check_xray; then
+    footer
+    exit 1
+fi
+
 # 检查是否已在运行
-if [ -f "$PID_PATH" ] && ps -p $(cat "$PID_PATH") >/dev/null; then
+if [ -f "$PID_PATH" ] && ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     # 提取配置参数
     PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
     UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
@@ -112,8 +186,9 @@ if [ -f "$PID_PATH" ] && ps -p $(cat "$PID_PATH") >/dev/null; then
     echo -e "  IPv6: ${lightpink}$ipv6${reset}"
     
     footer
-    read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
-    bash /root/VPN/menu/start_service.sh    
+    read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1 -r
+    bash /root/VPN/menu/start_service.sh
+    exit 0
 fi
 
 # 配置验证
@@ -134,23 +209,42 @@ read -r ipv4 ipv6 <<< "$(get_ips)"
 # 端口检查
 if ss -tulnp | grep -q ":$PORT "; then
     echo -e "${red}❌ 端口 $PORT 已被占用${reset}"
+    echo -e "${yellow}占用进程信息：${reset}"
+    ss -tulnp | grep ":$PORT "
     footer
-    read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+    read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1 -r
     bash /root/VPN/menu/start_service.sh
     exit 1
 fi
 
 # 启动服务
 echo -e "${yellow}🔄 正在启动服务...${reset}"
-nohup /root/VPN/xray/xray run -config "$CONFIG_PATH" > "$LOG_PATH" 2>&1 &
+echo -e "${cyan}使用Xray路径: ${lightpink}$XRAY_BIN${reset}"
+echo -e "${cyan}配置文件路径: ${lightpink}$CONFIG_PATH${reset}"
+
+{
+    echo "=== 启动时间: $(date '+%Y-%m-%d %H:%M:%S') ==="
+    echo "Xray版本: $("$XRAY_BIN" version | head -1)"
+    echo "启动命令: $XRAY_BIN run -config $CONFIG_PATH"
+    echo "工作目录: $(pwd)"
+    echo "环境变量:"
+    export
+    echo "----------------------------------------"
+    
+    # 设置资源文件路径
+    export XRAY_LOCATION_ASSET="$XRAY_DIR"
+    "$XRAY_BIN" run -config "$CONFIG_PATH"
+} >> "$LOG_PATH" 2>&1 &
+
 echo $! > "$PID_PATH"
-sleep 1
+sleep 2  # 增加等待时间确保进程稳定
 
 # 状态检查
-if ps -p $(cat "$PID_PATH") >/dev/null; then
+if ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     # 生成订阅文件
     {
         echo "# VLESS 订阅链接 - 生成于 $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "# Xray版本: $("$XRAY_BIN" version | head -1)"
         echo ""
         generate_connection_links "$ipv4" "$ipv6"
     } > "$SUB_FILE"
@@ -167,15 +261,25 @@ if ps -p $(cat "$PID_PATH") >/dev/null; then
     echo -e "${green}📶 网络信息:"
     echo -e "  IPv4: ${lightpink}$ipv4${reset}"
     echo -e "  IPv6: ${lightpink}$ipv6${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${yellow}📝 订阅文件已生成: ${lightpink}$SUB_FILE${reset}"
 else
     echo -e "${red}❌ 启动失败! 查看日志: ${lightpink}$LOG_PATH${reset}"
     echo -e "${yellow}可能原因:"
     echo -e "  1. 端口被占用"
     echo -e "  2. 证书配置错误"
     echo -e "  3. Xray核心未正确安装"
-    echo -e "  4. 内存不足${reset}"
+    echo -e "  4. 内存不足"
+    echo -e "  5. 资源文件缺失"
+    
+    # 显示日志最后10行
+    echo -e "\n${cyan}=== 日志最后10行 ===${reset}"
+    tail -n 10 "$LOG_PATH" | sed 's/^/  /'
+    
+    # 清理无效PID文件
+    [ -f "$PID_PATH" ] && rm -f "$PID_PATH"
 fi
 
 footer
-read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1 -r
 bash /root/VPN/menu/start_service.sh
