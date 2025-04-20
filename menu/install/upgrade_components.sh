@@ -50,22 +50,38 @@ info "📦 备份配置文件..."
 backup_dir="/root/VPN/backup_$(date +%Y%m%d%H%M%S)"
 mkdir -p "$backup_dir"
 
+# 备份配置文件
+info "📦 备份配置文件..."
+backup_dir="/root/VPN/backup_$(date +%Y%m%d%H%M%S)"
+mkdir -p "$backup_dir"
+
 # 备份重要配置文件
 config_files=(
-  "xray/config.json"
-  "hysteria.yaml"
-  ".cloudflared/config.yml"
-  ".cloudflared/cert.pem"
+  "/root/VPN/VLESS/config.json"
+  "/root/VPN/HY2/hysteria.yaml"
+  "/root/.cloudflared/config.yml"
+  "/root/.cloudflared/cert.pem"
 )
 
+backup_count=0
 for config in "${config_files[@]}"; do
+  config_dir="$backup_dir$(dirname "$config")"
+  mkdir -p "$config_dir"
+  
   if [ -f "$config" ]; then
-    mkdir -p "$backup_dir/$(dirname "$config")"
-    cp "$config" "$backup_dir/$config"
-    info "已备份: $config"
+    cp "$config" "$config_dir/"
+    info "✅ 已备份: $config"
+    ((backup_count++))
+  else
+    warning "⚠️  配置文件不存在: $config"
   fi
 done
-success "配置文件备份完成，保存在: $backup_dir"
+
+if [ $backup_count -gt 0 ]; then
+  success "已备份 $backup_count 个配置文件到: $backup_dir"
+else
+  warning "未找到任何可备份的配置文件"
+fi
 
 # 从GitHub更新项目
 info "🔄 从GitHub更新项目..."
@@ -104,7 +120,7 @@ success "配置文件恢复完成"
 # 更新组件
 info "🔄 更新组件..."
 components=(
-  "xray/xray"
+  "xray"
   "hysteria"
   "cloudflared"
 )
