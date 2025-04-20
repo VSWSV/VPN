@@ -71,7 +71,7 @@ for config in "${config_files[@]}"; do
     info "✅ 已备份: $config_path"
     ((backup_count++))
   else
-    warning "⚠️  配置文件不存在: $config_path"
+     info "⚠️  配置文件不存在: $config_path"
   fi
 done
 
