@@ -58,28 +58,6 @@ function generate_certs() {
     show_status "证书已生成到 ${lightpink}$CERTS_DIR${reset}"
 }
 
-function setup_flow_config() {
-    local xray_bin="/root/VPN/xray/xray"
-    if [ ! -f "$xray_bin" ]; then
-        echo -e "${red}❌ Xray二进制文件不存在: $xray_bin${reset}"
-        exit 1
-    fi
-
-    local version_info=$("$xray_bin" version 2>/dev/null || echo "0.0.0")
-    local version=$(echo "$version_info" | awk '/Xray/{print $2}')
-
-    if [[ "$version" == "0.0.0" ]]; then
-        echo -e "${yellow}⚠️ 无法获取Xray版本，将使用兼容模式${reset}"
-        echo '"flow": ""'
-    elif [[ "$version" < "1.8.0" ]]; then
-        echo -e "${yellow}⚠️ 检测到旧版Xray ($version)，将禁用flow控制${reset}"
-        echo '"flow": ""'
-    else
-        echo -e "${green}✅ 检测到新版Xray ($version)，已启用xtls-rprx-vision${reset}"
-        echo '"flow": "xtls-rprx-vision",'  # 注意此处逗号
-    fi
-}
-
 # 初始化目录
 mkdir -p "$VLESS_DIR"/{config,certs,logs,pids,client_configs,subscriptions}
 chmod 700 "$VLESS_DIR" "$VLESS_DIR"/{config,certs,logs,pids}
@@ -181,8 +159,7 @@ if [[ "$security" != "none" ]]; then
     echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
     echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
     echo -e "  ${green}② 使用现有证书${reset}"
-    read -p "$(echo -e " ${blue}请选择 [默认①]: ${reset}")" tls_choice
-    tls_choice=${tls_choice:-1}  # 空输入默认选1
+    read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
     case $tls_choice in
         1)
             generate_certs "$sni"
@@ -276,9 +253,6 @@ else
     tls_config='"security": "none"'
 fi
 
-# 设置flow参数
-flow_config=$(setup_flow_config)
-
 # 生成配置文件
 cat > "$CONFIG_PATH" <<EOF
 {
@@ -290,7 +264,7 @@ cat > "$CONFIG_PATH" <<EOF
         "clients": [
           {
             "id": "$uuid",
-            $flow_config
+            "flow": "xtls-rprx-vision"
           }
         ],
         "decryption": "none"
@@ -313,7 +287,6 @@ EOF
 # 验证配置文件
 if ! jq empty "$CONFIG_PATH" &>/dev/null; then
     echo -e "${red}❌ 生成的配置文件无效，请检查参数${reset}"
-    echo -e "${yellow}尝试手动修复配置文件: $CONFIG_PATH${reset}"
     exit 1
 fi
 
@@ -338,5 +311,5 @@ echo -e " ${lightpink}公网IPv6:   ${reset}${green}$ipv6${reset}"
 [[ $security != "none" ]] && echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
 
 footer
-read -p "$(echo -e "${cyan}按回车键返回...${reset}")" -n 1 -r
+read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/config_node.sh
