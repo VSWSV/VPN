@@ -27,32 +27,23 @@ while true; do
     read -p "请输入选项编号： " opt
     case $opt in
         1) bash /root/VPN/menu/network/check_ip.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         2) bash /root/VPN/menu/network/ping_test.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         3) bash /root/VPN/menu/network/ping_ip.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         4) bash /root/VPN/menu/network/check_ports.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         5) bash /root/VPN/menu/network/view_logs.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         6) bash /root/VPN/menu/network/speedtest.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         7) bash /root/VPN/menu/network/mtrtrace.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         8) bash /root/VPN/menu/network/dnsquery.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         9) bash /root/VPN/menu/network/bmonview.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         0) bash /root/VPN/menu.sh
             break ;;
         *) echo -e "${red}❌ 无效输入！${reset}"
