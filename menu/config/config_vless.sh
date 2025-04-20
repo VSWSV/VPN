@@ -87,31 +87,26 @@ if [ -f "$CONFIG_PATH" ]; then
 
     while true; do
         read -p "$(echo -e "${yellow}是否覆盖当前配置？(y/N): ${reset}")" -n 1 overwrite
-        echo  # 换行
-        
+        echo
         case "$overwrite" in
-            [Yy])
-                # 用户选择覆盖，继续执行后续配置
-                break
-                ;;
+            [Yy]) break ;;
             [Nn])
-                # 用户选择不覆盖，返回菜单
                 clear
                 bash /root/VPN/menu/config_node.sh
-                exit
-                ;;
+                exit ;;
             *)
-                # 无效输入，提示并重新询问
                 echo -e "${red}❌ 无效输入！${reset}"
                 sleep 0.5
-                # 清空输入缓冲区，防止残留字符影响
                 while read -r -t 0; do read -r; done
+                ;;
+        esac
+    done
+fi
 
 # 端口配置
 while true; do
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     read -p "$(echo -e " ${lightpink}⇨ 请输入监听端口 [回车自动生成]: ${reset}")" port
-    
     if [ -z "$port" ]; then
         port=$(generate_random_port)
         show_status "已自动生成可用端口: ${lightpink}$port${reset}"
@@ -136,7 +131,6 @@ show_status "自动生成 UUID: ${lightpink}$uuid${reset}"
 while true; do
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     read -p "$(echo -e " ${lightpink}⇨ 请输入SNI域名 (如: vpn.example.com): ${reset}")" sni
-    
     if validate_input "domain" "$sni"; then
         show_status "域名设置为: ${lightpink}$sni${reset}"
         break
@@ -152,28 +146,20 @@ echo -e "  ${green}① TLS (推荐)${reset}"
 echo -e "  ${green}② XTLS (高性能)${reset}"
 echo -e "  ${yellow}③ none (不加密)${reset}"
 read -p "$(echo -e " ${blue}请选择：${reset}")" security_choice
-
 case $security_choice in
     1) security="tls" ;;
     2) security="xtls" ;;
-    3) 
-        security="none"
-        show_error "警告: 禁用加密将导致连接不安全!"
-        ;;
-    *)
-        security="tls"
-        show_error "无效选择，默认使用TLS"
-        ;;
+    3) security="none"; show_error "警告: 禁用加密将导致连接不安全!" ;;
+    *) security="tls"; show_error "无效选择，默认使用TLS" ;;
 esac
 
-# TLS/XTLS配置
+# TLS配置
 if [[ "$security" != "none" ]]; then
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
     echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
     echo -e "  ${green}② 使用现有证书${reset}"
     read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
-
     case $tls_choice in
         1)
             generate_certs "$sni"
@@ -273,5 +259,3 @@ echo -e " ${lightpink}公网IPv6:   ${reset}${green}$ipv6${reset}"
 footer
 read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/config_node.sh
-
-
