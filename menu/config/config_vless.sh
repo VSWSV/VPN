@@ -85,10 +85,27 @@ if [ -f "$CONFIG_PATH" ]; then
     echo -e " ${lightpink}IPv6：     ${reset}${green}$current_ipv6${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 
-    read -p "$(echo -e "${yellow}是否覆盖当前配置？(y/N): ${reset}")" -n 1 overwrite
-    [[ ! $overwrite =~ ^[Yy]$ ]] && footer && exit 0
-    echo
-fi
+    while true; do
+        read -p "$(echo -e "${yellow}是否覆盖当前配置？(y/N): ${reset}")" -n 1 overwrite
+        echo  # 换行
+        
+        case "$overwrite" in
+            [Yy])
+                # 用户选择覆盖，继续执行后续配置
+                break
+                ;;
+            [Nn])
+                # 用户选择不覆盖，返回菜单
+                clear
+                bash /root/VPN/menu/config_node.sh
+                exit
+                ;;
+            *)
+                # 无效输入，提示并重新询问
+                echo -e "${red}❌ 无效输入！${reset}"
+                sleep 0.5
+                # 清空输入缓冲区，防止残留字符影响
+                while read -r -t 0; do read -r; done
 
 # 端口配置
 while true; do
