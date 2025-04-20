@@ -1,5 +1,4 @@
 #!/bin/bash 
-clear
 
 # 颜色定义
 cyan='\033[1;36m'
@@ -23,6 +22,7 @@ function footer() {
 }
 
 # 主逻辑
+clear
 header
 
 # 检查 cloudflared 是否在运行
