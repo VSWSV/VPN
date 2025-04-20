@@ -144,61 +144,37 @@ if [ ${#all_backups[@]} -gt 1 ]; then
     else
       echo -e "${yellow}  [$i] ${all_backups[$i]} ($size)${reset}"
     fi
-  # 提供删除备份选项
-echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-info "🗑️ 备份管理"
-echo -e "${yellow}当前备份目录: $backup_dir${reset}"
-
-# 显示备份目录大小
-backup_size=$(du -sh "$backup_dir" | cut -f1)
-info "📦 当前备份大小: $backup_size"
-
-# 查找所有备份目录
-all_backups=($(find /root/VPN -maxdepth 1 -type d -name "backup_*" | sort -r))
-if [ ${#all_backups[@]} -gt 1 ]; then
-  info "📅 现有备份列表(按时间排序):"
-  for ((i=0; i<${#all_backups[@]}; i++)); do
-    backup_date=$(basename "${all_backups[$i]}" | cut -d'_' -f2-)
-    size=$(du -sh "${all_backups[$i]}" | cut -f1)
-    if [ "$i" -eq 0 ]; then
-      echo -e "${green}  [$i] ${all_backups[$i]} (最新, $size)${reset}"
-    else
-      echo -e "${yellow}  [$i] ${all_backups[$i]} ($size)${reset}"
-    fi
   done
 
-  echo -e "${cyan}可以选择删除多个旧备份(最新备份[0]不会被删除)${reset}"
-  read -p "$(echo -e "${cyan}输入要删除的备份编号(多个编号用空格分隔，或'n'跳过): ${reset}")" choice
+  echo -e "${cyan}可以选择删除多个旧备份(用空格分隔编号，最新备份[0]不会被删除)${reset}"
+  read -p "$(echo -e "${cyan}输入要删除的备份编号(如:1 2 3)，或'n'跳过: ${reset}")" choice
   
   if [[ "$choice" != "n" ]]; then
     # 分割输入的选项
     IFS=' ' read -ra choices <<< "$choice"
     
     # 验证每个选择
-    valid_choices=()
+    deleted_count=0
     for c in "${choices[@]}"; do
       if [[ "$c" =~ ^[0-9]+$ ]] && [ "$c" -lt "${#all_backups[@]}" ] && [ "$c" -ne 0 ]; then
-        valid_choices+=("$c")
+        rm -rf "${all_backups[$c]}"
+        success "已删除备份: ${all_backups[$c]}"
+        ((deleted_count++))
+      elif [ "$c" -eq 0 ]; then
+        warning "跳过最新备份[0]的保护"
       else
         warning "忽略无效选择: $c"
       fi
     done
     
-    # 执行删除
-    if [ ${#valid_choices[@]} -gt 0 ]; then
-      for c in "${valid_choices[@]}"; do
-        rm -rf "${all_backups[$c]}"
-        success "已删除备份: ${all_backups[$c]}"
-      done
+    if [ $deleted_count -gt 0 ]; then
+      success "已成功删除 $deleted_count 个旧备份"
     else
-      info "没有有效的备份选择，保留所有备份"
+      info "没有删除任何备份"
     fi
   else
     info "保留所有备份"
   fi
-else
-  info "没有其他备份可管理"
-fi
 else
   info "没有其他备份可管理"
 fi
