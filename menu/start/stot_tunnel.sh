@@ -66,7 +66,7 @@ config_prompt() {
                 return $?
                 ;;
             [Nn])
-                return 1   # 返回非0状态表示用户取消
+                return $?  
                 ;;
             *)
                 echo -e "${red}无效输入，请重新选择${reset}"
