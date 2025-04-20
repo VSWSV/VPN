@@ -1,86 +1,72 @@
-#!/bin/bash
+#!/bin/bash 
 
 # 颜色定义
-red="\033[1;31m"; green="\033[1;32m"; yellow="\033[1;33m"
-cyan="\033[1;36m"; reset="\033[0m"
+cyan='\033[1;36m'
+yellow='\033[1;33m'
+orange='\033[38;5;208m'
+lightpink='\033[38;5;218m'
+green='\033[1;32m'
+red='\033[1;31m'
+reset='\033[0m'
 
-# 路径配置
-VLESS_DIR="/root/VPN/VLESS"
-PID_FILE="$VLESS_DIR/pids/vless.pid"
-LOG_FILE="$VLESS_DIR/logs/vless.log"
-PROCESS_NAME="xray"  # Xray核心进程名
-
+# 显示顶部边框和标题
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-    echo -e "${cyan}                              🔴 停止 VLESS 服务                                ${reset}"
+    echo -e "                                ${orange}🔴 停止 Cloudflare 隧道${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
+# 显示底部边框
 function footer() {
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 主流程
+# 主逻辑
+clear
 header
 
-# 检查PID文件是否存在
-if [ ! -f "$PID_FILE" ]; then
-    echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程名停止...${reset}"
-    
-    # 通过进程名和配置文件路径查找
-    VLESS_PID=$(pgrep -f "$PROCESS_NAME.*$VLESS_DIR/config/vless.json")
-    
-    if [ -z "$VLESS_PID" ]; then
-        echo -e "${green}✅ 未找到运行中的VLESS进程${reset}"
-        footer
-        read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
-        bash /root/VPN/menu/stop_service.sh
-        exit 0
-    fi
-else
-    VLESS_PID=$(cat "$PID_FILE")
+# 检查 cloudflared 是否在运行
+PID=$(pgrep -f "cloudflared tunnel run")
+
+if [ -z "$PID" ]; then
+    echo -e "${yellow}⚠️ 没有正在运行的 Cloudflare 隧道${reset}"
+    footer
+    read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
+    bash /root/VPN/menu/stop_service.sh
+    exit 0
 fi
 
-# 停止进程
-if [ -n "$VLESS_PID" ]; then
-    echo -e "${yellow}🔄 正在停止PID为 $VLESS_PID 的进程...${reset}"
+# 检查进程状态
+STATE=$(ps -o stat= -p "$PID" | tr -d ' ')
+CFD_BIN=$(command -v cloudflared)
+TUNNEL_NAME=$($CFD_BIN tunnel list 2>/dev/null | awk 'NR>1 {print $2}' | head -n 1)
 
-    # 获取进程状态
-    STATE=$(ps -o stat= -p "$VLESS_PID" | tr -d ' ')
+echo -e "${yellow}🔄 正在停止隧道: ${green}$TUNNEL_NAME${reset} (PID: ${green}$PID${reset})"
 
-    # 如果是僵尸进程
-    if [[ "$STATE" == *Z* ]]; then
-        echo -e "${yellow}⚠️  检测到僵尸进程（Zombie）...${reset}"
-        PPID=$(ps -o ppid= -p "$VLESS_PID" | tr -d ' ')
-        echo -e "${yellow}📌 僵尸进程的父进程为：$PPID，尝试强制回收...${reset}"
-        kill -9 "$PPID" 2>/dev/null
-        sleep 2
-    else
-        # 正常终止
-        kill -TERM "$VLESS_PID" 2>/dev/null
-        sleep 3
-
-        # 检查是否仍在运行
-        if ps -p "$VLESS_PID" >/dev/null; then
-            echo -e "${yellow}⚠️  正常终止失败，尝试强制停止...${reset}"
-            kill -9 "$VLESS_PID" 2>/dev/null
-            sleep 1
-        fi
-    fi
-
-    # 最终确认
-    if ! ps -p "$VLESS_PID" >/dev/null; then
-        echo -e "${green}✅ 成功停止VLESS服务${reset}"
-        [ -f "$PID_FILE" ] && rm -f "$PID_FILE"
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 服务已手动停止" >> "$LOG_FILE"
-    else
-        echo -e "${red}❌ 停止失败，请手动检查进程 ${yellow}$VLESS_PID${reset}"
-        echo -e "${yellow}尝试执行: kill -9 $VLESS_PID${reset}"
-    fi
+if [[ "$STATE" == *Z* ]]; then
+    echo -e "${yellow}⚠️ 检测到僵尸进程，尝试回收...${reset}"
+    PPID=$(ps -o ppid= -p "$PID" | tr -d ' ')
+    echo -e "${yellow}📌 父进程为: ${green}$PPID${reset}，执行: kill -9 $PPID"
+    kill -9 "$PPID" 2>/dev/null
+    sleep 2
 else
-    echo -e "${green}✅ 未检测到运行中的VLESS服务${reset}"
+    kill -TERM "$PID"
+    sleep 2
+
+    if ps -p "$PID" > /dev/null; then
+        echo -e "${yellow}⚠️ 正常终止失败，尝试强制停止...${reset}"
+        kill -9 "$PID" 2>/dev/null
+        sleep 1
+    fi
+fi
+
+# 最终确认
+if ! ps -p "$PID" > /dev/null; then
+    echo -e "${lightpink}✅ 隧道已成功停止${reset}"
+else
+    echo -e "${red}❌ 停止失败，请手动 kill -9 $PID${reset}"
 fi
 
 footer
-read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
+read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/stop_service.sh
