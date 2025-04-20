@@ -23,17 +23,9 @@ function footer() {
 # 主逻辑
 header
 
-# PID 文件（未来扩展）
-PID_FILE="/var/run/cloudflared.pid"
-PID=""
-PIDS=""
-
 # 优先读取 PID 文件
-if [ -f "$PID_FILE" ]; then
-    PID=$(cat "$PID_FILE")
-else
+if [ ! -f "$PID_FILE" ]; then
     echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程名停止...${reset}"
-    PIDS=$(pgrep -f "cloudflared tunnel run")
 fi
 
 # 如果都找不到
