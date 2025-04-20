@@ -46,7 +46,6 @@ info() { echo -e "${yellow}🔹 $1${reset}"; }
 success() { echo -e "${lightpink}✅ $1${reset}"; }
 error() { echo -e "${red}❌ $1${reset}"; }
 
-# 配置提示交互
 config_prompt() {
     while true; do
         echo -e "${yellow}是否要现在配置 Cloudflare 隧道？${reset}"
@@ -88,7 +87,6 @@ if pgrep -f "cloudflared tunnel run" >/dev/null; then
     footer
     read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
     bash /root/VPN/menu/start_service.sh
-    exit 0
 fi
 
 info "正在启动隧道: ${green}$TUNNEL_ID${reset}"
