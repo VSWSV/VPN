@@ -58,7 +58,6 @@ function generate_certs() {
     show_status "证书已生成到 ${lightpink}$CERTS_DIR${reset}"
 }
 
-# 检查Xray版本并设置flow参数
 function setup_flow_config() {
     local xray_bin="/root/VPN/xray/xray"
     if [ ! -f "$xray_bin" ]; then
@@ -313,6 +312,7 @@ EOF
 # 验证配置文件
 if ! jq empty "$CONFIG_PATH" &>/dev/null; then
     echo -e "${red}❌ 生成的配置文件无效，请检查参数${reset}"
+    echo -e "${yellow}尝试手动修复配置文件: $CONFIG_PATH${reset}"
     exit 1
 fi
 
