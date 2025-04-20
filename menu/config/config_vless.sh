@@ -76,7 +76,7 @@ function setup_flow_config() {
         echo '"flow": ""'
     else
         echo -e "${green}✅ 检测到新版Xray ($version)，已启用xtls-rprx-vision${reset}"
-        echo '"flow": "xtls-rprx-vision"'
+        echo '"flow": "xtls-rprx-vision",'  # 注意此处逗号
     fi
 }
 
@@ -181,7 +181,8 @@ if [[ "$security" != "none" ]]; then
     echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
     echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
     echo -e "  ${green}② 使用现有证书${reset}"
-    read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
+    read -p "$(echo -e " ${blue}请选择 [默认①]: ${reset}")" tls_choice
+    tls_choice=${tls_choice:-1}  # 空输入默认选1
     case $tls_choice in
         1)
             generate_certs "$sni"
