@@ -132,5 +132,5 @@ else
     echo -e "${lightpink}🔍 查看错误详情: ${green}tail -n 20 $LOG_FILE${reset}"
 fi
 footer
-read -p "$(echo -e "${cyan}按任意键返回上级菜单...${reset}")" -n 1
+read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
 bash /root/VPN/menu/start_service.sh
