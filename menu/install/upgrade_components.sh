@@ -123,6 +123,40 @@ for config in "${config_files[@]}"; do
 done
 success "配置文件恢复完成"
 
+# 提供删除备份选项
+echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+info "🗑️ 备份管理"
+echo -e "${yellow}当前备份目录: $backup_dir${reset}"
+
+# 显示备份目录大小
+backup_size=$(du -sh "$backup_dir" | cut -f1)
+info "📦 当前备份大小: $backup_size"
+
+# 查找所有备份目录
+all_backups=($(find /root/VPN -maxdepth 1 -type d -name "backup_*" | sort -r))
+if [ ${#all_backups[@]} -gt 1 ]; then
+  info "📅 现有备份列表(按时间排序):"
+  for ((i=0; i<${#all_backups[@]}; i++)); do
+    backup_date=$(basename "${all_backups[$i]}" | cut -d'_' -f2-)
+    size=$(du -sh "${all_backups[$i]}" | cut -f1)
+    if [ "$i" -eq 0 ]; then
+      echo -e "${green}  [$i] ${all_backups[$i]} (最新, $size)${reset}"
+    else
+      echo -e "${yellow}  [$i] ${all_backups[$i]} ($size)${reset}"
+    fi
+  done
+
+  read -p "$(echo -e "${cyan}是否删除旧备份? (输入要删除的备份编号或'n'跳过): ${reset}") choice
+  if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -lt "${#all_backups[@]}" ] && [ "$choice" -ne 0 ]; then
+    rm -rf "${all_backups[$choice]}"
+    success "已删除备份: ${all_backups[$choice]}"
+  else
+    info "保留所有备份"
+  fi
+else
+  info "没有其他备份可管理"
+fi
+
 # 更新组件权限
 info "🔄 更新组件权限..."
 components=(
