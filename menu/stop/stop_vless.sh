@@ -33,6 +33,8 @@ if [ ! -f "$PID_FILE" ]; then
     if [ -z "$VLESS_PID" ]; then
         echo -e "${green}✅ 未找到运行中的VLESS进程${reset}"
         footer
+        read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
+        bash /root/VPN/menu/stop_service.sh
         exit 0
     fi
 else
@@ -42,28 +44,34 @@ fi
 # 停止进程
 if [ -n "$VLESS_PID" ]; then
     echo -e "${yellow}🔄 正在停止PID为 $VLESS_PID 的进程...${reset}"
-    
-    # 先尝试正常终止
-    kill -TERM "$VLESS_PID" 2>/dev/null
-    
-    # 等待3秒
-    sleep 3
-    
-    # 检查是否仍在运行
-    if ps -p "$VLESS_PID" >/dev/null; then
-        echo -e "${yellow}⚠️  正常终止失败，尝试强制停止...${reset}"
-        kill -9 "$VLESS_PID" 2>/dev/null
-        sleep 1
+
+    # 获取进程状态
+    STATE=$(ps -o stat= -p "$VLESS_PID" | tr -d ' ')
+
+    # 如果是僵尸进程
+    if [[ "$STATE" == *Z* ]]; then
+        echo -e "${yellow}⚠️  检测到僵尸进程（Zombie）...${reset}"
+        PPID=$(ps -o ppid= -p "$VLESS_PID" | tr -d ' ')
+        echo -e "${yellow}📌 僵尸进程的父进程为：$PPID，尝试强制回收...${reset}"
+        kill -9 "$PPID" 2>/dev/null
+        sleep 2
+    else
+        # 正常终止
+        kill -TERM "$VLESS_PID" 2>/dev/null
+        sleep 3
+
+        # 检查是否仍在运行
+        if ps -p "$VLESS_PID" >/dev/null; then
+            echo -e "${yellow}⚠️  正常终止失败，尝试强制停止...${reset}"
+            kill -9 "$VLESS_PID" 2>/dev/null
+            sleep 1
+        fi
     fi
-    
+
     # 最终确认
     if ! ps -p "$VLESS_PID" >/dev/null; then
         echo -e "${green}✅ 成功停止VLESS服务${reset}"
-        
-        # 清理PID文件
         [ -f "$PID_FILE" ] && rm -f "$PID_FILE"
-        
-        # 记录停止时间到日志
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] 服务已手动停止" >> "$LOG_FILE"
     else
         echo -e "${red}❌ 停止失败，请手动检查进程 ${yellow}$VLESS_PID${reset}"
