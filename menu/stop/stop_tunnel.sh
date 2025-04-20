@@ -31,7 +31,7 @@ PID=$(pgrep -f "cloudflared tunnel run")
 if [ -z "$PID" ]; then
     echo -e "${yellow}⚠️ 没有正在运行的 Cloudflare 隧道${reset}"
     footer
-    read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
+    read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
     bash /root/VPN/menu/stop_service.sh
     exit 0
 fi
