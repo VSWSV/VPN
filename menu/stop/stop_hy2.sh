@@ -1,4 +1,5 @@
 #!/bin/bash
+clear
 
 # 颜色定义
 red="\033[1;31m"; green="\033[1;32m"; yellow="\033[1;33m"
@@ -20,7 +21,6 @@ function footer() {
 }
 
 # 主流程
-clear
 header
 # 检查PID文件是否存在
 if [ ! -f "$PID_FILE" ]; then
