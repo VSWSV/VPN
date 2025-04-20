@@ -16,28 +16,44 @@ function header() {
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-function get_ips() {
-    local ipv4 ipv6
-    ipv4=$(curl -s4m3 --connect-timeout 3 ifconfig.co 2>/dev/null || echo "未检测到")
-    ipv6=$(curl -s6m3 --connect-timeout 3 ifconfig.co 2>/dev/null || echo "未检测到")
-    echo "$ipv4" "$ipv6"
-}
-
-function wrap_subscription() {
-    local sub="$1"
-    local len=${#sub}
-    if [ $len -gt 65 ]; then
-        echo -e "${cyan}${sub:0:65}${reset}"
-        echo -e "${cyan}${sub:65}${reset}"
-    else
-        echo -e "${cyan}$sub${reset}"
-    fi
+function footer() {
+    echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
 function verify_config() {
-    [ -f "$CONFIG_PATH" ] || { echo -e "${red}❌ 配置文件不存在"; return 1; }
-    jq -e '.inbounds[0]' "$CONFIG_PATH" &>/dev/null || { echo -e "${red}❌ 配置文件格式错误"; return 1; }
+    if [ ! -f "$CONFIG_PATH" ]; then
+        echo -e "${red}❌ 配置文件不存在${reset}"
+        return 1
+    fi
+    
+    if ! jq -e '.inbounds[0]' "$CONFIG_PATH" &>/dev/null; then
+        echo -e "${red}❌ 配置文件格式错误${reset}"
+        return 1
+    fi
+    
     return 0
+}
+
+function config_prompt() {
+    while true; do
+        echo -e "${yellow}是否要现在配置 VLESS？${reset}"
+        echo -e "${green}[Y] 是${reset} ${red}[N] 否${reset}"
+        read -p "请输入选择 (Y/N): " choice
+        
+        case $choice in
+            [Yy])
+                bash /root/VPN/menu/config/config_vless.sh
+                return $?
+                ;;
+            [Nn])
+                bash /root/VPN/menu/start_service.sh
+                return $?
+                ;;
+            *)
+                echo -e "${red}无效输入，请重新选择${reset}"
+                ;;
+        esac
+    done
 }
 
 # 主流程
@@ -45,8 +61,8 @@ header
 
 # 配置验证
 if ! verify_config; then
-    echo -e "${yellow}请先运行配置脚本: bash /root/VPN/menu/config/config_vless.sh${reset}"
-    exit 1
+    config_prompt
+    exit $?
 fi
 
 # 提取配置参数
@@ -56,11 +72,20 @@ SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // empty' "$CONF
 FLOW=$(jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
 
 # 获取双栈IP
+function get_ips() {
+    local ipv4 ipv6
+    ipv4=$(curl -s4m3 --connect-timeout 3 ifconfig.co 2>/dev/null || echo "未检测到")
+    ipv6=$(curl -s6m3 --connect-timeout 3 ifconfig.co 2>/dev/null || echo "未检测到")
+    echo "$ipv4" "$ipv6"
+}
 read -r ipv4 ipv6 <<< "$(get_ips)"
 
 # 端口检查
 if ss -tulnp | grep -q ":$PORT "; then
     echo -e "${red}❌ 端口 $PORT 已被占用${reset}"
+    footer
+    read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+    bash /root/VPN/menu/start_service.sh
     exit 1
 fi
 
@@ -84,6 +109,18 @@ if ps -p $(cat "$PID_PATH") >/dev/null; then
     
     echo -e "${green}📡 订阅链接已生成: ${lightpink}$SUB_FILE${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    
+    # 显示订阅链接（自动换行）
+    function wrap_subscription() {
+        local sub="$1"
+        local len=${#sub}
+        if [ $len -gt 65 ]; then
+            echo -e "${cyan}${sub:0:65}${reset}"
+            echo -e "${cyan}${sub:65}${reset}"
+        else
+            echo -e "${cyan}$sub${reset}"
+        fi
+    }
     wrap_subscription "$SUB_LINK"
     
     # 显示完整网络信息
@@ -105,10 +142,6 @@ else
     echo -e "  4. 内存不足${reset}"
 fi
 
-footer() {
-    echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-}
 footer
-
 read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
 bash /root/VPN/menu/start_service.sh
