@@ -60,7 +60,7 @@ for comp in "${components[@]}"; do
   else
     error "$name 可执行文件不存在"
   fi
-donee
+done
 
 # 2. 验证端口监听
 info "📡 验证端口监听..."
