@@ -104,8 +104,7 @@ latest_commit=$(git log -1 --pretty=format:"%h - %s (%ci)")
 changed_files=$(git diff --name-only HEAD~1 HEAD)
 success "项目更新成功"
 info "📝 最后提交: ${green}$latest_commit${reset}"
-info "📄 更改的文件:"
-echo -e "${yellow}$changed_files${reset}"
+info "📄 更改的文件: ${green}$changed_files${reset}"
 
 # 恢复配置文件
 info "🔄 恢复配置文件..."
