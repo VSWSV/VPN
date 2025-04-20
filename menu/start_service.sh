@@ -28,7 +28,7 @@ while true; do
             break ;;
         2) bash /root/VPN/menu/start/start_vless.sh
             break ;;
-        3) bash /root/VPN/menu/start/tunnel_dms.sh
+        3) bash /root/VPN/menu/start/stop_tunnel.sh
             break ;;
         0) bash /root/VPN/menu.sh
             break ;;
