@@ -43,12 +43,13 @@ components=(
 
 for comp in "${components[@]}"; do
   IFS='|' read -r name cmd pattern <<< "$comp"
-  if [ -f "/root/VPN/${cmd%% *}" ]; then
-    version=$($cmd 2>&1 | head -n 1)
-    if [[ "$version" == *"$pattern"* ]]; then
-      success "$name 版本正常: ${green}$(echo $version | head -n 1)${reset}"
+  check_path="${cmd%% *}" 
+  if [ -f "$check_path" ]; then
+    version_output=$($cmd 2>&1 | head -n 1)
+    if [[ "$version_output" == *"$pattern"* ]]; then
+      success "$name 版本正常: ${green}$version_output${reset}"
     else
-      error "$name 版本异常: ${red}$version${reset}"
+      error "$name 版本异常: ${red}$version_output${reset}"
     fi
   else
     error "$name 可执行文件不存在"
