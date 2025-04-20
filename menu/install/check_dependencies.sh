@@ -37,8 +37,8 @@ echo -e "${cyan}╠════════════════════�
 # 1. 检查目录结构
 info "📂 检查目录结构..."
 [ -d "/root/VPN" ] && success "/root/VPN 目录存在" || error "/root/VPN 目录不存在"
-[ -d "/root/VPN/xray" ] && success "/root/VPN/xray 目录存在" || error "/root/VPN/xray 目录不存在"
-[ -f "/root/VPN/xray/xray" ] && success "Xray 可执行文件存在" || error "Xray 可执行文件缺失"
+[ -d "/root/VPN/xray" ] && success "/root/VPN 目录存在" || error "/root/VPN/xray 目录不存在"
+[ -f "/root/VPN/xray" ] && success "Xray 可执行文件存在" || error "Xray 可执行文件缺失"
 [ -f "/root/VPN/hysteria" ] && success "Hysteria 可执行文件存在" || error "Hysteria 可执行文件缺失"
 [ -f "/root/VPN/cloudflared" ] && success "Cloudflared 可执行文件存在" || error "Cloudflared 可执行文件缺失"
 
