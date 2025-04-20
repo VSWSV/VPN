@@ -16,36 +16,25 @@ CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"
 CFD_BIN="/root/VPN/cloudflared"
 LOG_FILE="$CLOUDFLARED_DIR/tunnel.log"
 
-# 标题
 show_header() {
-    clear
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
     printf "${orange}%*s🚀 启动 Cloudflare 隧道%*s\n" $(( (83 - 18) / 2 )) "" $(( (83 - 18 + 1) / 2 )) ""
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-show_footer() {
-    echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-}
-
-info() { echo -e "${yellow}🔹 $1${reset}"; }
-success() { echo -e "${green}✅ $1${reset}"; }
-error() { echo -e "${red}❌ $1${reset}"; }
-
-# 验证配置
-function verify_config() {
+verify_config() {
     [ -f "$CONFIG_FILE" ] || { echo -e "${red}❌ 配置文件不存在"; return 1; }
-    grep -q "隧道名称：" "$CONFIG_FILE" || { echo -e "${red}❌ 配置缺少隧道名称字段"; return 1; }
+    grep -q "password:" "$CONFIG_FILE" || { echo -e "${red}❌ 配置缺少password字段"; return 1; }
     return 0
 }
 
 # 配置提示
-function config_prompt() {
+config_prompt() {
     while true; do
         echo -e "${yellow}是否要现在配置 Cloudflare 隧道？${reset}"
         echo -e "${green}[Y] 是${reset} ${red}[N] 否${reset}"
         read -p "请输入选择 (Y/N): " choice
-        
+
         case $choice in
             [Yy])
                 bash /root/VPN/menu/config/config_tunnel.sh
@@ -62,19 +51,31 @@ function config_prompt() {
     done
 }
 
+show_footer() {
+    echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+}
+
+info() { echo -e "${yellow}🔹 $1${reset}"; }
+success() { echo -e "${lightpink}✅ $1${reset}"; }  # 保留你原来的颜色风格
+error() { echo -e "${red}❌ $1${reset}"; }
+
 # 获取隧道名称
 get_tunnel_name() {
-    if verify_config; then
+    if [[ -f "$CONFIG_FILE" ]]; then
         grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}'
     else
-        config_prompt
-        exit $?
+        error "未找到配置文件 $CONFIG_FILE"
+        exit 1
     fi
 }
 
 # 主逻辑
 main() {
+    clear
     show_header
+
+    # 检查配置
+    verify_config || { config_prompt; exit $?; }
 
     TUNNEL_NAME=$(get_tunnel_name)
 
@@ -85,8 +86,7 @@ main() {
         echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
         echo -e "${lightpink}📌 使用命令查看日志: ${green}tail -f $LOG_FILE${reset}"
         show_footer
-        read -p "$(echo -e "${white}按回车键返回主菜单...${reset}")" -n 1
-        bash /root/VPN/menu/start_service.sh
+        read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
         return
     fi
 
@@ -115,8 +115,7 @@ main() {
     fi
 
     show_footer
-    read -p "$(echo -e "${white}按回车键返回主菜单...${reset}")" -n 1
-    bash /root/VPN/menu/start_service.sh
+    read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
 }
 
 main
