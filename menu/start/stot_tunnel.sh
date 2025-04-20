@@ -12,21 +12,42 @@ reset='\033[0m'
 
 # 路径配置
 CLOUDFLARED_DIR="/root/.cloudflared"
-CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"
-CFD_BIN="/root/VPN/cloudflared"
+CONFIG_FILE="$CLOUDFLARED_DIR/config.yml"
 LOG_FILE="$CLOUDFLARED_DIR/tunnel.log"
 
+# 校验配置文件
+verify_config() {
+    [ -f "$CONFIG_FILE" ] || { echo -e "${red}❌ 缺少 config.yml 配置文件"; return 1; }
+    
+    CREDENTIALS_FILE=$(grep '^credentials-file:' "$CONFIG_FILE" | awk '{print $2}')
+    if [ ! -f "$CREDENTIALS_FILE" ]; then
+        echo -e "${red}❌ 缺少认证凭证文件: $CREDENTIALS_FILE"; return 1;
+    fi
+
+    grep -q '^tunnel:' "$CONFIG_FILE" || { echo -e "${red}❌ 配置中缺少 tunnel 字段"; return 1; }
+
+    return 0
+}
+
+# 获取隧道 ID（可用于显示）
+get_tunnel_id() {
+    grep '^tunnel:' "$CONFIG_FILE" | awk '{print $2}'
+}
+
+# 显示标题
 show_header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
     printf "${orange}%*s🚀 启动 Cloudflare 隧道%*s\n" $(( (83 - 18) / 2 )) "" $(( (83 - 18 + 1) / 2 )) ""
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-verify_config() {
-    [ -f "$CONFIG_FILE" ] || { echo -e "${red}❌ 配置文件不存在"; return 1; }
-    grep -q "password:" "$CONFIG_FILE" || { echo -e "${red}❌ 配置缺少password字段"; return 1; }
-    return 0
+show_footer() {
+    echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
+
+info() { echo -e "${yellow}🔹 $1${reset}"; }
+success() { echo -e "${lightpink}✅ $1${reset}"; }
+error() { echo -e "${red}❌ $1${reset}"; }
 
 # 配置提示
 config_prompt() {
@@ -51,33 +72,17 @@ config_prompt() {
     done
 }
 
-show_footer() {
-    echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-}
-
-info() { echo -e "${yellow}🔹 $1${reset}"; }
-success() { echo -e "${lightpink}✅ $1${reset}"; }  # 保留你原来的颜色风格
-error() { echo -e "${red}❌ $1${reset}"; }
-
-# 获取隧道名称
-get_tunnel_name() {
-    if [[ -f "$CONFIG_FILE" ]]; then
-        grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}'
-    else
-        error "未找到配置文件 $CONFIG_FILE"
-        exit 1
-    fi
-}
-
 # 主逻辑
 main() {
     clear
     show_header
 
-    # 检查配置
-    verify_config || { config_prompt; exit $?; }
+    if ! verify_config; then
+        config_prompt
+        return 1
+    fi
 
-    TUNNEL_NAME=$(get_tunnel_name)
+    TUNNEL_ID=$(get_tunnel_id)
 
     # 检查是否已运行
     if pgrep -f "cloudflared tunnel run" >/dev/null; then
@@ -91,8 +96,8 @@ main() {
     fi
 
     # 启动隧道
-    info "正在启动隧道: ${green}$TUNNEL_NAME${reset}"
-    nohup $CFD_BIN tunnel run "$TUNNEL_NAME" > "$LOG_FILE" 2>&1 &
+    info "正在启动隧道: ${green}$TUNNEL_ID${reset}"
+    nohup cloudflared tunnel run > "$LOG_FILE" 2>&1 &
 
     sleep 2
 
@@ -107,8 +112,8 @@ main() {
         echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
         echo -e "${red}⚠️ 可能原因:"
         echo -e "1. 证书未正确配置"
-        echo -e "2. 配置文件损坏"
-        echo -e "3. 端口冲突"
+        echo -e "2. 配置文件错误或缺失字段"
+        echo -e "3. cloudflared 程序不可执行"
         echo -e "4. 网络连接问题${reset}"
         echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
         echo -e "${lightpink}🔍 查看错误详情: ${green}tail -n 20 $LOG_FILE${reset}"
