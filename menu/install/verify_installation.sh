@@ -35,10 +35,9 @@ printf "%${padding}s" ""; echo -e "${orange}$title${reset}"
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 
 # 1. 验证组件版本
-info "🔄 验证组件版本..."
 components=(
   "Xray|xray/xray version|Xray-core"
-  "Hysteria|/VPN/hysteriaa version|v"
+  "Hysteria|HY2/hysteria version|v"
   "Cloudflared|cloudflared --version|cloudflared"
 )
 
