@@ -12,7 +12,7 @@ reset='\033[0m'
 # 显示顶部边框和标题
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-    echo -e "                                ${orange}🔴 停止 Cloudflare 隧道${reset}"
+    echo -e "                              ${orange}🔴 停止 Cloudflare 隧道${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -25,11 +25,14 @@ function footer() {
 clear
 header
 
+# 统一输出第一行
+echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程名停止...${reset}"
+
 # 获取所有 cloudflared tunnel run 的进程 PID
 PIDS=$(pgrep -f "cloudflared tunnel run")
 
 if [ -z "$PIDS" ]; then
-    echo -e "${yellow}⚠️ 没有正在运行的 Cloudflare 隧道${reset}"
+    echo -e "${lightpink}✅ 未找到运行中的Cloudflare隧道${reset}"
     footer
     read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
     bash /root/VPN/menu/stop_service.sh
