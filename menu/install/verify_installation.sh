@@ -36,12 +36,10 @@ echo -e "${cyan}╠════════════════════�
 
 # 1. 验证组件版本
 components=(
-  "Xray|xray/xray version|Xray-core"
-  "Hysteria|HY2/hysteria version|v"
+  "Xray|xray/xray version|Xray"
+  "Hysteria|VPN/hysteria version|hysteria"
   "Cloudflared|cloudflared --version|cloudflared"
 )
-
-
 
 for comp in "${components[@]}"; do
   IFS='|' read -r name cmd pattern <<< "$comp"
