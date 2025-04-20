@@ -75,3 +75,7 @@ echo -e "${yellow}▶ /root/VPN/xray/xray run -config /root/VPN/xray/config.json
 echo -e "${yellow}▶ /root/VPN/hysteria --config /root/VPN/hysteria.yaml${reset}"
 echo -e "${yellow}▶ /root/VPN/cloudflared tunnel login${reset}"
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+
+# 返回上级菜单
+read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
+bash /root/VPN/menu/install_upgrade.sh
