@@ -186,32 +186,58 @@ if [[ "$security" != "none" ]]; then
     case $tls_choice in
         1)
             generate_certs "$sni"
-            tls_config='"security": "'$security'",
-    "tlsSettings": {
-      "serverName": "'$sni'",
-      "certificates": [
-        {
-          "certificateFile": "'$CERTS_DIR/cert.pem'",
-          "keyFile": "'$CERTS_DIR/private.key'"
-        }
-      ]
-    }'
+            if [[ "$security" == "xtls" ]]; then
+                tls_config='"security": "'$security'",
+        "xtlsSettings": {
+          "serverName": "'$sni'",
+          "certificates": [
+            {
+              "certificateFile": "'$CERTS_DIR/cert.pem'",
+              "keyFile": "'$CERTS_DIR/private.key'"
+            }
+          ]
+        }'
+            else
+                tls_config='"security": "'$security'",
+        "tlsSettings": {
+          "serverName": "'$sni'",
+          "certificates": [
+            {
+              "certificateFile": "'$CERTS_DIR/cert.pem'",
+              "keyFile": "'$CERTS_DIR/private.key'"
+            }
+          ]
+        }'
+            fi
             ;;
         2)
             while true; do
                 read -p "$(echo -e " ${lightpink}⇨ 请输入证书路径: ${reset}")" cert_path
                 read -p "$(echo -e " ${lightpink}⇨ 请输入私钥路径: ${reset}")" key_path
                 if [ -f "$cert_path" ] && [ -f "$key_path" ]; then
-                    tls_config='"security": "'$security'",
-    "tlsSettings": {
-      "serverName": "'$sni'",
-      "certificates": [
-        {
-          "certificateFile": "'$cert_path'",
-          "keyFile": "'$key_path'"
-        }
-      ]
-    }'
+                    if [[ "$security" == "xtls" ]]; then
+                        tls_config='"security": "'$security'",
+            "xtlsSettings": {
+              "serverName": "'$sni'",
+              "certificates": [
+                {
+                  "certificateFile": "'$cert_path'",
+                  "keyFile": "'$key_path'"
+                }
+              ]
+            }'
+                    else
+                        tls_config='"security": "'$security'",
+            "tlsSettings": {
+              "serverName": "'$sni'",
+              "certificates": [
+                {
+                  "certificateFile": "'$cert_path'",
+                  "keyFile": "'$key_path'"
+                }
+              ]
+            }'
+                    fi
                     break
                 else
                     show_error "证书文件不存在，请重新输入"
@@ -221,16 +247,29 @@ if [[ "$security" != "none" ]]; then
         *)
             show_error "无效选择，默认使用自签名证书"
             generate_certs "$sni"
-            tls_config='"security": "'$security'",
-    "tlsSettings": {
-      "serverName": "'$sni'",
-      "certificates": [
-        {
-          "certificateFile": "'$CERTS_DIR/cert.pem'",
-          "keyFile": "'$CERTS_DIR/private.key'"
-        }
-      ]
-    }'
+            if [[ "$security" == "xtls" ]]; then
+                tls_config='"security": "'$security'",
+        "xtlsSettings": {
+          "serverName": "'$sni'",
+          "certificates": [
+            {
+              "certificateFile": "'$CERTS_DIR/cert.pem'",
+              "keyFile": "'$CERTS_DIR/private.key'"
+            }
+          ]
+        }'
+            else
+                tls_config='"security": "'$security'",
+        "tlsSettings": {
+          "serverName": "'$sni'",
+          "certificates": [
+            {
+              "certificateFile": "'$CERTS_DIR/cert.pem'",
+              "keyFile": "'$CERTS_DIR/private.key'"
+            }
+          ]
+        }'
+            fi
             ;;
     esac
 else
@@ -261,9 +300,21 @@ cat > "$CONFIG_PATH" <<EOF
         $tls_config
       }
     }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "settings": {}
+    }
   ]
 }
 EOF
+
+# 验证配置文件
+if ! jq empty "$CONFIG_PATH" &>/dev/null; then
+    echo -e "${red}❌ 生成的配置文件无效，请检查参数${reset}"
+    exit 1
+fi
 
 chmod 600 "$CONFIG_PATH"
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
