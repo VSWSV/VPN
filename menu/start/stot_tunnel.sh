@@ -95,7 +95,7 @@ sleep 2
 
 if pgrep -f "cloudflared tunnel run" >/dev/null; then
     PID=$(pgrep -f "cloudflared tunnel run")
-    success "隧道启动成功! (PID: ${green}$PID${reset}${lightpink})${reset}"
+    success "隧道启动成功! (PID: ${green}$PID${reset})"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${lightpink}📌 实时日志路径: ${green}$LOG_FILE${reset}"
 else
