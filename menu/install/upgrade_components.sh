@@ -129,3 +129,7 @@ echo -e "${yellow}▶ systemctl restart xray.service${reset}"
 echo -e "${yellow}▶ systemctl restart hysteria.service${reset}"
 echo -e "${yellow}▶ systemctl restart cloudflared.service${reset}"
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+
+# 返回上级菜单
+read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
+bash /root/VPN/menu/install_upgrade.sh
