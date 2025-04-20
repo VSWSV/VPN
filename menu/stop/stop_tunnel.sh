@@ -39,7 +39,7 @@ if [ -z "$CLOUDFLARE_PIDS" ]; then
     bash /root/VPN/menu/stop_service.sh
     exit 0
 fi
-
+else
 # 获取隧道名称
 CFD_BIN=$(command -v cloudflared)
 TUNNEL_NAME=$($CFD_BIN tunnel list 2>/dev/null | awk 'NR>1 {print $2}' | head -n 1)
