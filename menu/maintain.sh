@@ -26,29 +26,21 @@ while true; do
     read -p "请输入选项编号： " opt
     case $opt in
         1) bash /root/VPN/menu/maintain/toggle_logs.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         2) bash /root/VPN/menu/maintain/clean_system_cache.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         3) bash /root/VPN/menu/maintain/release_mem.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+           break ;;
         4) bash /root/VPN/menu/maintain/show_errors.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         5) bash /root/VPN/menu/maintain/temp_clean.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         6) bash /root/VPN/menu/maintain/clear_proxy_cache.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         7) bash /root/VPN/menu/maintain/clean_all_logs.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         8) bash /root/VPN/menu/maintain/disk_check.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         0) bash /root/VPN/menu.sh
             break ;;
         *) echo -e "${red}❌ 无效输入！${reset}"
