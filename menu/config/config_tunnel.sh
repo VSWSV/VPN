@@ -1,5 +1,5 @@
 #!/bin/bash
-
+clear
 # 颜色定义
 cyan='\033[1;36m'
 yellow='\033[1;33m'
