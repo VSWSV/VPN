@@ -59,7 +59,7 @@ done
 # 3. 检查配置文件
 info "📄 检查配置文件..."
 config_files=(
-  "/root/VPN/VLESS/config/config.json"
+  "/root/VPN/VLESS/config/vless.json"
   "/root/VPN/HY2/config/hysteria.yaml"
   "/root/.cloudflared/config.yml"
   "/root/.cloudflared/cert.pem"
