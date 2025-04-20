@@ -52,23 +52,26 @@ mkdir -p "$backup_dir"
 
 # 备份重要配置文件
 config_files=(
-  "/root/VPN/VLESS/config.json"
-  "/root/VPN/HY2/hysteria.yaml"
-  "/root/.cloudflared/config.yml"
-  "/root/.cloudflared/cert.pem"
+  "VLESS/config.json"
+  "HY2/hysteria.yaml"
+  "../.cloudflared/config.yml"
+  "../.cloudflared/cert.pem"
 )
 
 backup_count=0
 for config in "${config_files[@]}"; do
-  config_dir="$backup_dir$(dirname "$config")"
-  mkdir -p "$config_dir"
+  config_path="/root/VPN/$config"
+  if [[ $config == ../* ]]; then
+    config_path="/root/${config#../}"
+  fi
   
-  if [ -f "$config" ]; then
-    cp "$config" "$config_dir/"
-    info "✅ 已备份: $config"
+  if [ -f "$config_path" ]; then
+    mkdir -p "$backup_dir/$(dirname "$config")"
+    cp "$config_path" "$backup_dir/$config"
+    info "✅ 已备份: $config_path"
     ((backup_count++))
   else
-    warning "⚠️  配置文件不存在: $config"
+    warning "⚠️  配置文件不存在: $config_path"
   fi
 done
 
@@ -82,14 +85,17 @@ fi
 info "🔄 从GitHub更新项目..."
 if ! command -v git &> /dev/null; then
   info "安装git..."
-  apt install -y git || error_exit "Git安装失败"
+  apt update && apt install -y git || error_exit "Git安装失败"
 fi
 
 if [ ! -d "/root/VPN/.git" ]; then
-  git clone https://github.com/VSWSV/VPN.git /root/VPN-temp && \
-  cp -r /root/VPN-temp/. /root/VPN/ && \
-  rm -rf /root/VPN-temp || error_exit "项目克隆失败"
+  info "首次克隆项目..."
+  mv /root/VPN /root/VPN_backup
+  git clone https://github.com/VSWSV/VPN.git /root/VPN || error_exit "项目克隆失败"
+  cp -r /root/VPN_backup/* /root/VPN/
+  rm -rf /root/VPN_backup
 else
+  info "更新现有项目..."
   git fetch origin && git reset --hard origin/main || error_exit "项目更新失败"
 fi
 
@@ -104,33 +110,41 @@ echo -e "${yellow}$changed_files${reset}"
 # 恢复配置文件
 info "🔄 恢复配置文件..."
 for config in "${config_files[@]}"; do
-  if [ -f "$backup_dir/$config" ]; then
-    mkdir -p "$(dirname "$config")"
-    cp "$backup_dir/$config" "$config"
-    info "已恢复: $config"
+  backup_path="$backup_dir/$config"
+  restore_path="/root/VPN/$config"
+  if [[ $config == ../* ]]; then
+    restore_path="/root/${config#../}"
+  fi
+  
+  if [ -f "$backup_path" ]; then
+    mkdir -p "$(dirname "$restore_path")"
+    cp "$backup_path" "$restore_path"
+    info "已恢复: $restore_path"
   fi
 done
 success "配置文件恢复完成"
 
-# 更新组件
-info "🔄 更新组件..."
+# 更新组件权限
+info "🔄 更新组件权限..."
 components=(
-  "xray"
-  "hysteria"
-  "cloudflared"
+  "/root/VPN/xray/xray"
+  "/root/VPN/hysteria"
+  "/root/VPN/cloudflared"
 )
 
 for comp in "${components[@]}"; do
   if [ -f "$comp" ]; then
     chmod +x "$comp"
     info "设置执行权限: $comp"
+  else
+    warning "组件不存在: $comp"
   fi
 done
 
-# 设置最高权限
-info "🔒 设置最高执行权限..."
+# 设置目录权限
+info "🔒 设置目录权限..."
+find /root/VPN -name "*.sh" -exec chmod +x {} \;
 chmod -R 755 /root/VPN
-chmod +x /root/VPN/*.sh
 success "权限设置完成"
 
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
