@@ -146,7 +146,7 @@ if [ ${#all_backups[@]} -gt 1 ]; then
     fi
   done
 
-  read -p "$(echo -e "${cyan}是否删除旧备份? (输入要删除的备份编号或'n'跳过): ${reset}") choice
+  read -p "$(echo -e "${cyan}是否删除旧备份? (输入要删除的备份编号或'n'跳过): ${reset}")" choice
   if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -lt "${#all_backups[@]}" ] && [ "$choice" -ne 0 ]; then
     rm -rf "${all_backups[$choice]}"
     success "已删除备份: ${all_backups[$choice]}"
