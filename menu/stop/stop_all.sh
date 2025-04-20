@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 
 # 颜色定义
 cyan='\033[1;36m'
@@ -28,7 +28,7 @@ error() { echo -e "${red}❌ $1${reset}"; }
 main() {
     clear
     show_header
-    
+
     # 检查运行状态
     if ! pgrep -f "cloudflared tunnel run" >/dev/null; then
         echo -e "${yellow}⚠️ 没有正在运行的 Cloudflare 隧道${reset}"
@@ -36,18 +36,29 @@ main() {
         read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
         return
     fi
-    
-    # 获取隧道信息
+
+    # 获取 PID 和隧道名
     PID=$(pgrep -f "cloudflared tunnel run")
-    TUNNEL_NAME=$($CFD_BIN tunnel list | awk 'NR>1 {print $2}')
-    
+    STATE=$(ps -o stat= -p "$PID" | tr -d ' ')
+    CFD_BIN=$(command -v cloudflared)
+    TUNNEL_NAME=$($CFD_BIN tunnel list 2>/dev/null | awk 'NR>1 {print $2}' | head -n 1)
+
     info "正在停止隧道: ${green}$TUNNEL_NAME${reset} (PID: ${green}$PID${reset})"
-    
-    # 停止隧道
-    kill -TERM "$PID"
-    sleep 2
-    
-    # 验证停止结果
+
+    # 如果是僵尸进程
+    if [[ "$STATE" == *Z* ]]; then
+        echo -e "${yellow}⚠️ 检测到僵尸进程 (Zombie)，尝试回收...${reset}"
+        PPID=$(ps -o ppid= -p "$PID" | tr -d ' ')
+        echo -e "${yellow}📌 父进程为: ${green}$PPID${reset}，执行: kill -9 $PPID"
+        kill -9 "$PPID" 2>/dev/null
+        sleep 2
+    else
+        # 正常停止
+        kill -TERM "$PID"
+        sleep 2
+    fi
+
+    # 验证是否停止成功
     if pgrep -f "cloudflared tunnel run" >/dev/null; then
         error "停止隧道失败!"
         echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
@@ -57,9 +68,9 @@ main() {
         echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
         echo -e "${lightpink}🗑️ 已清理进程: ${green}$PID${reset}"
     fi
-    
+
     show_footer
-    read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
+    read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
 }
 
 main
