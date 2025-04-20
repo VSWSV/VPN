@@ -36,8 +36,8 @@ echo -e "${cyan}╠════════════════════�
 
 # 1. 验证组件版本
 components=(
-  "Xray|/root/VPN/xray --version|Xray"
-  "Hysteria|/root/VPN/hysteria version|Version:"
+  "Xray|/root/VPN/xray/xray --version|Xray"
+  "Hysteria|/root/VPN/hysteria --version|Version:"
   "Cloudflared|/root/VPN/cloudflared --version|cloudflared"
 )
 
