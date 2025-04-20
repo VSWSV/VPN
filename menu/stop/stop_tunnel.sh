@@ -32,7 +32,7 @@ echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程名停止...${r
 PIDS=$(pgrep -f "cloudflared tunnel run")
 
 if [ -z "$PIDS" ]; then
-    echo -e "${lightpink}✅ 未找到运行中的Cloudflare隧道${reset}"
+    echo -e "${green}✅ 未找到运行中的Cloudflare隧道${reset}"
     footer
     read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
     bash /root/VPN/menu/stop_service.sh
@@ -66,7 +66,7 @@ for PID in $PIDS; do
 
     # 最终确认
     if ! ps -p "$PID" > /dev/null; then
-        echo -e "${lightpink}✅ 隧道 PID $PID 已成功停止${reset}"
+        echo -e "${green}✅ 隧道 PID $PID 已成功停止${reset}"
     else
         echo -e "${red}❌ 停止失败，请手动 kill -9 $PID${reset}"
     fi
