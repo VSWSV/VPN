@@ -7,6 +7,7 @@ orange='\033[38;5;208m'
 lightpink='\033[38;5;218m'
 green='\033[1;32m'
 red='\033[1;31m'
+white='\033[1;37m'
 reset='\033[0m'
 
 # 路径配置
@@ -27,7 +28,7 @@ show_footer() {
 }
 
 info() { echo -e "${yellow}🔹 $1${reset}"; }
-success() { echo -e "${lightpink}✅ $1${reset}"; }
+success() { echo -e "${green}✅ $1${reset}"; }
 error() { echo -e "${red}❌ $1${reset}"; }
 
 # 获取隧道名称
@@ -36,6 +37,10 @@ get_tunnel_name() {
         grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}'
     else
         error "未找到配置文件 $CONFIG_FILE"
+        echo -e "${yellow}请先运行配置脚本: bash /root/VPN/menu/config/config_tunnel.sh${reset}"
+        show_footer
+        read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+        bash /root/VPN/menu/start_service.sh
         exit 1
     fi
 }
@@ -54,7 +59,8 @@ main() {
         echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
         echo -e "${lightpink}📌 使用命令查看日志: ${green}tail -f $LOG_FILE${reset}"
         show_footer
-        read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
+        read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+        bash /root/VPN/menu/start_service.sh
         return
     fi
     
@@ -83,7 +89,8 @@ main() {
     fi
     
     show_footer
-    read -p "$(echo -e "${yellow}按回车键返回...${reset}")" dummy
+    read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+    bash /root/VPN/menu/start_service.sh
 }
 
 main
