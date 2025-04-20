@@ -98,7 +98,7 @@ if [ -f "$PID_PATH" ] && ps -p $(cat "$PID_PATH") >/dev/null; then
         echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
     }
     footer
-    read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+    read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
     bash /root/VPN/menu/start_service.sh
     exit 0
 fi
@@ -167,5 +167,5 @@ footer() {
 }
 footer
 
-read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
 bash /root/VPN/menu/start_service.sh
