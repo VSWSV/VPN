@@ -472,7 +472,7 @@ main() {
     final_info
     show_bottom_line
     chmod +x "$0"
-    read -p "$(echo -e "${yellow}按回车键返回主菜单...${reset}")" dummy
+    read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
     bash "/root/VPN/menu/config_node.sh"
 }
 
