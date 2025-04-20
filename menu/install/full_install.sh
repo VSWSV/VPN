@@ -25,6 +25,39 @@ function error_exit() {
   exit 1
 }
 
+# 下载组件函数（带覆盖确认）
+download_component() {
+  local name=$1
+  local url=$2
+  local filename=$3
+  local is_zip=$4
+
+  if [ -f "/root/VPN/$filename" ]; then
+    warning "$name 已存在，是否覆盖安装？（y/n）"
+    read -r choice
+    if [[ "$choice" == [yY] ]]; then
+      rm -f "/root/VPN/$filename"
+      info "开始下载 $name..."
+    else
+      warning "跳过 $name 安装"
+      return 1
+    fi
+  fi
+
+  if wget -O "/root/VPN/$filename" "$url"; then
+    if [ "$is_zip" = "true" ]; then
+      unzip -o "/root/VPN/$filename" -d "/root/VPN"
+      rm "/root/VPN/$filename"
+    fi
+    chmod +x "/root/VPN/$(basename "$filename" .zip)" 2>/dev/null
+    success "$name 安装成功"
+    return 0
+  else
+    warning "$name 下载失败"
+    return 1
+  fi
+}
+
 # 计算标题居中
 title="🛠️ 正在开始一键环境安装（含所有依赖）"
 title_length=${#title}
@@ -67,36 +100,20 @@ apt install -y software-properties-common && add-apt-repository universe -y && a
 info "🧰 安装网络工具（mtr-tiny traceroute bmon）..."
 apt install -y mtr-tiny traceroute bmon && success "网络工具安装完成" || warning "部分网络工具安装失败，请手动检查"
 
+# 下载组件部分
 info "⬇️ 下载 Xray..."
-wget -O Xray-linux-64.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip && success "Xray 下载成功" || error_exit "Xray 下载失败"
-
-info "📦 解压 Xray..."
-unzip -o Xray-linux-64.zip -d xray && chmod +x xray/xray && success "Xray 解压并赋权完成" || error_exit "Xray 解压失败"
+download_component "Xray" "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" "Xray-linux-64.zip" "true"
 
 info "⬇️ 下载 Hysteria..."
-# 检查是否已有文件，若有则提示用户是否删除
-if [ -f "hysteria" ]; then
-  warning "Hysteria 已存在，是否强行删除并继续安装？（y/n）"
-  read -r choice
-  if [[ "$choice" == [yY] ]]; then
-    rm -f hysteria
-    info "已删除旧版 Hysteria，开始重新下载..."
-  else
-    warning "跳过 Hysteria 下载，继续下一步安装"
-    success "Hysteria 已跳过"
-    exit 0
-  fi
-fi
-
-wget -O hysteria https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64 && chmod +x hysteria && success "Hysteria 下载并赋权完成" || error_exit "Hysteria 下载失败"
+download_component "Hysteria" "https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64" "hysteria" "false"
 
 info "⬇️ 下载 Cloudflared..."
-wget -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && chmod +x cloudflared && success "Cloudflared 下载并赋权完成" || error_exit "Cloudflared 下载失败"
+download_component "Cloudflared" "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" "cloudflared" "false"
 
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "🎉 所有组件和依赖已成功安装并保存在 /root/VPN"
 echo -e "${yellow}📌 示例运行命令：${reset}"
-echo -e "${yellow}▶ /root/VPN/xray/xray run -config /root/VPN/xray/config.json${reset}"
+echo -e "${yellow}▶ /root/VPN/xray run -config /root/VPN/config.json${reset}"
 echo -e "${yellow}▶ /root/VPN/hysteria --config /root/VPN/hysteria.yaml${reset}"
 echo -e "${yellow}▶ /root/VPN/cloudflared tunnel login${reset}"
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
