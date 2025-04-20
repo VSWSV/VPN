@@ -50,11 +50,6 @@ info "📦 备份配置文件..."
 backup_dir="/root/VPN/backup_$(date +%Y%m%d%H%M%S)"
 mkdir -p "$backup_dir"
 
-# 备份配置文件
-info "📦 备份配置文件..."
-backup_dir="/root/VPN/backup_$(date +%Y%m%d%H%M%S)"
-mkdir -p "$backup_dir"
-
 # 备份重要配置文件
 config_files=(
   "/root/VPN/VLESS/config.json"
