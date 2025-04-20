@@ -25,14 +25,11 @@ while true; do
     read -p "请输入选项编号：" opt
     case $opt in
         1) bash /root/VPN/menu/start/start_hy2.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         2) bash /root/VPN/menu/start/start_vless.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         3) bash /root/VPN/menu/start/start_all.sh
-            read -p "操作完成，按任意键返回菜单..."
-            ;;
+            break ;;
         0) bash /root/VPN/menu.sh
             break ;;
         *) echo -e "${red}❌ 无效输入！${reset}"
