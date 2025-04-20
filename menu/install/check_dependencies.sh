@@ -39,12 +39,12 @@ info "📂 检查目录结构..."
 [ -d "/root/VPN" ] && success "/root/VPN 目录存在" || error "/root/VPN 目录不存在"
 [ -d "/root/VPN/xray" ] && success "/root/VPN/xray 目录存在" || error "/root/VPN/xray 目录不存在"
 [ -f "/root/VPN/xray/xray" ] && success "Xray 可执行文件存在" || error "Xray 可执行文件缺失"
-[ -f "/root/VPN/hysteria" ] && success "Hysteria 可执行文件存在" || error "Hysteria 可执行文件缺失"
+[ -f "/root/VPN/HY2hysteria" ] && success "Hysteria 可执行文件存在" || error "Hysteria 可执行文件缺失"
 [ -f "/root/VPN/cloudflared" ] && success "Cloudflared 可执行文件存在" || error "Cloudflared 可执行文件缺失"
 
 # 2. 检查基本依赖
 info "📦 检查基本依赖..."
-dependencies=("curl" "wget" "unzip" "socat" "tar" "sudo" "git" "mtr-tiny" "traceroute" "bmon")
+dependencies=("dpkg" "curl" "wget" "unzip" "socat" "tar" "sudo" "git" "mtr-tiny" "traceroute" "bmon")
 missing_deps=0
 
 for dep in "${dependencies[@]}"; do
@@ -59,10 +59,10 @@ done
 # 3. 检查配置文件
 info "📄 检查配置文件..."
 config_files=(
-  "/root/VPN/xray/config.json"
-  "/root/VPN/hysteria.yaml"
-  "/root/VPN/.cloudflared/config.yml"
-  "/root/VPN/.cloudflared/cert.pem"
+  "/root/VPN/VLESSconfig.json"
+  "/root/VPN/HY2hysteria.yaml"
+  "/root/.cloudflared/config.yml"
+  "/root/.cloudflared/cert.pem"
 )
 
 missing_configs=0
@@ -93,7 +93,7 @@ done
 info "🔒 检查执行权限..."
 executables=(
   "/root/VPN/xray/xray"
-  "/root/VPN/hysteria"
+  "/root/VPN/HY2hysteria"
   "/root/VPN/cloudflared"
 )
 
@@ -121,5 +121,5 @@ info "💡 建议操作:"
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
 # 返回上级菜单
-read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
+read -p "$(echo -e \"${cyan}按回车键返回...${reset}\")" dummy
 bash /root/VPN/menu/install_upgrade.sh
