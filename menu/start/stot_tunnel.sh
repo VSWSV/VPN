@@ -16,7 +16,7 @@ CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"
 CFD_BIN="/root/VPN/cloudflared"
 LOG_FILE="$CLOUDFLARED_DIR/tunnel.log"
 
-# 显示标题
+# 标题
 show_header() {
     clear
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
@@ -32,10 +32,16 @@ info() { echo -e "${yellow}🔹 $1${reset}"; }
 success() { echo -e "${green}✅ $1${reset}"; }
 error() { echo -e "${red}❌ $1${reset}"; }
 
+# 验证配置
+function verify_config() {
+    [ -f "$CONFIG_FILE" ] || { echo -e "${red}❌ 配置文件不存在"; return 1; }
+    grep -q "隧道名称：" "$CONFIG_FILE" || { echo -e "${red}❌ 配置缺少隧道名称字段"; return 1; }
+    return 0
+}
+
 # 配置提示
-config_prompt() {
+function config_prompt() {
     while true; do
-        echo -e "${red}❌ 配置文件不存在${reset}"
         echo -e "${yellow}是否要现在配置 Cloudflare 隧道？${reset}"
         echo -e "${green}[Y] 是${reset} ${red}[N] 否${reset}"
         read -p "请输入选择 (Y/N): " choice
@@ -58,7 +64,7 @@ config_prompt() {
 
 # 获取隧道名称
 get_tunnel_name() {
-    if [[ -f "$CONFIG_FILE" ]]; then
+    if verify_config; then
         grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}'
     else
         config_prompt
@@ -69,9 +75,9 @@ get_tunnel_name() {
 # 主逻辑
 main() {
     show_header
-    
+
     TUNNEL_NAME=$(get_tunnel_name)
-    
+
     # 检查是否已运行
     if pgrep -f "cloudflared tunnel run" >/dev/null; then
         PID=$(pgrep -f "cloudflared tunnel run")
@@ -83,13 +89,13 @@ main() {
         bash /root/VPN/menu/start_service.sh
         return
     fi
-    
+
     # 启动隧道
     info "正在启动隧道: ${green}$TUNNEL_NAME${reset}"
     nohup $CFD_BIN tunnel run "$TUNNEL_NAME" > "$LOG_FILE" 2>&1 &
-    
+
     sleep 2
-    
+
     # 检查启动结果
     if pgrep -f "cloudflared tunnel run" >/dev/null; then
         PID=$(pgrep -f "cloudflared tunnel run")
@@ -107,7 +113,7 @@ main() {
         echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
         echo -e "${lightpink}🔍 查看错误详情: ${green}tail -n 20 $LOG_FILE${reset}"
     fi
-    
+
     show_footer
     read -p "$(echo -e "${white}按回车键返回主菜单...${reset}")" -n 1
     bash /root/VPN/menu/start_service.sh
