@@ -42,14 +42,11 @@ while true; do
     read -p "请输入选项编号：" opt
     case $opt in
         1) confirm_action "卸载 HY2/VLESS 节点" "/root/VPN/menu/uninstall/uninstall_hy2_vless.sh"
-            read -p "按任意键返回菜单..." -n 1 -s
-            ;;
+            break ;;
         2) confirm_action "卸载核心组件（sing-box）" "/root/VPN/menu/uninstall/uninstall_core.sh"
-            read -p "按任意键返回菜单..." -n 1 -s
-            ;;
+            break ;;
         3) confirm_action "完全卸载 VPN 系统" "/root/VPN/menu/uninstall/full_uninstall.sh"
-            read -p "按任意键返回菜单..." -n 1 -s
-            ;;
+            break ;;
         0) bash /root/VPN/menu.sh
             break ;;
         *) echo -e "${red}❌ 无效输入！${reset}"
