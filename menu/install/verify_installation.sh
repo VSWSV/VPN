@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 clear
 
 green="\033[1;32m"
@@ -37,15 +37,15 @@ echo -e "${cyan}╠════════════════════�
 # 1. 验证组件版本
 info "🔄 验证组件版本..."
 components=(
-  "Xray|xray/xray --version|Xray-core"
-  "Hysteria|hysteria --version|hysteria"
+  "Xray|/root/VPN/xray/xray version|Xray-core"
+  "Hysteria|/root/VPN/hysteria version|hysteria"
   "Cloudflared|cloudflared --version|cloudflared"
 )
 
 for comp in "${components[@]}"; do
   IFS='|' read -r name cmd pattern <<< "$comp"
   if [ -f "/root/VPN/${cmd%% *}" ]; then
-    version=$(/root/VPN/$cmd 2>&1 | head -n 1)
+    version=$($cmd 2>&1 | head -n 1)
     if [[ "$version" == *"$pattern"* ]]; then
       success "$name 版本正常: ${green}$(echo $version | head -n 1)${reset}"
     else
@@ -92,10 +92,10 @@ done
 # 4. 验证配置文件
 info "📄 验证配置文件..."
 configs=(
-  "/root/VPN/xray/config.json|Xray 配置文件"
-  "/root/VPN/hysteria.yaml|Hysteria 配置文件"
-  "/root/VPN/.cloudflared/config.yml|Cloudflared 配置文件"
-  "/root/VPN/.cloudflared/cert.pem|Cloudflared 证书"
+  "/root/VPN/VLESS/config.json|VLESS 配置文件"
+  "/root/VPN/HY2/hysteria.yaml|HY2 Hysteria 配置文件"
+  "/root/.cloudflared/config.yml|Cloudflared 配置文件"
+  "/root/.cloudflared/cert.pem|Cloudflared 证书"
 )
 
 valid_configs=0
