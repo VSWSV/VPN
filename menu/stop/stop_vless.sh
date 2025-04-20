@@ -3,7 +3,7 @@ clear
 
 # 颜色定义
 red="\033[1;31m"; green="\033[1;32m"; yellow="\033[1;33m"
-cyan="\033[1;36m"; reset="\033[0m"
+cyan="\033[1;36m"; orange="\033[38;5;208m"; reset="\033[0m"
 
 # 路径配置
 VLESS_DIR="/root/VPN/VLESS"
