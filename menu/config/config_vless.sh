@@ -58,6 +58,29 @@ function generate_certs() {
     show_status "证书已生成到 ${lightpink}$CERTS_DIR${reset}"
 }
 
+# 检查Xray版本并设置flow参数
+function setup_flow_config() {
+    local xray_bin="/root/VPN/xray/xray"
+    if [ ! -f "$xray_bin" ]; then
+        echo -e "${red}❌ Xray二进制文件不存在: $xray_bin${reset}"
+        exit 1
+    fi
+
+    local version_info=$("$xray_bin" version 2>/dev/null || echo "0.0.0")
+    local version=$(echo "$version_info" | awk '/Xray/{print $2}')
+
+    if [[ "$version" == "0.0.0" ]]; then
+        echo -e "${yellow}⚠️ 无法获取Xray版本，将使用兼容模式${reset}"
+        echo '"flow": ""'
+    elif [[ "$version" < "1.8.0" ]]; then
+        echo -e "${yellow}⚠️ 检测到旧版Xray ($version)，将禁用flow控制${reset}"
+        echo '"flow": ""'
+    else
+        echo -e "${green}✅ 检测到新版Xray ($version)，已启用xtls-rprx-vision${reset}"
+        echo '"flow": "xtls-rprx-vision"'
+    fi
+}
+
 # 初始化目录
 mkdir -p "$VLESS_DIR"/{config,certs,logs,pids,client_configs,subscriptions}
 chmod 700 "$VLESS_DIR" "$VLESS_DIR"/{config,certs,logs,pids}
@@ -163,7 +186,8 @@ if [[ "$security" != "none" ]]; then
     case $tls_choice in
         1)
             generate_certs "$sni"
-            tls_config='"tlsSettings": {
+            tls_config='"security": "'$security'",
+    "tlsSettings": {
       "serverName": "'$sni'",
       "certificates": [
         {
@@ -178,7 +202,8 @@ if [[ "$security" != "none" ]]; then
                 read -p "$(echo -e " ${lightpink}⇨ 请输入证书路径: ${reset}")" cert_path
                 read -p "$(echo -e " ${lightpink}⇨ 请输入私钥路径: ${reset}")" key_path
                 if [ -f "$cert_path" ] && [ -f "$key_path" ]; then
-                    tls_config='"tlsSettings": {
+                    tls_config='"security": "'$security'",
+    "tlsSettings": {
       "serverName": "'$sni'",
       "certificates": [
         {
@@ -196,7 +221,8 @@ if [[ "$security" != "none" ]]; then
         *)
             show_error "无效选择，默认使用自签名证书"
             generate_certs "$sni"
-            tls_config='"tlsSettings": {
+            tls_config='"security": "'$security'",
+    "tlsSettings": {
       "serverName": "'$sni'",
       "certificates": [
         {
@@ -211,6 +237,9 @@ else
     tls_config='"security": "none"'
 fi
 
+# 设置flow参数
+flow_config=$(setup_flow_config)
+
 # 生成配置文件
 cat > "$CONFIG_PATH" <<EOF
 {
@@ -222,7 +251,7 @@ cat > "$CONFIG_PATH" <<EOF
         "clients": [
           {
             "id": "$uuid",
-            "flow": "xtls-rprx-direct"
+            $flow_config
           }
         ],
         "decryption": "none"
@@ -257,5 +286,5 @@ echo -e " ${lightpink}公网IPv6:   ${reset}${green}$ipv6${reset}"
 [[ $security != "none" ]] && echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
 
 footer
-read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
+read -p "$(echo -e "${cyan}按回车键返回...${reset}")" -n 1 -r
 bash /root/VPN/menu/config_node.sh
