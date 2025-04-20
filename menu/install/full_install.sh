@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 clear
 
 green="\033[1;32m"
@@ -63,6 +63,20 @@ info "📦 解压 Xray..."
 unzip -o Xray-linux-64.zip -d xray && chmod +x xray/xray && success "Xray 解压并赋权完成" || error_exit "Xray 解压失败"
 
 info "⬇️ 下载 Hysteria..."
+# 检查是否已有文件，若有则提示用户是否删除
+if [ -f "hysteria" ]; then
+  warning "Hysteria 已存在，是否强行删除并继续安装？（y/n）"
+  read -r choice
+  if [[ "$choice" == [yY] ]]; then
+    rm -f hysteria
+    info "已删除旧版 Hysteria，开始重新下载..."
+  else
+    warning "跳过 Hysteria 下载，继续下一步安装"
+    success "Hysteria 已跳过"
+    exit 0
+  fi
+fi
+
 wget -O hysteria https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64 && chmod +x hysteria && success "Hysteria 下载并赋权完成" || error_exit "Hysteria 下载失败"
 
 info "⬇️ 下载 Cloudflared..."
