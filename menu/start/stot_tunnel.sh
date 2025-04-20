@@ -18,6 +18,7 @@ LOG_FILE="$CLOUDFLARED_DIR/tunnel.log"
 
 # 显示标题
 show_header() {
+    clear
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗"
     printf "${orange}%*s🚀 启动 Cloudflare 隧道%*s\n" $(( (83 - 18) / 2 )) "" $(( (83 - 18 + 1) / 2 )) ""
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
@@ -31,23 +32,42 @@ info() { echo -e "${yellow}🔹 $1${reset}"; }
 success() { echo -e "${green}✅ $1${reset}"; }
 error() { echo -e "${red}❌ $1${reset}"; }
 
+# 配置提示
+config_prompt() {
+    while true; do
+        echo -e "${red}❌ 配置文件不存在${reset}"
+        echo -e "${yellow}是否要现在配置 Cloudflare 隧道？${reset}"
+        echo -e "${green}[Y] 是${reset} ${red}[N] 否${reset}"
+        read -p "请输入选择 (Y/N): " choice
+        
+        case $choice in
+            [Yy])
+                bash /root/VPN/menu/config/config_tunnel.sh
+                return $?
+                ;;
+            [Nn])
+                bash /root/VPN/menu/start_service.sh
+                return $?
+                ;;
+            *)
+                echo -e "${red}无效输入，请重新选择${reset}"
+                ;;
+        esac
+    done
+}
+
 # 获取隧道名称
 get_tunnel_name() {
     if [[ -f "$CONFIG_FILE" ]]; then
         grep "隧道名称：" "$CONFIG_FILE" | awk -F '：' '{print $2}'
     else
-        error "未找到配置文件 $CONFIG_FILE"
-        echo -e "${yellow}请先运行配置脚本: bash /root/VPN/menu/config/config_tunnel.sh${reset}"
-        show_footer
-        read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
-        bash /root/VPN/menu/start_service.sh
-        exit 1
+        config_prompt
+        exit $?
     fi
 }
 
 # 主逻辑
 main() {
-    clear
     show_header
     
     TUNNEL_NAME=$(get_tunnel_name)
@@ -59,7 +79,7 @@ main() {
         echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
         echo -e "${lightpink}📌 使用命令查看日志: ${green}tail -f $LOG_FILE${reset}"
         show_footer
-        read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+        read -p "$(echo -e "${white}按回车键返回主菜单...${reset}")" -n 1
         bash /root/VPN/menu/start_service.sh
         return
     fi
@@ -89,7 +109,7 @@ main() {
     fi
     
     show_footer
-    read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+    read -p "$(echo -e "${white}按回车键返回主菜单...${reset}")" -n 1
     bash /root/VPN/menu/start_service.sh
 }
 
