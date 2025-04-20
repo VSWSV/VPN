@@ -1,5 +1,5 @@
 #!/bin/bash
-
+clear
 cyan="\033[1;36m"
 green="\033[1;32m"
 reset="\033[0m"
