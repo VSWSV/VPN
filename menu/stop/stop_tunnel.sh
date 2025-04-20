@@ -9,11 +9,11 @@ green='\033[1;32m'
 red='\033[1;31m'
 reset='\033[0m'
 
-# 路径配置
+# 静默创建日志目录（修复警告）
 LOG_DIR="/root/VPN/cloudflared"
-[ -d "$LOG_DIR" ] || mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" 2>/dev/null
 
-# 界面设计（严格保持原有样式）
+# 界面设计
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
     echo -e "                                ${orange}🔴 停止 Cloudflare 隧道${reset}"
@@ -43,34 +43,23 @@ fi
 CFD_BIN=$(command -v cloudflared)
 TUNNEL_INFO=$($CFD_BIN tunnel list 2>/dev/null | awk 'NR>1 {print "名称:"$2, "ID:"$1}')
 
-# 进程停止逻辑（完整版）
+# 进程停止逻辑
 for PID in "${PIDS[@]}"; do
     echo -e "${yellow}🔄 正在停止进程 PID: ${green}$PID${reset}"
     
-    # 检查进程是否存在
     if ! ps -p "$PID" >/dev/null; then
         echo -e "${yellow}⚠️ 进程不存在，跳过处理${reset}"
         continue
     fi
 
-    # 获取进程状态
     STATE=$(ps -o stat= -p "$PID" | tr -d ' ')
     
-    # 处理僵尸进程
     if [[ "$STATE" == *Z* ]]; then
         echo -e "${yellow}⚠️ 检测到僵尸进程${reset}"
         PPID=$(ps -o ppid= -p "$PID" | tr -d ' ')
-        
-        if [ "$PPID" -ne 1 ] && [ -n "$PPID" ]; then
-            echo -e "${yellow}📌 终止父进程 PPID: $PPID${reset}"
-            kill -9 "$PPID" 2>/dev/null
-            sleep 1
-        else
-            echo -e "${red}❌ 拒绝终止系统关键进程${reset}"
-        fi
+        [ "$PPID" -ne 1 ] && kill -9 "$PPID" 2>/dev/null
     fi
 
-    # 终止进程
     kill -TERM "$PID" 2>/dev/null
     sleep 2
     if ps -p "$PID" >/dev/null; then
@@ -79,7 +68,6 @@ for PID in "${PIDS[@]}"; do
         sleep 1
     fi
 
-    # 确认结果
     if ! ps -p "$PID" >/dev/null; then
         echo -e "${green}✅ 终止成功${reset}"
     else
@@ -89,13 +77,7 @@ for PID in "${PIDS[@]}"; do
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 done
 
-# 显示隧道信息
-if [ -n "$TUNNEL_INFO" ]; then
-    echo -e "${yellow}📌 活动隧道信息:${reset}"
-    echo "$TUNNEL_INFO" | while read line; do
-        echo -e " ${green}▸${reset} $line"
-    done
-fi
+[ -n "$TUNNEL_INFO" ] && echo -e "${yellow}📌 活动隧道信息:\n${TUNNEL_INFO}" | sed "s/^/ ${green}▸${reset} /"
 
 footer
 read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
