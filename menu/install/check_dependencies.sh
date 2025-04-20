@@ -92,8 +92,8 @@ done
 # 5. 检查执行权限
 info "🔒 检查执行权限..."
 executables=(
-  "/root/VPN/xray/xray"
-  "/root/VPN/HY2hysteria"
+  "/root/VPN/xray"
+  "/root/VPN/hysteria"
   "/root/VPN/cloudflared"
 )
 
