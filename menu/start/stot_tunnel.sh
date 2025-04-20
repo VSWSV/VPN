@@ -85,7 +85,7 @@ if pgrep -f "cloudflared tunnel run" >/dev/null; then
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${lightpink}📌 使用命令查看日志: ${green}tail -f $LOG_FILE${reset}"
     footer
-    read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+    read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
     bash /root/VPN/menu/start_service.sh
 fi
 
