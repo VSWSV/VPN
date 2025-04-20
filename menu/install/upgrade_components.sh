@@ -52,8 +52,8 @@ mkdir -p "$backup_dir"
 
 # 备份重要配置文件
 config_files=(
-  "VLESS/config.json"
-  "HY2/hysteria.yaml"
+  "VLESS/config/config.json"
+  "HY2/config/hysteria.yaml"
   "../.cloudflared/config.yml"
   "../.cloudflared/cert.pem"
 )
