@@ -48,9 +48,9 @@ error() { echo -e "${red}❌ $1${reset}"; }
 
 # 终止所有隧道进程
 kill_tunnel() {
-    pkill -f "cloudflared.*tunnel" && sleep 1
-    if pgrep -f "cloudflared.*tunnel" >/dev/null; then
-        pkill -9 -f "cloudflared.*tunnel"
+    pkill -f "cloudflared tunnel run" && sleep 1
+    if pgrep -f "cloudflared tunnel run" >/dev/null; then
+        pkill -9 -f "cloudflared tunnel run"
     fi
 }
 
@@ -66,7 +66,7 @@ config_prompt() {
                 return $?
                 ;;
             [Nn])
-                return $?   # 返回非0状态表示用户取消
+                return 1   # 返回非0状态表示用户取消
                 ;;
             *)
                 echo -e "${red}无效输入，请重新选择${reset}"
@@ -79,7 +79,7 @@ config_prompt() {
 clear
 header
 
-# 先终止可能残留的进程
+# 强制终止残留进程
 kill_tunnel >/dev/null 2>&1
 
 if ! verify_config; then
@@ -88,29 +88,35 @@ if ! verify_config; then
     if [ $config_exit_code -ne 0 ]; then
         echo -e "${yellow}退出配置流程...${reset}"
         footer
-        exit 1
+        read -p "$(echo -e "${cyan}按任意键返回上级菜单...${reset}")" -n 1
+        bash /root/VPN/menu/start_service.sh
+        exit 0
     fi
 fi
 
 TUNNEL_ID=$(get_tunnel_id)
 
-# 增强进程检测：匹配所有隧道相关进程
-if pgrep -f "cloudflared.*tunnel" >/dev/null; then
-    PID=$(pgrep -f "cloudflared.*tunnel")
-    echo -e "${yellow}⚠️ 检测到残留隧道进程 (PID: ${green}$PID${yellow})，正在清理...${reset}"
-    kill_tunnel
-    sleep 2
+# 精准检测隧道主进程
+if pgrep -f "cloudflared tunnel run" >/dev/null; then
+    PID=$(pgrep -f "cloudflared tunnel run")
+    echo -e "${yellow}⚠️ 隧道已在运行中 (主进程 PID: ${green}$PID${yellow})${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${lightpink}📌 使用命令查看日志: ${green}tail -f $LOG_FILE${reset}"
+    footer
+    read -p "$(echo -e "${cyan}按任意键返回上级菜单...${reset}")" -n 1
+    bash /root/VPN/menu/start_service.sh
+    exit 0
 fi
 
 info "正在启动隧道: ${green}$TUNNEL_ID${reset}"
 nohup cloudflared tunnel run > "$LOG_FILE" 2>&1 &
 
-# 增加等待时间，确保进程启动
+# 等待进程启动
 sleep 5
 
-if pgrep -f "cloudflared.*tunnel" >/dev/null; then
-    PID=$(pgrep -f "cloudflared.*tunnel")
-    success "隧道启动成功! (主进程 PID: ${green}$(pgrep -o -f "cloudflared.*tunnel")${reset})"
+if pgrep -f "cloudflared tunnel run" >/dev/null; then
+    PID=$(pgrep -f "cloudflared tunnel run")
+    success "隧道启动成功! (主进程 PID: ${green}$PID${reset})"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${lightpink}📌 实时日志路径: ${green}$LOG_FILE${reset}"
     echo -e "${yellow}❗ 请等待 1-2 分钟让 Cloudflare 完成状态同步${reset}"
@@ -126,4 +132,5 @@ else
     echo -e "${lightpink}🔍 查看错误详情: ${green}tail -n 20 $LOG_FILE${reset}"
 fi
 footer
-exit 0
+read -p "$(echo -e "${cyan}按任意键返回上级菜单...${reset}")" -n 1
+bash /root/VPN/menu/start_service.sh
