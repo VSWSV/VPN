@@ -20,8 +20,8 @@ function footer() {
 }
 
 # 主流程
+clear
 header
-
 # 检查PID文件是否存在
 if [ ! -f "$PID_FILE" ]; then
     echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程名停止...${reset}"
