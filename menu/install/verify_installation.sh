@@ -135,8 +135,8 @@ test_urls=(
   "https://www.baidu.com|百度"
   "https://www.google.com|谷歌"
   "https://www.youtube.com|油管"
-  "https://www.cloudflare.com|C-F"
-  "https://github.com|G站" 
+  "https://github.com|G 站" 
+  "https://www.cloudflare.com|C-F" 
 )
 
 for entry in "${test_urls[@]}"; do
