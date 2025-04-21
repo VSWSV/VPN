@@ -110,17 +110,6 @@ for exe in "${executables[@]}"; do
     error "$exe 缺少执行权限"
   fi
 done
-
-# 6. 检查已安装组件版本
-info "🧪 检查已安装组件版本..."
-xray_version=$(/root/VPN/xray/xray version 2>/dev/null | grep -i "Xray" || echo "未知")
-hysteria_version=$(/root/VPN/hysteria version 2>/dev/null | grep -i "Version" || echo "未知")
-cloudflared_version=$(/root/VPN/cloudflared --version 2>/dev/null | head -n 1 || echo "未知")
-
-echo -e "${green}Xray 当前版本：$xray_version${reset}"
-echo -e "${green}Hysteria 当前版本：$hysteria_version${reset}"
-echo -e "${green}Cloudflared 当前版本：$cloudflared_version${reset}"
-
 # 总结报告
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "📊 检查总结:"
