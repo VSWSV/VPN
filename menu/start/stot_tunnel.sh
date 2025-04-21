@@ -42,32 +42,49 @@ footer() {
     echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
+# 提示
 info() { echo -e "${yellow}🔹 $1${reset}"; }
 success() { echo -e "${lightpink}✅ $1${reset}"; }
 error() { echo -e "${red}❌ $1${reset}"; }
 
-# 配置提示
+# 终止所有隧道进程
+kill_tunnel() {
+    pkill -f "cloudflared tunnel run" && sleep 1
+    if pgrep -f "cloudflared tunnel run" >/dev/null; then
+        pkill -9 -f "cloudflared tunnel run"
+    fi
+}
+
+# 提示是否配置
 config_prompt() {
     while true; do
         echo -e "${yellow}是否要现在配置 Cloudflare 隧道？${reset}"
         echo -e "${green}[Y] 是${reset} ${red}[N] 否${reset}"
         read -p "请输入选择 (Y/N): " choice
-
         case $choice in
-            [Yy]) bash /root/VPN/menu/config/config_tunnel.sh; return $? ;;
-            [Nn]) return $? ;;
-            *) echo -e "${red}无效输入，请重新选择${reset}" ;;
+            [Yy])
+                bash /root/VPN/menu/config/config_tunnel.sh
+                return $? ;;
+            [Nn])
+                return $? ;;
+            *)
+                echo -e "${red}无效输入，请重新选择${reset}" ;;
         esac
     done
 }
 
-# 启动流程
+# 主逻辑开始
+clear
 header
 
-# 校验配置
+# 强制终止残留进程
+kill_tunnel >/dev/null 2>&1
+
+# 检查配置文件
 if ! verify_config; then
     config_prompt
-    if [ $? -ne 0 ]; then
+    config_exit_code=$?
+    if [ $config_exit_code -ne 0 ]; then
         echo -e "${yellow}退出配置流程...${reset}"
         footer
         read -p "$(echo -e "${cyan}按任意键返回上级菜单...${reset}")" -n 1
@@ -78,32 +95,40 @@ fi
 
 TUNNEL_ID=$(get_tunnel_id)
 
-# 使用 systemctl 检查是否已运行
-if systemctl is-active --quiet cloudflared; then
-    echo -e "${yellow}⚠️ Cloudflared 服务已运行${reset}"
-    echo -e "${lightpink}📌 使用命令查看日志：${green}tail -f $LOG_FILE${reset}"
+# 检查是否已有运行中进程
+if pgrep -f "cloudflared tunnel run" >/dev/null; then
+    PID=$(pgrep -f "cloudflared tunnel run")
+    echo -e "${yellow}⚠️ 隧道已在运行中 (主进程 PID: ${green}$PID${yellow})${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${lightpink}📌 使用命令查看日志: ${green}tail -f $LOG_FILE${reset}"
     footer
     read -p "$(echo -e "${cyan}按任意键返回上级菜单...${reset}")" -n 1
     bash /root/VPN/menu/start_service.sh
     exit 0
 fi
 
-# 启动服务
-info "正在通过 systemctl 启动隧道服务..."
-systemctl restart cloudflared
+# 启动隧道
+info "正在启动隧道: ${green}$TUNNEL_ID${reset}"
+nohup cloudflared tunnel run --config "$CONFIG_FILE" > "$LOG_FILE" 2>&1 &
 
-# 检查启动是否成功
-sleep 3
-if systemctl is-active --quiet cloudflared; then
-    success "Cloudflared 隧道服务启动成功！"
-    echo -e "${lightpink}📌 日志路径：${green}$LOG_FILE${reset}"
-    echo -e "${yellow}❗ 请等待 1~2 分钟以完成连接同步${reset}"
+# 启动后延迟检测
+sleep 5
+
+# 检查是否已成功运行
+if pgrep -f "cloudflared tunnel run" >/dev/null; then
+    PID=$(pgrep -f "cloudflared tunnel run")
+    success "隧道启动成功! (主进程 PID: ${green}$PID${reset})"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${lightpink}📌 实时日志路径: ${green}$LOG_FILE${reset}"
+    echo -e "${yellow}❗ 请等待 1-2 分钟让 Cloudflare 完成状态同步${reset}"
 else
     error "隧道启动失败！"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${red}⚠️ 可能原因："
     echo -e "1. 配置错误或证书缺失"
     echo -e "2. Cloudflared 文件未设置可执行权限"
-    echo -e "3. 网络不通或端口占用"
+    echo -e "3. 网络不通或端口占用${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${lightpink}🔍 查看日志：${green}tail -n 20 $LOG_FILE${reset}"
 fi
 
