@@ -1,6 +1,7 @@
 #!/bin/bash
 clear
 
+# 颜色定义
 green="\033[1;32m"
 yellow="\033[1;33m"
 red="\033[1;31m"
@@ -24,7 +25,7 @@ function error() {
   echo -e "${red}❌ $1${reset}"
 }
 
-# 计算标题居中
+# 标题居中显示
 title="🔍 系统依赖检查"
 title_length=${#title}
 total_width=83
@@ -44,17 +45,23 @@ info "📂 检查目录结构..."
 
 # 2. 检查基本依赖
 info "📦 检查基本依赖..."
-dependencies=("dpkg" "curl" "wget" "unzip" "socat" "tar" "sudo" "git" "mtr" "traceroute" "bmon")
+dependencies=("dpkg" "curl" "wget" "unzip" "socat" "tar" "sudo" "git" "mtr" "traceroute" "bmon" "jq" "openssl")
 missing_deps=0
 
 for dep in "${dependencies[@]}"; do
-  if command -v "$dep" &> /dev/null; then
-    success "$dep 已安装"
-  else
-    error "$dep 未安装"
+  if ! command -v $dep &> /dev/null; then
+    warning "$dep 未安装"
     ((missing_deps++))
+  else
+    success "$dep 已安装"
   fi
 done
+
+if [ $missing_deps -gt 0 ]; then
+  echo -e "${yellow}⚠️ 有 $missing_deps 个依赖未安装${reset}"
+else
+  success "✅ 所有依赖均已安装"
+fi
 
 # 3. 检查配置文件
 info "📄 检查配置文件..."
@@ -79,7 +86,6 @@ done
 info "⚙️ 检查服务状态..."
 services=("xray" "hysteria" "cloudflared")
 running_services=0
-
 for service in "${services[@]}"; do
   if systemctl is-active --quiet "$service"; then
     success "$service 服务正在运行"
@@ -105,6 +111,16 @@ for exe in "${executables[@]}"; do
   fi
 done
 
+# 6. 检查已安装组件版本
+info "🧪 检查已安装组件版本..."
+xray_version=$(/root/VPN/xray/xray version 2>/dev/null | grep -i "Xray" || echo "未知")
+hysteria_version=$(/root/VPN/hysteria version 2>/dev/null | grep -i "Version" || echo "未知")
+cloudflared_version=$(/root/VPN/cloudflared --version 2>/dev/null | head -n 1 || echo "未知")
+
+echo -e "${green}Xray 当前版本：$xray_version${reset}"
+echo -e "${green}Hysteria 当前版本：$hysteria_version${reset}"
+echo -e "${green}Cloudflared 当前版本：$cloudflared_version${reset}"
+
 # 总结报告
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "📊 检查总结:"
@@ -114,7 +130,7 @@ info "📊 检查总结:"
 
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "💡 建议操作:"
-[ $missing_deps -gt 0 ] && echo -e "${yellow}▶ 运行安装脚本安装缺失依赖${reset}"
+[ $missing_deps -gt 0 ] && echo -e "${yellow}▶ 建议运行安装脚本安装缺失依赖${reset}"
 [ $missing_configs -gt 0 ] && echo -e "${yellow}▶ 检查并创建缺失的配置文件${reset}"
 [ $running_services -lt ${#services[@]} ] && echo -e "${yellow}▶ 启动未运行的服务 (systemctl start <服务名>)${reset}"
 
