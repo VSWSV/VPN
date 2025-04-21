@@ -116,8 +116,8 @@ if [ -f "$PID_PATH" ] && ps -p $(cat "$PID_PATH") >/dev/null; then
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📶 网络信息:"
     echo -e "  🔵 本地端口: ${lightpink}$PORT${reset}"
-    echo -e "  IPv4: ${lightpink}$ipv4${reset}"
-    echo -e "  IPv6: ${lightpink}$ipv6${reset}"
+    echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
+    echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
     
     footer
     read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
@@ -175,8 +175,8 @@ if ps -p $(cat "$PID_PATH") >/dev/null; then
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📶 网络信息:"
     echo -e "  🔵 本地端口: ${lightpink}$PORT${reset}"
-    echo -e "  IPv4: ${lightpink}$ipv4${reset}"
-    echo -e "  IPv6: ${lightpink}$ipv6${reset}"
+    echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
+    echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
 else
     echo -e "${red}❌ 启动失败! 查看日志: ${lightpink}$LOG_PATH${reset}"
     echo -e "${yellow}可能原因:"
