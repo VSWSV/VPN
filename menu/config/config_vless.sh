@@ -33,7 +33,7 @@ function validate_input() {
         uuid) [[ "$2" =~ ^[0-9a-fA-F-]{36}$ ]] ;;
         port) [[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -ge 1 ] && [ "$2" -le 65535 ] ;;
         domain) [[ "$2" =~ ^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]] ;;
-        security) [[ "$2" =~ ^(tls|xtls|none)$ ]] ;;
+        security) [[ "$2" =~ ^(tls|reality|none)$ ]] ;;
     esac
 }
 
@@ -143,39 +143,53 @@ done
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 echo -e " ${lightpink}⇨ 请选择传输安全协议:${reset}"
 echo -e "  ${green}① TLS (推荐)${reset}"
-echo -e "  ${green}② XTLS (高性能)${reset}"
+echo -e "  ${green}② REALITY (最新技术)${reset}"
 echo -e "  ${yellow}③ none (不加密)${reset}"
 read -p "$(echo -e " ${blue}请选择：${reset}")" security_choice
 case $security_choice in
     1) security="tls" ;;
-    2) security="xtls" ;;
+    2) security="reality" ;;
     3) security="none"; show_error "警告: 禁用加密将导致连接不安全!" ;;
     *) security="tls"; show_error "无效选择，默认使用TLS" ;;
 esac
 
-# TLS配置
+# TLS/REALITY配置
 if [[ "$security" != "none" ]]; then
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-    echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
-    echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
-    echo -e "  ${green}② 使用现有证书${reset}"
-    read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
-    case $tls_choice in
-        1)
-            generate_certs "$sni"
-            if [[ "$security" == "xtls" ]]; then
-                tls_config='"security": "'$security'",
-        "xtlsSettings": {
-          "serverName": "'$sni'",
-          "certificates": [
-            {
-              "certificateFile": "'$CERTS_DIR/cert.pem'",
-              "keyFile": "'$CERTS_DIR/private.key'"
-            }
-          ]
+    
+    if [[ "$security" == "reality" ]]; then
+        # REALITY配置
+        echo -e "${yellow}🛠️  正在配置 REALITY 参数...${reset}"
+        read -p "$(echo -e " ${lightpink}⇨ 请输入目标网站 (如:www.google.com): ${reset}")" dest_domain
+        read -p "$(echo -e " ${lightpink}⇨ 请输入目标端口 (默认443): ${reset}")" dest_port
+        dest_port=${dest_port:-443}
+        
+        # 生成REALITY密钥对
+        echo -e "${yellow}🔑 正在生成REALITY密钥...${reset}"
+        reality_keys=$(/root/VPN/xray/xray x25519)
+        private_key=$(echo "$reality_keys" | awk '/Private key:/ {print $3}')
+        public_key=$(echo "$reality_keys" | awk '/Public key:/ {print $3}')
+        
+        # 生成shortId
+        short_id=$(openssl rand -hex 8)
+        
+        tls_config='"security": "reality",
+        "realitySettings": {
+          "dest": "'$dest_domain:$dest_port'",
+          "serverNames": ["'$sni'"],
+          "privateKey": "'$private_key'",
+          "shortIds": ["'$short_id'"]
         }'
-            else
-                tls_config='"security": "'$security'",
+    else
+        # TLS配置
+        echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
+        echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
+        echo -e "  ${green}② 使用现有证书${reset}"
+        read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
+        case $tls_choice in
+            1)
+                generate_certs "$sni"
+                tls_config='"security": "tls",
         "tlsSettings": {
           "serverName": "'$sni'",
           "certificates": [
@@ -185,26 +199,13 @@ if [[ "$security" != "none" ]]; then
             }
           ]
         }'
-            fi
-            ;;
-        2)
-            while true; do
-                read -p "$(echo -e " ${lightpink}⇨ 请输入证书路径: ${reset}")" cert_path
-                read -p "$(echo -e " ${lightpink}⇨ 请输入私钥路径: ${reset}")" key_path
-                if [ -f "$cert_path" ] && [ -f "$key_path" ]; then
-                    if [[ "$security" == "xtls" ]]; then
-                        tls_config='"security": "'$security'",
-            "xtlsSettings": {
-              "serverName": "'$sni'",
-              "certificates": [
-                {
-                  "certificateFile": "'$cert_path'",
-                  "keyFile": "'$key_path'"
-                }
-              ]
-            }'
-                    else
-                        tls_config='"security": "'$security'",
+                ;;
+            2)
+                while true; do
+                    read -p "$(echo -e " ${lightpink}⇨ 请输入证书路径: ${reset}")" cert_path
+                    read -p "$(echo -e " ${lightpink}⇨ 请输入私钥路径: ${reset}")" key_path
+                    if [ -f "$cert_path" ] && [ -f "$key_path" ]; then
+                        tls_config='"security": "tls",
             "tlsSettings": {
               "serverName": "'$sni'",
               "certificates": [
@@ -214,29 +215,16 @@ if [[ "$security" != "none" ]]; then
                 }
               ]
             }'
+                        break
+                    else
+                        show_error "证书文件不存在，请重新输入"
                     fi
-                    break
-                else
-                    show_error "证书文件不存在，请重新输入"
-                fi
-            done
-            ;;
-        *)
-            show_error "无效选择，默认使用自签名证书"
-            generate_certs "$sni"
-            if [[ "$security" == "xtls" ]]; then
-                tls_config='"security": "'$security'",
-        "xtlsSettings": {
-          "serverName": "'$sni'",
-          "certificates": [
-            {
-              "certificateFile": "'$CERTS_DIR/cert.pem'",
-              "keyFile": "'$CERTS_DIR/private.key'"
-            }
-          ]
-        }'
-            else
-                tls_config='"security": "'$security'",
+                done
+                ;;
+            *)
+                show_error "无效选择，默认使用自签名证书"
+                generate_certs "$sni"
+                tls_config='"security": "tls",
         "tlsSettings": {
           "serverName": "'$sni'",
           "certificates": [
@@ -246,9 +234,9 @@ if [[ "$security" != "none" ]]; then
             }
           ]
         }'
-            fi
-            ;;
-    esac
+                ;;
+        esac
+    fi
 else
     tls_config='"security": "none"'
 fi
@@ -306,9 +294,18 @@ echo -e " ${lightpink}连接端口:   ${reset}${green}$port${reset}"
 echo -e " ${lightpink}用户ID：    ${reset}${green}$uuid${reset}"
 echo -e " ${lightpink}传输协议:   ${reset}${green}tcp${reset}"
 echo -e " ${lightpink}安全协议:   ${reset}${green}$security${reset}"
+
+if [[ "$security" == "reality" ]]; then
+    echo -e " ${lightpink}公钥：      ${reset}${green}$public_key${reset}"
+    echo -e " ${lightpink}Short ID:   ${reset}${green}$short_id${reset}"
+fi
+
 echo -e " ${lightpink}公网IPv4:   ${reset}${green}$ipv4${reset}"
 echo -e " ${lightpink}公网IPv6:   ${reset}${green}$ipv6${reset}"
-[[ $security != "none" ]] && echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
+
+if [[ $security != "none" && $security != "reality" ]]; then
+    echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
+fi
 
 footer
 read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
