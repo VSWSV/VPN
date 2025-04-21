@@ -49,9 +49,9 @@ if [ -n "$HYSTERIA_PID" ]; then
     # 如果是僵尸进程
     if [[ "$STATE" == *Z* ]]; then
         echo -e "${yellow}⚠️  检测到僵尸进程（Zombie）...${reset}"
-        PPID=$(ps -o ppid= -p "$HYSTERIA_PID" | tr -d ' ')
-        echo -e "${yellow}📌 僵尸进程的父进程为：$PPID，尝试强制回收...${reset}"
-        kill -9 "$PPID" 2>/dev/null
+        PARENT_PID=$(ps -o ppid= -p "$HYSTERIA_PID" | tr -d ' ')  # 修改：使用 PARENT_PID 替代 PPID
+        echo -e "${yellow}📌 僵尸进程的父进程为：$PARENT_PID，尝试强制回收...${reset}"
+        kill -9 "$PARENT_PID" 2>/dev/null  # 修改：使用 PARENT_PID
         sleep 2
     else
         # 正常终止
