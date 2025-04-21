@@ -89,6 +89,77 @@ while true; do
   fi
 done
 
+echo -e "${green}🔐 第5步：系统安全与终端美化优化...${reset}"
+
+echo -e "${yellow}➤ 正在修改当前用户密码...${reset}"
+if passwd; then
+  echo -e "${green}✅ 密码修改成功${reset}"
+else
+  echo -e "${red}❌ 密码修改失败，请手动检查${reset}"
+fi
+
+echo -e "${yellow}➤ 禁用 MOTD 动态欢迎信息...${reset}"
+if chmod -x /etc/update-motd.d/*; then
+  echo -e "${green}✅ MOTD 动态信息已禁用${reset}"
+else
+  echo -e "${red}❌ 禁用失败，文件不存在或权限不足${reset}"
+fi
+
+echo -e "${yellow}➤ 正在创建美化终端信息脚本 /etc/profile.d/motd.sh${reset}"
+cat << 'EOF' > /etc/profile.d/motd.sh
+#!/bin/bash
+function bar() {
+  local percent=$1
+  local blocks=$((percent * 50 / 100))
+  local empty=$((50 - blocks))
+  local bar=""
+  local color="\033[0;32m"
+  if (( percent >= 80 )); then color="\033[0;31m"
+  elif (( percent >= 60 )); then color="\033[0;33m"; fi
+  for ((i = 0; i < blocks; i++)); do bar+="▓"; done
+  for ((i = 0; i < empty; i++)); do bar+="░"; done
+  echo -e "$color$bar\033[0m"
+}
+load=$(uptime | awk -F'load average: ' '{print $2}' | cut -d, -f1)
+cpu_perc=$(awk -v l="$load" 'BEGIN { printf("%.0f", l*10) }')
+cpu_bar=$(bar $cpu_perc)
+mem_used=$(free | awk '/Mem:/ {printf("%.0f", $3/$2*100)}')
+mem_bar=$(bar $mem_used)
+disk_used=$(df / | awk 'END {print $5}' | tr -d '%')
+disk_bar=$(bar $disk_used)
+swap_used=$(free | awk '/Swap:/ { if ($2==0) print 0; else printf("%.0f", $3/$2*100) }')
+swap_bar=$(bar $swap_used)
+ipv4=$(hostname -I | awk '{print $1}')
+ipv6=$(ip -6 addr show scope global | awk '/inet6/ {print $2}' | cut -d/ -f1 | head -n 1)
+current_time=$(date +"%Y-%m-%d %H:%M:%S")
+echo 
+echo -e "CPU 使用率:        $cpu_bar  $cpu_perc%"
+echo
+echo -e "内存使用率:        $mem_bar  ${mem_used}%"
+echo
+echo -e "磁盘占用率:        $disk_bar  ${disk_used}%"
+echo
+echo -e "空间使用率:        $swap_bar  ${swap_used}%"
+echo
+echo -e "公网 IPv4 地址:    \033[1;33m$ipv4\033[0m"
+echo -e "公网 IPv6 地址:    \033[1;36m$ipv6\033[0m"
+echo -e "当前时间:          \033[1;34m$current_time\033[0m"
+EOF
+
+chmod +x /etc/profile.d/motd.sh && source /etc/profile.d/motd.sh
+touch ~/.hushlogin && echo -e "${green}✅ MOTD 脚本启用成功${reset}"
+
+echo -e "${yellow}➤ 正在配置 SSH 保活...${reset}"
+sed -i 's/#ClientAliveInterval.*/ClientAliveInterval 60/' /etc/ssh/sshd_config
+sed -i 's/#ClientAliveCountMax.*/ClientAliveCountMax 3/' /etc/ssh/sshd_config
+systemctl restart sshd && echo -e "${green}✅ SSH 配置修改并重启成功${reset}"
+
+echo -e "${yellow}➤ 正在启用 IPv6 支持...${reset}"
+sed -i 's/^net\.ipv6\.conf\.all\.disable_ipv6 = 1/#&/' /etc/sysctl.conf
+sed -i 's/^net\.ipv6\.conf\.default\.disable_ipv6 = 1/#&/' /etc/sysctl.conf
+sed -i 's/^net\.ipv6\.conf\.lo\.disable_ipv6 = 1/#&/' /etc/sysctl.conf
+sysctl -p && echo -e "${green}✅ IPv6 设置已应用成功${reset}"
+
 echo -e "${blue}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-echo -e "              ${green}🎉 安装完成！现在你可以直接输入 ${reset}${custom_command}${green} 来启动菜单！${reset}"
+echo -e "     ${green}🎯 安全强化 + 终端美化设置全部完成！您现在拥有超帅的欢迎界面！${reset}"
 echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
