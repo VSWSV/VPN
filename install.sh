@@ -18,7 +18,8 @@ echo -e "      本脚本将执行以下操作：                            ${gr
 echo -e "      ${green}1.${reset} 清理APT缓存并更新源"
 echo -e "      ${green}2.${reset} 安装必要工具 GIT和CUR"
 echo -e "      ${green}3.${reset} 克隆或覆盖 GITHUB 仓库到 /ROOT/VPN"
-echo -e "      ${green}4.${reset} 设置 'vpn' 命令来快速启动菜单"
+echo -e "      ${green}4.${reset} 设置 '自定义' 命令来快速启动菜单"
+echo -e "      ${green}5.${reset} 修改密码-美化显示-开启IPV6-SSH 保活"
 echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
 read -p "$(echo -e ${yellow}是否继续安装？请输入 [Y/N]：${reset}) " answer
