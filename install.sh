@@ -142,8 +142,11 @@ echo
 echo -e "空间使用率:        $swap_bar  ${swap_used}%"
 echo
 echo -e "公网 IPv4 地址:    \033[1;33m$ipv4\033[0m"
+echo
 echo -e "公网 IPv6 地址:    \033[1;36m$ipv6\033[0m"
+echo
 echo -e "当前时间:          \033[1;34m$current_time\033[0m"
+echo
 EOF
 
 chmod +x /etc/profile.d/motd.sh && source /etc/profile.d/motd.sh
