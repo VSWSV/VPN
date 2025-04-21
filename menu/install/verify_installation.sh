@@ -1,6 +1,7 @@
 #!/bin/bash 
 clear
 
+# 颜色定义
 green="\033[1;32m"
 yellow="\033[1;33m"
 red="\033[1;31m"
@@ -17,14 +18,14 @@ function success() {
 }
 
 function warning() {
-  echo -e "${yellow}⚠️  $1${reset}"
+  echo -e "${yellow}⚠️ $1${reset}"
 }
 
 function error() {
   echo -e "${red}❌ $1${reset}"
 }
 
-# 计算标题居中
+# 标题居中显示
 title="🔎 安装完整性验证"
 title_length=${#title}
 total_width=83
@@ -43,7 +44,7 @@ components=(
 
 for comp in "${components[@]}"; do
   IFS='|' read -r name cmd pattern <<< "$comp"
-  check_path="${cmd%% *}" 
+  check_path="${cmd%% *}"
   if [ -f "$check_path" ]; then
     version_output=$($cmd 2>&1 | grep -i "$pattern" | head -n 1)
     if [[ -n "$version_output" ]]; then
@@ -55,8 +56,16 @@ for comp in "${components[@]}"; do
   else
     error "$name 可执行文件不存在"
   fi
-done
+  
+  # 新增: 检查是否已设置全局路径
+  global_path="/usr/local/bin/${name,,}"
+  if command -v "$global_path" &>/dev/null; then
+    success "$name 已设置全局命令 ($global_path)"
+  else
+    warning "$name 未设置全局命令"
+  fi
 
+done
 
 # 2. 验证端口监听
 info "📡 验证端口监听..."
