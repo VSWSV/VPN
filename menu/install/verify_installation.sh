@@ -132,10 +132,11 @@ done
 info "🌐 验证网络连通性..."
 
 test_urls=(
-  "https://www.google.com|Google"
-  "https://www.cloudflare.com|Cloudflare"
-  "https://github.com|GitHub"
-  "https://www.vswsv.com|您的主域"
+  "https://www.baidu.com|百度"
+  "https://www.google.com|谷歌"
+  "https://www.youtube.com|油管"
+  "https://www.cloudflare.com|C-F"
+  "https://github.com|G站" 
 )
 
 for entry in "${test_urls[@]}"; do
