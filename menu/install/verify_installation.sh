@@ -38,7 +38,7 @@ echo -e "${cyan}╠════════════════════�
 components=(
   "Xray|/root/VPN/xray/xray version|Xray"
   "Hysteria|/root/VPN/hysteria version|Version:"
-  "Cloudflared|/root/VPN/cloudflared version|cloudflared"
+  "Cloudflared|/root/VPN/cloudflared --version|cloudflared"
 )
 
 for comp in "${components[@]}"; do
@@ -49,12 +49,14 @@ for comp in "${components[@]}"; do
     if [[ -n "$version_output" ]]; then
       success "$name 版本正常: ${green}$(echo "$version_output" | awk '{$1=$1;print}')${reset}"
     else
-      error "$name 版本异常: ${red}$($cmd 2>&1 | head -n 5 | tr '\n' ' ')${reset}"
+      warning "$name 无法识别版本信息"
+      echo -e "${red}↳ 输出: $($cmd 2>&1 | head -n 2)${reset}"
     fi
   else
     error "$name 可执行文件不存在"
   fi
 done
+
 
 # 2. 验证端口监听
 info "📡 验证端口监听..."
