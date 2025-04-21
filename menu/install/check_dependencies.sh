@@ -98,18 +98,25 @@ for cfg in "${configs[@]}"; do
   fi
 done
 
-# 5. 检查服务状态
-info "⚙️ 检查服务状态..."
-services=("xray" "hysteria" "cloudflared")
-running_services=0
+# 6. 检查 GitHub 项目是否有更新
+info "🌐 检查 GitHub 项目是否有更新..."
+cd /root/VPN 2>/dev/null || warning "⚠️ 项目目录不存在，无法检查 GitHub 更新"
+if [ -d ".git" ]; then
+  local_commit=$(git rev-parse HEAD 2>/dev/null)
+  remote_commit=$(git ls-remote https://github.com/VSWSV/VPN.git HEAD | awk '{print $1}')
 
-for service in "${services[@]}"; do
-  if systemctl is-active --quiet "$service"; then
-    success "$service 服务正在运行"
-    ((running_services++))
+  if [[ -z "$local_commit" || -z "$remote_commit" ]]; then
+    warning "❌ 无法获取 Git 提交信息，跳过 GitHub 更新检测"
   else
-    warning "$service 服务未运行"
+    if [ "$local_commit" != "$remote_commit" ]; then
+      warning "📌 当前项目版本不是最新！"
+    else
+      success "✅ 当前项目已是最新版本"
+    fi
   fi
+else
+  warning "未初始化 Git 项目，跳过更新检测"
+fi
 done
 
 # 总结
