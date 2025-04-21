@@ -18,7 +18,7 @@ function success() {
 }
 
 function warning() {
-  echo -e "${yellow}⚠️  $1${reset}"
+  echo -e "${yellow}⚠️ $1${reset}"
 }
 
 function error() {
@@ -98,17 +98,32 @@ for cfg in "${configs[@]}"; do
   fi
 done
 
-# 5. 检查服务状态
+# 5. 检查服务状态（支持 systemd 与进程检测）
 info "⚙️ 检查服务状态..."
-services=("xray" "hysteria" "cloudflared")
+services=(
+  "xray|Xray 服务|/root/VPN/xray/xray"
+  "hysteria|Hysteria 服务|/root/VPN/hysteria"
+  "cloudflared|Cloudflared 服务|/root/VPN/cloudflared"
+)
+
 running_services=0
 
 for svc in "${services[@]}"; do
-  if systemctl is-active --quiet "$svc"; then
-    success "$svc 服务正在运行"
-    ((running_services++))
+  IFS='|' read -r service name binary_path <<< "$svc"
+  if systemctl list-units --all | grep -q "${service}.service"; then
+    if systemctl is-active --quiet "$service"; then
+      success "$name 正在运行（由 systemd 管理）"
+      ((running_services++))
+    else
+      warning "$name 已注册但未运行"
+    fi
   else
-    warning "$svc 服务未运行"
+    if pgrep -f "$binary_path" > /dev/null; then
+      success "$name 正在运行（手动或后台进程）"
+      ((running_services++))
+    else
+      warning "$name 未运行（未发现进程）"
+    fi
   fi
 done
 
@@ -132,7 +147,7 @@ else
   warning "未初始化 Git 项目，跳过更新检测"
 fi
 
-# 7. 总结报告
+# 总结报告
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "📊 检查总结:"
 [ "$missing_deps" -eq 0 ] && success "所有依赖已安装" || warning "缺少 $missing_deps 个依赖"
@@ -147,6 +162,6 @@ info "💡 建议操作:"
 
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
-# 返回主菜单
-read -p "$(echo -e "${cyan}按任意键返回...${reset}")" dummy
+# 返回菜单
+read -p "$(echo -e \"${cyan}按任意键返回...${reset}\")" dummy
 bash /root/VPN/menu/install_upgrade.sh
