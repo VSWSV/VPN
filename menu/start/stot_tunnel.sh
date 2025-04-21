@@ -22,6 +22,10 @@ verify_config() {
 
     grep -q '^tunnel:' "$CONFIG_FILE" || { echo -e "${red}❌ 配置中缺少 tunnel 字段"; return 1; }
 
+    # 提取端口信息
+    PORT=$(grep -A5 'ingress:' "$CONFIG_FILE" | grep -E 'http://[^:]+:([0-9]+)' | sed -E 's|.*:([0-9]+).*|\1|' | head -1)
+    [ -z "$PORT" ] && PORT="未配置"
+
     return 0
 }
 
@@ -66,13 +70,19 @@ if ! verify_config; then
     exit 1
 fi
 
-# 获取隧道 ID
+# 获取隧道 ID 和端口
 TUNNEL_ID=$(get_tunnel_id)
+PORT=$(grep -A5 'ingress:' "$CONFIG_FILE" | grep -E 'http://[^:]+:([0-9]+)' | sed -E 's|.*:([0-9]+).*|\1|' | head -1)
+[ -z "$PORT" ] && PORT="未配置"
 
 # ✅ 检查是否已有运行中的进程
 if pgrep -f "cloudflared tunnel run" >/dev/null; then
     PID=$(pgrep -f "cloudflared tunnel run")
     echo -e "${yellow}⚠️ 隧道已在运行中 (主进程 PID: ${green}$PID${yellow})${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${green}📌 隧道信息:"
+    echo -e "  🔵 本地端口: ${lightpink}$PORT${reset}"
+    echo -e "  🆔 隧道 ID: ${lightpink}$TUNNEL_ID${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${lightpink}📌 使用命令查看日志: ${green}tail -f $LOG_FILE${reset}"
     footer
@@ -94,6 +104,10 @@ sleep 5
 if pgrep -f "cloudflared tunnel run" >/dev/null; then
     PID=$(pgrep -f "cloudflared tunnel run")
     success "隧道启动成功! (主进程 PID: ${green}$PID${reset})"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${green}📌 隧道信息:"
+    echo -e "  🔵 本地端口: ${lightpink}$PORT${reset}"
+    echo -e "  🆔 隧道 ID: ${lightpink}$TUNNEL_ID${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${lightpink}📌 实时日志路径: ${green}$LOG_FILE${reset}"
     echo -e "${yellow}❗ 请等待 1-2 分钟让 Cloudflare 完成状态同步${reset}"
