@@ -25,7 +25,7 @@ function error() {
   echo -e "${red}❌ $1${reset}"
 }
 
-# 标题居中显示
+# 标题
 title="🔍 系统依赖检查"
 title_length=${#title}
 total_width=83
@@ -58,12 +58,12 @@ for dep in "${dependencies[@]}"; do
 done
 
 if [ $missing_deps -gt 0 ]; then
-  echo -e "${yellow}⚠️ 有 $missing_deps 个依赖未安装${reset}"
+  warning "⚠️ 有 $missing_deps 个依赖未安装"
 else
   success "✅ 所有依赖均已安装"
 fi
 
-# 5. 检查执行权限
+# 3. 检查执行权限
 info "🔒 检查执行权限..."
 executables=(
   "/root/VPN/xray/xray"
@@ -78,21 +78,55 @@ for exe in "${executables[@]}"; do
     error "$exe 缺少执行权限"
   fi
 done
-# 总结报告
+
+# 4. 检查配置文件存在
+info "📄 检查配置文件..."
+configs=(
+  "/root/VPN/VLESS/config/vless.json"
+  "/root/VPN/HY2/config/hysteria.yaml"
+  "/root/.cloudflared/config.yml"
+  "/root/.cloudflared/cert.pem"
+)
+
+missing_configs=0
+for cfg in "${configs[@]}"; do
+  if [ -f "$cfg" ]; then
+    success "$cfg 存在"
+  else
+    warning "$cfg 缺失"
+    ((missing_configs++))
+  fi
+done
+
+# 5. 检查服务状态
+info "⚙️ 检查服务状态..."
+services=("xray" "hysteria" "cloudflared")
+running_services=0
+
+for service in "${services[@]}"; do
+  if systemctl is-active --quiet "$service"; then
+    success "$service 服务正在运行"
+    ((running_services++))
+  else
+    warning "$service 服务未运行"
+  fi
+done
+
+# 总结
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "📊 检查总结:"
-[ $missing_deps -eq 0 ] && success "所有依赖已安装" || warning "缺少 $missing_deps 个依赖"
-[ $missing_configs -eq 0 ] && success "所有配置文件存在" || warning "缺少 $missing_configs 个配置文件"
-[ $running_services -eq ${#services[@]} ] && success "所有服务正在运行" || warning "$running_services/${#services[@]} 个服务在运行"
+[ "$missing_deps" -eq 0 ] && success "所有依赖已安装" || warning "缺少 $missing_deps 个依赖"
+[ "$missing_configs" -eq 0 ] && success "所有配置文件存在" || warning "缺少 $missing_configs 个配置文件"
+[ "$running_services" -eq ${#services[@]} ] && success "所有服务正在运行" || warning "$running_services/${#services[@]} 个服务在运行"
 
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "💡 建议操作:"
-[ $missing_deps -gt 0 ] && echo -e "${yellow}▶ 建议运行安装脚本安装缺失依赖${reset}"
-[ $missing_configs -gt 0 ] && echo -e "${yellow}▶ 检查并创建缺失的配置文件${reset}"
-[ $running_services -lt ${#services[@]} ] && echo -e "${yellow}▶ 启动未运行的服务 (systemctl start <服务名>)${reset}"
+[ "$missing_deps" -gt 0 ] && echo -e "${yellow}▶ 建议运行安装脚本安装缺失依赖${reset}"
+[ "$missing_configs" -gt 0 ] && echo -e "${yellow}▶ 检查并创建缺失的配置文件${reset}"
+[ "$running_services" -lt ${#services[@]} ] && echo -e "${yellow}▶ 启动未运行的服务 (systemctl start <服务名>)${reset}"
 
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
-# 返回上级菜单
+# 返回主菜单
 read -p "$(echo -e "${cyan}按任意键返回...${reset}")" dummy
 bash /root/VPN/menu/install_upgrade.sh
