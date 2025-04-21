@@ -57,7 +57,7 @@ for dep in "${dependencies[@]}"; do
   fi
 done
 
-if [ $missing_deps -gt 0 ]; then
+if [ "$missing_deps" -gt 0 ]; then
   warning "⚠️ 有 $missing_deps 个依赖未安装"
 else
   success "✅ 所有依赖均已安装"
@@ -98,6 +98,20 @@ for cfg in "${configs[@]}"; do
   fi
 done
 
+# 5. 检查服务状态
+info "⚙️ 检查服务状态..."
+services=("xray" "hysteria" "cloudflared")
+running_services=0
+
+for svc in "${services[@]}"; do
+  if systemctl is-active --quiet "$svc"; then
+    success "$svc 服务正在运行"
+    ((running_services++))
+  else
+    warning "$svc 服务未运行"
+  fi
+done
+
 # 6. 检查 GitHub 项目是否有更新
 info "🌐 检查 GitHub 项目是否有更新..."
 cd /root/VPN 2>/dev/null || warning "⚠️ 项目目录不存在，无法检查 GitHub 更新"
@@ -117,7 +131,8 @@ if [ -d ".git" ]; then
 else
   warning "未初始化 Git 项目，跳过更新检测"
 fi
-# 总结
+
+# 7. 总结报告
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "📊 检查总结:"
 [ "$missing_deps" -eq 0 ] && success "所有依赖已安装" || warning "缺少 $missing_deps 个依赖"
