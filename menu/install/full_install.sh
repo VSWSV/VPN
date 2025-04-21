@@ -31,7 +31,7 @@ function error_exit() {
 check_component() {
   local name=$1
   local binary_path=$2
-  
+
   if [ -x "$binary_path" ]; then
     success "$name 已安装: $binary_path"
     return 0
@@ -50,7 +50,6 @@ download_component() {
   local binary_name=$5
   local install_path="/root/VPN"
 
-  # 特殊处理Xray路径
   if [ "$name" = "Xray" ]; then
     local binary_path="$install_path/xray/xray"
     local target_path="$install_path/xray"
@@ -59,7 +58,6 @@ download_component() {
     local target_path="$install_path"
   fi
 
-  # 检查是否已安装
   if [ -x "$binary_path" ]; then
     warning "$name 已存在于: $binary_path，是否覆盖安装？(y/n)"
     read -r choice
@@ -69,14 +67,12 @@ download_component() {
     rm -f "$binary_path"
   fi
 
-  # 下载文件
   info "开始下载 $name..."
   if ! wget -O "$install_path/$filename" "$url"; then
     warning "$name 下载失败"
     return 1
   fi
 
-  # 处理压缩包
   if [ "$is_zip" = "true" ]; then
     if ! unzip -o "$install_path/$filename" -d "$target_path"; then
       warning "$name 解压失败"
@@ -85,10 +81,8 @@ download_component() {
     rm "$install_path/$filename"
   fi
 
-  # 设置权限
   chmod +x "$binary_path" 2>/dev/null
 
-  # 验证安装
   if [ -x "$binary_path" ]; then
     success "$name 安装成功: $binary_path"
     return 0
@@ -122,7 +116,7 @@ cd /root/VPN || error_exit "无法进入目录"
 
 # 安装基础工具
 info "🔧 安装基础工具..."
-apt update && apt install -y curl wget unzip socat tar sudo \
+apt update && apt install -y curl wget unzip socat tar sudo jq openssl \
   software-properties-common mtr-tiny traceroute bmon \
   && success "工具安装完成" || error_exit "工具安装失败"
 
@@ -165,6 +159,5 @@ echo -e "${yellow}▶ Hysteria: /root/VPN/hysteria --config /root/VPN/hysteria.y
 echo -e "${yellow}▶ Cloudflared: /root/VPN/cloudflared tunnel login${reset}"
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
-# 返回菜单
-read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
+read -p "$(echo -e \"${cyan}按回车键返回...${reset}\")" dummy
 bash /root/VPN/menu/install_upgrade.sh
