@@ -41,7 +41,21 @@ check_component() {
   fi
 }
 
-# 增强版下载函数
+# 下载安装函数
+install_global_link() {
+  local binary_path=$1
+  local global_name=$2
+
+  if [ -f "$binary_path" ]; then
+    ln -sf "$binary_path" "/usr/local/bin/$global_name"
+    chmod +x "/usr/local/bin/$global_name"
+    success "$global_name 已创建全局命令: /usr/local/bin/$global_name"
+  else
+    warning "$global_name 未找到实际路径, 忽略全局链接"
+  fi
+}
+
+# 下载函数
 download_component() {
   local name=$1
   local url=$2
@@ -85,6 +99,7 @@ download_component() {
 
   if [ -x "$binary_path" ]; then
     success "$name 安装成功: $binary_path"
+    install_global_link "$binary_path" "$binary_name"
     return 0
   else
     warning "$name 安装验证失败"
@@ -129,17 +144,17 @@ add-apt-repository universe -y && apt update \
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "⬇️ 正在安装组件..."
 
-# Xray安装（特殊处理）
+# Xray
 download_component "Xray" \
   "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip" \
   "Xray-linux-64.zip" "true" "xray"
 
-# Hysteria安装
+# Hysteria
 download_component "Hysteria" \
   "https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64" \
   "hysteria" "false" "hysteria"
 
-# Cloudflared安装
+# Cloudflared
 download_component "Cloudflared" \
   "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" \
   "cloudflared" "false" "cloudflared"
@@ -154,11 +169,10 @@ check_component "Cloudflared" "/root/VPN/cloudflared"
 # 使用说明
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 info "🎉 安装完成！使用命令:"
-echo -e "${yellow}▶ Xray:    /root/VPN/xray/xray run -config /root/VPN/config.json${reset}"
-echo -e "${yellow}▶ Hysteria: /root/VPN/hysteria --config /root/VPN/hysteria.yaml${reset}"
-echo -e "${yellow}▶ Cloudflared: /root/VPN/cloudflared tunnel login${reset}"
+echo -e "${yellow}▶ Xray:        xray run -config /root/VPN/config.json${reset}"
+echo -e "${yellow}▶ Hysteria:    hysteria --config /root/VPN/hysteria.yaml${reset}"
+echo -e "${yellow}▶ Cloudflared: cloudflared tunnel login${reset}"
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
 read -p "$(echo -e ${cyan}按回车键返回...${reset})" dummy
 bash /root/VPN/menu/install_upgrade.sh
-
