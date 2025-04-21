@@ -182,9 +182,9 @@ if [ -f "$PID_PATH" ] && ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     # 网络信息
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📶 网络信息:"
-    echo -e "  🔵 监听端口: ${lightpink}$PORT${reset}"
-    echo -e "  IPv4: ${lightpink}$ipv4${reset}"
-    echo -e "  IPv6: ${lightpink}$ipv6${reset}"
+    echo -e "🔵 监听端口: ${lightpink}$PORT${reset}"
+    echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
+    echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
     
     footer
     read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1 -r
@@ -260,9 +260,9 @@ if ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     # 网络信息
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📶 网络信息:"
-    echo -e "  🔵 监听端口: ${lightpink}$PORT${reset}"
-    echo -e "  IPv4: ${lightpink}$ipv4${reset}"
-    echo -e "  IPv6: ${lightpink}$ipv6${reset}"
+    echo -e "🔵 监听端口: ${lightpink}$PORT${reset}"
+    echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
+    echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${yellow}📝 订阅文件已生成: ${lightpink}$SUB_FILE${reset}"
 else
