@@ -159,5 +159,6 @@ echo -e "${yellow}▶ Hysteria: /root/VPN/hysteria --config /root/VPN/hysteria.y
 echo -e "${yellow}▶ Cloudflared: /root/VPN/cloudflared tunnel login${reset}"
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
-read -p "$(echo -e \"${cyan}按回车键返回...${reset}\")" dummy
+read -p "$(echo -e ${cyan}按回车键返回...${reset})" dummy
 bash /root/VPN/menu/install_upgrade.sh
+
