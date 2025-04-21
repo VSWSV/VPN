@@ -4,14 +4,14 @@ clear
 cyan="\033[1;36m"; green="\033[1;32m"; yellow="\033[1;33m"
 red="\033[1;31m"; orange="\033[38;5;208m"; white="\033[1;37m"; lightpink="\033[38;5;213m"; reset="\033[0m"
 
-# 固定路径（完全匹配您的实际结构）
+# 固定路径
 VLESS_DIR="/root/VPN/VLESS"
 CONFIG_PATH="$VLESS_DIR/config/vless.json"
 LOG_PATH="$VLESS_DIR/logs/vless.log"
 PID_PATH="$VLESS_DIR/pids/vless.pid"
 SUB_FILE="$VLESS_DIR/subscriptions/vless_sub.txt"
-XRAY_BIN="/root/VPN/xray/xray"  # 精确匹配您的xray位置
-XRAY_DIR="/root/VPN/xray"       # xray资源文件目录
+XRAY_BIN="/root/VPN/xray/xray"
+XRAY_DIR="/root/VPN/xray"
 
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
@@ -24,7 +24,6 @@ function footer() {
 }
 
 function check_xray() {
-    # 检查二进制文件
     if [ ! -f "$XRAY_BIN" ]; then
         echo -e "${red}❌ Xray核心未找到: $XRAY_BIN${reset}"
         echo -e "${yellow}请检查以下文件是否存在：${reset}"
@@ -32,7 +31,6 @@ function check_xray() {
         return 1
     fi
     
-    # 检查执行权限
     if [ ! -x "$XRAY_BIN" ]; then
         echo -e "${yellow}⚠️ 尝试修复执行权限...${reset}"
         if ! chmod +x "$XRAY_BIN"; then
@@ -42,14 +40,12 @@ function check_xray() {
         fi
     fi
     
-    # 验证版本
     if ! "$XRAY_BIN" version &>/dev/null; then
         echo -e "${red}❌ Xray二进制验证失败${reset}"
         echo -e "${yellow}可能原因：架构不匹配或文件损坏${reset}"
         return 1
     fi
     
-    # 检查资源文件
     local required_files=("geoip.dat" "geosite.dat")
     for file in "${required_files[@]}"; do
         if [ ! -f "$XRAY_DIR/$file" ]; then
@@ -77,7 +73,6 @@ function verify_config() {
         return 1
     fi
     
-    # 验证关键配置项
     local required_fields=("port" "settings.clients[0].id")
     for field in "${required_fields[@]}"; do
         if ! jq -e ".inbounds[0].${field}" "$CONFIG_PATH" &>/dev/null; then
@@ -115,25 +110,38 @@ function generate_connection_links() {
     local ipv4=$1 ipv6=$2
     
     # 从配置文件读取参数
-    local PORT UUID SNI FLOW
+    local PORT UUID SNI FLOW SECURITY PUBLIC_KEY SHORT_ID DEST
     PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
     UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
-    SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // empty' "$CONFIG_PATH")
+    SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
     FLOW=$(jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
+    SECURITY=$(jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
+    PUBLIC_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.publicKey // empty' "$CONFIG_PATH")
+    SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0] // empty' "$CONFIG_PATH")
+    DEST=$(jq -r '.inbounds[0].streamSettings.realitySettings.dest // empty' "$CONFIG_PATH")
+    
+    # 通用参数
+    local common_params="type=tcp&flow=$FLOW"
     
     # 1. 域名连接
     if [ -n "$SNI" ]; then
         echo -e "${green}🌐 域名直连:${reset}"
-        echo "vless://${UUID}@${SNI}:${PORT}?type=tcp&security=xtls&sni=${SNI}&flow=${FLOW}#VLESS-域名直连"
+        if [[ "$SECURITY" == "reality" ]]; then
+            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VLESS-REALITY"
+        else
+            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VLESS-$SECURITY"
+        fi
         echo ""
-    else
-        echo -e "${yellow}⚠️ 未配置域名(SNI)${reset}"
     fi
     
     # 2. IPv4连接
     if [[ "$ipv4" != "未检测到" ]]; then
         echo -e "${green}📡 IPv4直连:${reset}"
-        echo "vless://${UUID}@${ipv4}:${PORT}?type=tcp&security=xtls&sni=${SNI}&flow=${FLOW}#VLESS-IPv4直连"
+        if [[ "$SECURITY" == "reality" ]]; then
+            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VLESS-REALITY-IPv4"
+        else
+            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VLESS-$SECURITY-IPv4"
+        fi
         echo ""
     else
         echo -e "${red}⚠️ IPv4地址未检测到${reset}"
@@ -142,7 +150,11 @@ function generate_connection_links() {
     # 3. IPv6连接
     if [[ "$ipv6" != "未检测到" ]]; then
         echo -e "${green}📶 IPv6直连:${reset}"
-        echo "vless://${UUID}@[${ipv6}]:${PORT}?type=tcp&security=xtls&sni=${SNI}&flow=${FLOW}#VLESS-IPv6直连"
+        if [[ "$SECURITY" == "reality" ]]; then
+            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VLESS-REALITY-IPv6"
+        else
+            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VLESS-$SECURITY-IPv6"
+        fi
         echo ""
     else
         echo -e "${red}⚠️ IPv6地址未检测到${reset}"
@@ -166,8 +178,8 @@ if [ -f "$PID_PATH" ] && ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     # 提取配置参数
     PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
     UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
-    SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // empty' "$CONFIG_PATH")
-    FLOW=$(jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
+    SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
+    SECURITY=$(jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
     
     # 获取双栈IP
     read -r ipv4 ipv6 <<< "$(get_ips)"
@@ -201,8 +213,8 @@ fi
 # 提取配置参数
 PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
 UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
-SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // empty' "$CONFIG_PATH")
-FLOW=$(jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
+SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
+SECURITY=$(jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
 
 # 获取双栈IP
 read -r ipv4 ipv6 <<< "$(get_ips)"
@@ -238,7 +250,7 @@ echo -e "${cyan}配置文件路径: ${lightpink}$CONFIG_PATH${reset}"
 } >> "$LOG_PATH" 2>&1 &
 
 echo $! > "$PID_PATH"
-sleep 2  # 增加等待时间确保进程稳定
+sleep 2
 
 # 状态检查
 if ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
@@ -247,7 +259,12 @@ if ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
         echo "# VLESS 订阅链接 - 生成于 $(date '+%Y-%m-%d %H:%M:%S')"
         echo "# Xray版本: $("$XRAY_BIN" version | head -1)"
         echo ""
-        generate_connection_links "$ipv4" "$ipv6"
+        generate_connection_links "$ipv4" "$ipv6" | while read -r line; do
+            if [[ "$line" == vless://* ]]; then
+                echo -n "$line" | base64 -w 0
+                echo ""
+            fi
+        done
     } > "$SUB_FILE"
     
     echo -e "${green}✅ 启动成功! PID: $(cat "$PID_PATH")${reset}"
@@ -265,6 +282,7 @@ if ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${yellow}📝 订阅文件已生成: ${lightpink}$SUB_FILE${reset}"
+    echo -e "${yellow}🔗 订阅链接内容已使用Base64编码${reset}"
 else
     echo -e "${red}❌ 启动失败! 查看日志: ${lightpink}$LOG_PATH${reset}"
     echo -e "${yellow}可能原因:"
