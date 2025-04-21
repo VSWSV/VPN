@@ -139,6 +139,7 @@ test_urls=(
   "https://www.cloudflare.com|C-F" 
 )
 
+reachable=0
 for entry in "${test_urls[@]}"; do
   IFS='|' read -r url name <<< "$entry"
   response=$(curl -o /dev/null -s -w "%{http_code} %{time_total}" --max-time 5 "$url")
@@ -146,9 +147,10 @@ for entry in "${test_urls[@]}"; do
   time_taken=$(echo "$response" | awk '{print $2}')
   
   if [[ "$http_code" =~ ^2|3 ]]; then
-    echo -e "${green}✅ $name 可访问 ($url) | 状态码: $http_code | 延迟: ${time_taken}s${reset}"
+    success "$name 可访问 ($url) | 状态码: $http_code | 延迟: ${time_taken}s"
+    ((reachable++))
   else
-    echo -e "${red}❌ $name 访问失败 ($url) | 状态码: $http_code | 延迟: ${time_taken}s${reset}"
+    warning "$name 访问失败 ($url) | 状态码: $http_code | 延迟: ${time_taken}s"
   fi
 done
 
