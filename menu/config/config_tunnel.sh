@@ -445,11 +445,11 @@ final_info() {
     echo -e "${lightpink}本地端口：${green}$PORT${reset}"
     echo -e "${lightpink}证书路径：${green}$CERT_FILE${reset}"
     echo -e "${lightpink}配置文件：${green}$CONFIG_YML${reset}"
-    echo
+    
     echo -e "\n${green}🚀 启动隧道命令：${reset}"
     echo
     echo -e "${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
-    echo
+
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
     ls -lh "$CLOUDFLARED_DIR" | grep -E "cert.pem|$TUNNEL_ID.json|config_info.txt|config.yml" 2>/dev/null
 }
