@@ -63,38 +63,6 @@ else
   success "✅ 所有依赖均已安装"
 fi
 
-# 3. 检查配置文件
-info "📄 检查配置文件..."
-config_files=(
-  "/root/VPN/VLESS/config/vless.json"
-  "/root/VPN/HY2/config/hysteria.yaml"
-  "/root/.cloudflared/config.yml"
-  "/root/.cloudflared/cert.pem"
-)
-
-missing_configs=0
-for config in "${config_files[@]}"; do
-  if [ -f "$config" ]; then
-    success "$config 存在"
-  else
-    warning "$config 缺失"
-    ((missing_configs++))
-  fi
-done
-
-# 4. 检查服务状态
-info "⚙️ 检查服务状态..."
-services=("xray" "hysteria" "cloudflared")
-running_services=0
-for service in "${services[@]}"; do
-  if systemctl is-active --quiet "$service"; then
-    success "$service 服务正在运行"
-    ((running_services++))
-  else
-    warning "$service 服务未运行"
-  fi
-done
-
 # 5. 检查执行权限
 info "🔒 检查执行权限..."
 executables=(
