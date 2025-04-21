@@ -95,22 +95,12 @@ active_services=0
 for svc in "${services[@]}"; do
   IFS='|' read -r service name binary_path <<< "$svc"
 
-  # 先用 systemctl 检查
-  if systemctl list-units --type=service --all | grep -q "${service}.service"; then
-    if systemctl is-active --quiet "$service"; then
-      success "$name 正在运行 (由 systemd 管理)"
-      ((active_services++))
-    else
-      error "$name 已注册但未运行"
-    fi
+  # 使用 pgrep 检查进程是否存在
+  if pgrep -f "$binary_path" > /dev/null; then
+    success "$name 正在运行 (手动或后台进程)"
+    ((active_services++))
   else
-    # 再用 ps 检查是否手动运行
-    if pgrep -f "$binary_path" > /dev/null; then
-      success "$name 正在运行 (手动或后台进程)"
-      ((active_services++))
-    else
-      error "$name 未运行 (未发现进程)"
-    fi
+    error "$name 未运行 (未发现进程)"
   fi
 done
 
