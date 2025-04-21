@@ -72,24 +72,37 @@ done
 
 # 3. 验证服务状态
 info "⚙️ 验证服务状态..."
+
 services=(
-  "xray|Xray 服务"
-  "hysteria|Hysteria 服务"
-  "cloudflared|Cloudflared 服务"
+  "xray|Xray 服务|/root/VPN/xray/xray"
+  "hysteria|Hysteria 服务|/root/VPN/hysteria"
+  "cloudflared|Cloudflared 服务|/root/VPN/cloudflared"
 )
 
 active_services=0
+
 for svc in "${services[@]}"; do
-  IFS='|' read -r service name <<< "$svc"
-  if systemctl is-active --quiet "$service"; then
-    success "$name 正在运行"
-    ((active_services++))
+  IFS='|' read -r service name binary_path <<< "$svc"
+
+  # 先用 systemctl 检查
+  if systemctl list-units --type=service --all | grep -q "${service}.service"; then
+    if systemctl is-active --quiet "$service"; then
+      success "$name 正在运行 (由 systemd 管理)"
+      ((active_services++))
+    else
+      error "$name 已注册但未运行"
+    fi
   else
-    error "$name 未运行"
+    # 再用 ps 检查是否手动运行
+    if pgrep -f "$binary_path" > /dev/null; then
+      success "$name 正在运行 (手动或后台进程)"
+      ((active_services++))
+    else
+      error "$name 未运行 (未发现进程)"
+    fi
   fi
 done
 
-# 4. 验证配置文件
 info "📄 验证配置文件..."
 configs=(
   "/root/VPN/VLESS/config/vless.json|VLESS 配置文件"
@@ -115,22 +128,27 @@ done
 
 # 5. 验证网络连通性
 info "🌐 验证网络连通性..."
+
 test_urls=(
   "https://www.google.com|Google"
   "https://www.cloudflare.com|Cloudflare"
   "https://github.com|GitHub"
+  "https://www.vswsv.com|您的主域"
 )
 
-reachable=0
-for url in "${test_urls[@]}"; do
-  IFS='|' read -r address name <<< "$url"
-  if curl --max-time 5 -s -o /dev/null "$address"; then
-    success "$name 可达"
-    ((reachable++))
+for entry in "${test_urls[@]}"; do
+  IFS='|' read -r url name <<< "$entry"
+  response=$(curl -o /dev/null -s -w "%{http_code} %{time_total}" --max-time 5 "$url")
+  http_code=$(echo "$response" | awk '{print $1}')
+  time_taken=$(echo "$response" | awk '{print $2}')
+  
+  if [[ "$http_code" =~ ^2|3 ]]; then
+    echo -e "${green}✅ $name 可访问 ($url) | 状态码: $http_code | 延迟: ${time_taken}s${reset}"
   else
-    warning "$name 不可达"
+    echo -e "${red}❌ $name 访问失败 ($url) | 状态码: $http_code | 延迟: ${time_taken}s${reset}"
   fi
 done
+
 
 # 总结报告
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
