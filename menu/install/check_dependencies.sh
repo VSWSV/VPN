@@ -58,9 +58,9 @@ for dep in "${dependencies[@]}"; do
 done
 
 if [ "$missing_deps" -gt 0 ]; then
-  warning "⚠️ 有 $missing_deps 个依赖未安装"
+  warning "有 $missing_deps 个依赖未安装"
 else
-  success "✅ 所有依赖均已安装"
+  success "所有依赖均已安装"
 fi
 
 # 3. 检查执行权限
@@ -140,7 +140,7 @@ if [ -d ".git" ]; then
     if [ "$local_commit" != "$remote_commit" ]; then
       warning "📌 当前项目版本不是最新！"
     else
-      success "✅ 当前项目已是最新版本"
+      success "当前项目已是最新版本"
     fi
   fi
 else
