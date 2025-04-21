@@ -115,7 +115,7 @@ if [ -f "$PID_PATH" ] && ps -p $(cat "$PID_PATH") >/dev/null; then
     # 网络信息
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📶 网络信息:"
-    echo -e "  🔵 本地端口: ${lightpink}$PORT${reset}"
+    echo -e "🔵 本地端口: ${lightpink}$PORT${reset}"
     echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
     echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
     
@@ -174,7 +174,7 @@ if ps -p $(cat "$PID_PATH") >/dev/null; then
     # 网络信息
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📶 网络信息:"
-    echo -e "  🔵 本地端口: ${lightpink}$PORT${reset}"
+    echo -e "🔵 本地端口: ${lightpink}$PORT${reset}"
     echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
     echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
 else
