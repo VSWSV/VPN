@@ -150,13 +150,13 @@ show_status "自动生成 UUID: ${lightpink}$uuid${reset}"
 # 域名配置
 while true; do
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-    read -p "$(echo -e " ${lightpink}⇨ 请输入SNI域名 (如: vpn.example.com): ${reset}")" sni
+    read -p "$(echo -e " ${lightpink}⇨ 请输入SNI域名 (如:www.google.com): ${reset}")" sni
     
     if validate_input "domain" "$sni"; then
         show_status "域名设置为: ${lightpink}$sni${reset}"
         break
     else
-        show_error "无效域名格式 (示例: example.com)"
+        show_error "无效域名格式 (示例:www.google.com)"
     fi
 done
 
