@@ -447,6 +447,7 @@ final_info() {
     echo -e "${lightpink}配置文件：${green}$CONFIG_YML${reset}"
 
     echo -e "\n${green}🚀 启动隧道命令：${reset}"
+    
     echo -e "${cyan}$CFD_BIN tunnel run $TUNNEL_NAME${reset}"
 
     echo -e "\n${lightpink}📁 生成的文件：${reset}"
