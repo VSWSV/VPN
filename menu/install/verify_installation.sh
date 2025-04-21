@@ -136,7 +136,7 @@ test_urls=(
   "https://www.google.com|谷歌"
   "https://www.youtube.com|油管"
   "https://github.com|G 站" 
-  "https://www.cloudflare.com|C-F" 
+  "https://www.cloudflare.com|C  F" 
 )
 
 reachable=0
