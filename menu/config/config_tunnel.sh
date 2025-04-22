@@ -309,15 +309,19 @@ create_dns_records() {
 
 generate_config_yml() {
     cat > "$CONFIG_YML" <<EOF
-url: http://localhost:$PORT
-logfile: /root/.cloudflared/tunnel.log
 tunnel: $TUNNEL_ID
 credentials-file: $CLOUDFLARED_DIR/$TUNNEL_ID.json
+logfile: /root/.cloudflared/tunnel.log
+ingress:
+  - hostname: ${SUB_DOMAIN}.${CF_ZONE}
+    service: http://localhost:$PORT
+  - service: http_status:404
 EOF
 
     success "📄 已生成配置文件：${green}$CONFIG_YML${reset}"
     info "🚪 隧道将转发至本地端口：${green}$PORT${reset}"
 }
+
 
 handle_tunnel() {
     if [[ ! -f "$CERT_FILE" ]]; then
