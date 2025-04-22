@@ -72,9 +72,9 @@ TUNNEL_ID=$(get_tunnel_id)
 PORT=$(grep -A5 'ingress:' "$CONFIG_FILE" | grep -E 'http://[^:]+:([0-9]+)' | sed -E 's|.*:([0-9]+).*|\1|' | head -1)
 [ -z "$PORT" ] && PORT="未配置"
 
-# 检查是否已有进程
+# 检查是否已有运行中的进程，且与当前 TUNNEL_ID 匹配
 if pgrep -f "$CLOUD_FLARED tunnel run" >/dev/null; then
-    PID=$(pgrep -f "$CLOUD_FLARED tunnel run")
+    PID=$(pgrep -f "$CLOUD_FLARED tunnel run" | head -n1)
     echo "$PID" > "$PID_FILE"
     echo -e "${yellow}⚠️ 隧道已在运行中 (主进程 PID: ${green}$PID${yellow})${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
@@ -92,15 +92,15 @@ fi
 # 无进程时清理旧的
 kill_tunnel >/dev/null 2>&1
 
-# 启动服务（已修复 ✅）
+# 启动服务
 info "正在启动隧道: ${green}$TUNNEL_ID${reset}"
 nohup "$CLOUD_FLARED" tunnel --config "$CONFIG_FILE" run "$TUNNEL_ID" > "$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 
 sleep 5
 
-if pgrep -f "$CLOUD_FLARED tunnel" >/dev/null; then
-    PID=$(pgrep -f "$CLOUD_FLARED tunnel")
+if pgrep -f "$CLOUD_FLARED tunnel run" >/dev/null; then
+    PID=$(pgrep -f "$CLOUD_FLARED tunnel run" | head -n1)
     success "隧道启动成功! (主进程 PID: ${green}$PID${reset})"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📌 隧道信息:"
@@ -113,7 +113,6 @@ else
     error "隧道启动失败!"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 
-    # 智能诊断
     if [ ! -f "$CONFIG_FILE" ]; then
         echo -e "${red}❌ 配置文件缺失：$CONFIG_FILE${reset}"
     elif [ -z "$TUNNEL_ID" ]; then
