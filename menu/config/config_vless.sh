@@ -305,20 +305,20 @@ else
     tls_config='"security": "none"'
 fi
 
-# 生成配置文件
+# 生成配置文件（修复后的JSON生成部分）
 config_json=$(jq -n \
   --argjson port "$port" \
   --arg uuid "$uuid" \
   --arg sni "$sni" \
   --arg security "$security" \
   --arg network "$network" \
-  --arg path "$path" \
-  --arg serviceName "$serviceName" \
-  --arg dest_domain "$dest_domain" \
-  --argjson dest_port "$dest_port" \
-  --arg private_key "$private_key" \
-  --arg public_key "$public_key" \
-  --arg short_id "$short_id" \
+  --arg path "${path:-/vless-ws}" \
+  --arg serviceName "${serviceName:-grpc-service}" \
+  --arg dest_domain "${dest_domain:-example.com}" \
+  --argjson dest_port "${dest_port:-443}" \
+  --arg private_key "${private_key:-}" \
+  --arg public_key "${public_key:-}" \
+  --arg short_id "${short_id:-}" \
   --arg certFile "$( [[ "$security" == "tls" && "$tls_choice" == "2" ]] && echo "$cert_path" || echo "$CERTS_DIR/cert.pem" )" \
   --arg keyFile "$( [[ "$security" == "tls" && "$tls_choice" == "2" ]] && echo "$key_path" || echo "$CERTS_DIR/private.key" )" \
   '{
@@ -327,48 +327,49 @@ config_json=$(jq -n \
         "port": $port,
         "protocol": "vless",
         "settings": {
-          "clients": [{ "id": $uuid, "flow": "xtls-rprx-vision" }],
+          "clients": [
+            {
+              "id": $uuid,
+              "flow": "xtls-rprx-vision"
+            }
+          ],
           "decryption": "none"
         },
-        "streamSettings": (
-          if $security == "reality" then
-            {
-              "network": $network,
-              "security": $security,
-              "realitySettings": {
-                "dest": $dest_domain + ":" + ($dest_port | tostring),
-                "serverNames": [$sni],
-                "privateKey": $private_key,
-                "publicKey": $public_key,
-                "shortIds": [$short_id]
-              }
+        "streamSettings": {
+          "network": $network,
+          "security": $security,
+          ($network + "Settings"): 
+            if $network == "ws" then { "path": $path, "headers": {} }
+            elif $network == "grpc" then { "serviceName": $serviceName }
+            elif $network == "h2" then { "path": $path, "host": [$sni] }
+            else {} end,
+          ($security + "Settings"): 
+            if $security == "reality" then {
+              "dest": $dest_domain + ":" + ($dest_port | tostring),
+              "serverNames": [$sni],
+              "privateKey": $private_key,
+              "publicKey": $public_key,
+              "shortIds": [$short_id]
             }
-          else
-            {
-              "network": $network,
-              "security": $security,
-              ($security + "Settings"): (if $security == "tls" then
+            elif $security == "tls" then {
+              "serverName": $sni,
+              "certificates": [
                 {
-                  "serverName": $sni,
-                  "certificates": [
-                    {
-                      "certificateFile": $certFile,
-                      "keyFile": $keyFile
-                    }
-                  ]
+                  "certificateFile": $certFile,
+                  "keyFile": $keyFile
                 }
-              else empty end)
+              ]
             }
-          end
-        ) + (
-          if $network == "ws" then { "wsSettings": { "path": $path } }
-          elif $network == "grpc" then { "grpcSettings": { "serviceName": $serviceName } }
-          elif $network == "h2" then { "httpSettings": { "path": $path, "host": [$sni] } }
-          else {} end
-        )
+            else {} end
+        }
       }
     ],
-    "outbounds": [{ "protocol": "freedom" }]
+    "outbounds": [
+      {
+        "protocol": "freedom",
+        "settings": {}
+      }
+    ]
   }')
 
 # 验证并写入配置
@@ -393,11 +394,11 @@ echo -e " ${lightpink}传输协议:   ${reset}${green}$network${reset}"
 echo -e " ${lightpink}安全协议:   ${reset}${green}$security${reset}"
 
 if [[ "$network" == "ws" ]]; then
-    echo -e " ${lightpink}WS路径：    ${reset}${green}$path${reset}"
+    echo -e " ${lightpink}WS路径：    ${reset}${green}${path:-/vless-ws}${reset}"
 elif [[ "$network" == "grpc" ]]; then
-    echo -e " ${lightpink}gRPC服务名: ${reset}${green}$serviceName${reset}"
+    echo -e " ${lightpink}gRPC服务名: ${reset}${green}${serviceName:-grpc-service}${reset}"
 elif [[ "$network" == "h2" ]]; then
-    echo -e " ${lightpink}H2路径：    ${reset}${green}$path${reset}"
+    echo -e " ${lightpink}H2路径：    ${reset}${green}${path:-/h2-path}${reset}"
 fi
 
 if [[ "$security" == "reality" ]]; then
