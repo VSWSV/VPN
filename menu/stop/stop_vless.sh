@@ -7,10 +7,13 @@ cyan="\033[1;36m"; orange="\033[38;5;208m"; reset="\033[0m"
 
 # 路径配置
 VLESS_DIR="/root/VPN/VLESS"
+CONFIG_PATH="$VLESS_DIR/config/vless.json"
 PID_FILE="$VLESS_DIR/pids/vless.pid"
 LOG_FILE="$VLESS_DIR/logs/vless.log"
-PROCESS_NAME="xray"
-TARGET_PORT=24694
+PROCESS_NAME="/root/VPN/xray/xray"
+
+# 动态提取监听端口
+TARGET_PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH" 2>/dev/null)
 
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
@@ -24,10 +27,15 @@ function footer() {
 
 header
 
+if [ -z "$TARGET_PORT" ] || ! [[ "$TARGET_PORT" =~ ^[0-9]+$ ]]; then
+    echo -e "${red}❌ 配置文件中未能解析有效监听端口，跳过端口释放检测${reset}"
+    TARGET_PORT=""
+fi
+
 # 检查PID文件是否存在
 if [ ! -f "$PID_FILE" ]; then
-    echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程名停止...${reset}"
-    VLESS_PIDS=($(pgrep -f "$PROCESS_NAME run.*$VLESS_DIR/config/vless.json"))
+    echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程路径匹配...${reset}"
+    VLESS_PIDS=($(pgrep -f "$PROCESS_NAME"))
     if [ ${#VLESS_PIDS[@]} -eq 0 ]; then
         echo -e "${green}✅ 未找到运行中的VLESS进程${reset}"
         footer
@@ -43,6 +51,7 @@ fi
 if [ ${#VLESS_PIDS[@]} -gt 0 ]; then
     for PID in "${VLESS_PIDS[@]}"; do
         echo -e "${yellow}🔄 正在处理进程 PID: ${green}$PID${reset}"
+
         STATE=$(ps -o stat= -p "$PID" 2>/dev/null | tr -d ' ')
         if [ -z "$STATE" ]; then
             echo -e "${yellow}⚠️  进程 $PID 不存在${reset}"
@@ -73,7 +82,7 @@ if [ ${#VLESS_PIDS[@]} -gt 0 ]; then
                 sed -i "/^$PID$/d" "$PID_FILE"
                 [ ! -s "$PID_FILE" ] && rm -f "$PID_FILE"
             fi
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 进程 $PID 已停止" >> "$LOG_FILE"
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] VLESS 进程 $PID 已停止" >> "$LOG_FILE"
         else
             echo -e "${red}❌ 停止进程 PID: $PID 失败，请手动检查${reset}"
         fi
@@ -84,20 +93,22 @@ else
 fi
 
 # 端口释放二次验证
-PORT_STATUS=$(ss -tulnp | grep ":$TARGET_PORT ")
-if [[ -n "$PORT_STATUS" ]]; then
-    echo -e "${red}❌ 端口 $TARGET_PORT 仍然被占用${reset}"
-    PID_REMAIN=$(echo "$PORT_STATUS" | grep -oP 'pid=\K[0-9]+')
-    echo -e "${yellow}👉 尝试强制释放残留进程 PID: $PID_REMAIN${reset}"
-    kill -9 "$PID_REMAIN" 2>/dev/null
-    sleep 1
-    if ss -tulnp | grep -q ":$TARGET_PORT "; then
-        echo -e "${red}❌ 释放失败，请手动检查${reset}"
+if [ -n "$TARGET_PORT" ]; then
+    PORT_STATUS=$(ss -tulnp | grep ":$TARGET_PORT ")
+    if [[ -n "$PORT_STATUS" ]]; then
+        echo -e "${red}❌ 端口 $TARGET_PORT 仍然被占用${reset}"
+        PID_REMAIN=$(echo "$PORT_STATUS" | grep -oP 'pid=\K[0-9]+')
+        echo -e "${yellow}👉 尝试强制释放残留进程 PID: $PID_REMAIN${reset}"
+        kill -9 "$PID_REMAIN" 2>/dev/null
+        sleep 1
+        if ss -tulnp | grep -q ":$TARGET_PORT "; then
+            echo -e "${red}❌ 释放失败，请手动检查${reset}"
+        else
+            echo -e "${green}✅ 已强制释放端口 $TARGET_PORT${reset}"
+        fi
     else
-        echo -e "${green}✅ 已强制释放端口 $TARGET_PORT${reset}"
+        echo -e "${green}✅ 端口 $TARGET_PORT 已成功释放${reset}"
     fi
-else
-    echo -e "${green}✅ 端口 $TARGET_PORT 已成功释放${reset}"
 fi
 
 footer
