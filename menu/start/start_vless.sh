@@ -232,7 +232,7 @@ fi
 
 # 启动服务
 echo -e "${yellow}🔄 正在启动服务...${reset}"
-echo -e "${cyan}使用Xray路径: ${lightpink}$XRAY_BIN${reset}"
+echo -e "${cyan}程序路径: ${lightpink}$XRAY_BIN${reset}"
 echo -e "${cyan}配置文件路径: ${lightpink}$CONFIG_PATH${reset}"
 
 {
@@ -280,9 +280,7 @@ if ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     echo -e "🔵 监听端口: ${lightpink}$PORT${reset}"
     echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
     echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
-    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${yellow}📝 订阅文件已生成: ${lightpink}$SUB_FILE${reset}"
-    echo -e "${yellow}🔗 订阅链接内容已使用Base64编码${reset}"
 else
     echo -e "${red}❌ 启动失败! 查看日志: ${lightpink}$LOG_PATH${reset}"
     echo -e "${yellow}可能原因:"
