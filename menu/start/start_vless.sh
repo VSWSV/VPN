@@ -128,7 +128,7 @@ function generate_connection_links() {
         if [[ "$SECURITY" == "reality" ]]; then
             echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-域名转发"
         else
-            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-$SECURITY"
+            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-域名转发"
         fi
         echo ""
     fi
@@ -139,7 +139,7 @@ function generate_connection_links() {
         if [[ "$SECURITY" == "reality" ]]; then
             echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-IPv4直连"
         else
-            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-$SECURITY-IPv4"
+            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-IPv4直连4"
         fi
         echo ""
     else
@@ -152,7 +152,7 @@ function generate_connection_links() {
         if [[ "$SECURITY" == "reality" ]]; then
             echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-IPv6直连"
         else
-            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-$SECURITY-IPv6"
+            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-IPv6直连"
         fi
         echo ""
     else
