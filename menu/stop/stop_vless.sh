@@ -110,6 +110,7 @@ if [ -n "$TARGET_PORT" ]; then
         echo -e "${green}✅ 端口 $TARGET_PORT 已成功释放${reset}"
     fi
 fi
+pkill -f xray
 
 footer
 read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
