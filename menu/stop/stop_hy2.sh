@@ -30,7 +30,7 @@ if [ -z "$TARGET_PORT" ] || ! [[ "$TARGET_PORT" =~ ^[0-9]+$ ]]; then
 fi
 
 if [ ! -f "$PID_FILE" ]; then
-    echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程路径匹配...${reset}"
+    echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程匹配...${reset}"
     HY2_PIDS=($(pgrep -f "$PROCESS_NAME"))
     if [ ${#HY2_PIDS[@]} -eq 0 ]; then
         echo -e "${green}✅ 未找到运行中的Hysteria进程${reset}"
