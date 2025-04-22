@@ -14,7 +14,7 @@ CLOUDFLARED_DIR="/root/.cloudflared"
 CERT_FILE="$CLOUDFLARED_DIR/cert.pem"
 CONFIG_FILE="$CLOUDFLARED_DIR/config_info.txt"
 CONFIG_YML="$CLOUDFLARED_DIR/config.yml"
-CLOUD_FLARED="/root/VPN/cloudflared"  # ✅ 自定义路径执行文件
+CLOUD_FLARED="/root/VPN/cloudflared" 
 
 function header() {
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
