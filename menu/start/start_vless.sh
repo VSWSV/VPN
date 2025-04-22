@@ -250,7 +250,7 @@ echo -e "${cyan}配置文件路径: ${lightpink}$CONFIG_PATH${reset}"
 } >> "$LOG_PATH" 2>&1 &
 
 echo $! > "$PID_PATH"
-sleep 0.5
+sleep 2
 
 # 状态检查
 if ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
