@@ -69,7 +69,7 @@ function generate_connection_links() {
     
     # 1. 域名连接
     echo -e "${green}🌐 域名直连:${reset}"
-    echo "hysteria2://${UUID}@${SNI}:${PORT}?sni=${SNI}&alpn=${ALPN}${insecure_flag}#HY2-域名直连"
+    echo "hysteria2://${UUID}@${SNI}:${PORT}?sni=${SNI}&alpn=${ALPN}${insecure_flag}#HY2-域名转发"
     echo ""
     
     # 2. IPv4连接
