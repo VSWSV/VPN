@@ -108,7 +108,7 @@ function config_prompt() {
 
 function generate_connection_links() {
     local ipv4=$1 ipv6=$2
-    
+
     # 从配置文件读取参数
     local PORT UUID SNI FLOW SECURITY PUBLIC_KEY SHORT_ID DEST
     PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
@@ -119,46 +119,47 @@ function generate_connection_links() {
     PUBLIC_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.publicKey // empty' "$CONFIG_PATH")
     SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0] // empty' "$CONFIG_PATH")
     DEST=$(jq -r '.inbounds[0].streamSettings.realitySettings.dest // empty' "$CONFIG_PATH")
-    
-    # 通用参数
+
     local common_params="type=tcp&flow=$FLOW"
-    
+
     # 1. 域名连接
     if [ -n "$SNI" ]; then
         echo -e "${green}🌐 域名直连:${reset}"
         if [[ "$SECURITY" == "reality" ]]; then
-            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VLESS-REALITY"
+            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-域名转发"
         else
-            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VLESS-$SECURITY"
+            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-$SECURITY"
         fi
         echo ""
     fi
-    
+
     # 2. IPv4连接
     if [[ "$ipv4" != "未检测到" ]]; then
         echo -e "${green}📡 IPv4直连:${reset}"
         if [[ "$SECURITY" == "reality" ]]; then
-            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VLESS-REALITY-IPv4"
+            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-IPv4直连"
         else
-            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VLESS-$SECURITY-IPv4"
+            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-$SECURITY-IPv4"
         fi
         echo ""
     else
         echo -e "${red}⚠️ IPv4地址未检测到${reset}"
     fi
-    
+
     # 3. IPv6连接
     if [[ "$ipv6" != "未检测到" ]]; then
         echo -e "${green}📶 IPv6直连:${reset}"
         if [[ "$SECURITY" == "reality" ]]; then
-            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VLESS-REALITY-IPv6"
+            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-IPv6直连"
         else
-            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VLESS-$SECURITY-IPv6"
+            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-$SECURITY-IPv6"
         fi
         echo ""
     else
         echo -e "${red}⚠️ IPv6地址未检测到${reset}"
     fi
+}
+
 }
 
 # 主流程
