@@ -58,10 +58,10 @@ if [ ${#VLESS_PIDS[@]} -gt 0 ]; then
         # 处理僵尸进程
         if [[ "$STATE" == *Z* ]]; then
             echo -e "${yellow}⚠️  检测到僵尸进程（PID: $PID）...${reset}"
-            PPID=$(ps -o ppid= -p "$PID" 2>/dev/null | tr -d ' ')
-            if [ -n "$PPID" ]; then
-                echo -e "${yellow}📌 僵尸进程的父进程为：$PPID，尝试强制回收...${reset}"
-                kill -9 "$PPID" 2>/dev/null
+            PARENT_PID=$(ps -o ppid= -p "$PID" 2>/dev/null | tr -d ' ')
+            if [ -n "$PARENT_PID" ]; then
+                echo -e "${yellow}📌 僵尸进程的父进程为：$PARENT_PID，尝试强制回收...${reset}"
+                kill -9 "$PARENT_PID" 2>/dev/null
                 sleep 1
             fi
         else
