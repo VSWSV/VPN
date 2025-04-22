@@ -1,21 +1,15 @@
 #!/bin/bash
 clear
 
-# 颜色定义
 red="\033[1;31m"; green="\033[1;32m"; yellow="\033[1;33m"
 cyan="\033[1;36m"; orange="\033[38;5;208m"; reset="\033[0m"
 
-# 路径配置
 HY2_DIR="/root/VPN/HY2"
 CONFIG_PATH="$HY2_DIR/config/hysteria.yaml"
 PID_FILE="$HY2_DIR/pids/hysteria.pid"
 LOG_FILE="$HY2_DIR/logs/hysteria.log"
 PROCESS_NAME="/root/VPN/hysteria"
 
-# 预清理：确保无残留进程
-pkill -f hysteria
-
-# 动态读取监听端口（如 listen: :39445）
 TARGET_PORT=$(grep -E "^listen:" "$CONFIG_PATH" | sed -E 's/.*:([0-9]+)/\1/')
 
 function header() {
@@ -35,7 +29,6 @@ if [ -z "$TARGET_PORT" ] || ! [[ "$TARGET_PORT" =~ ^[0-9]+$ ]]; then
     TARGET_PORT=""
 fi
 
-# 获取运行中的进程 PID
 if [ ! -f "$PID_FILE" ]; then
     echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程路径匹配...${reset}"
     HY2_PIDS=($(pgrep -f "$PROCESS_NAME"))
@@ -50,7 +43,6 @@ else
     HY2_PIDS=($(cat "$PID_FILE"))
 fi
 
-# 停止进程
 if [ ${#HY2_PIDS[@]} -gt 0 ]; then
     for PID in "${HY2_PIDS[@]}"; do
         echo -e "${yellow}🔄 正在处理进程 PID: ${green}$PID${reset}"
@@ -114,6 +106,8 @@ if [ -n "$TARGET_PORT" ]; then
         echo -e "${green}✅ 端口 $TARGET_PORT 已成功释放${reset}"
     fi
 fi
+
+pkill -f hysteria
 
 footer
 read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
