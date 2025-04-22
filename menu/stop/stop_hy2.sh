@@ -92,7 +92,6 @@ fi
 if [ -n "$TARGET_PORT" ]; then
     PORT_STATUS=$(ss -tulnp | grep ":$TARGET_PORT ")
     if [[ -n "$PORT_STATUS" ]]; then
-        echo -e "${red}❌ 端口 $TARGET_PORT 仍然被占用${reset}"
         PID_REMAIN=$(echo "$PORT_STATUS" | grep -oP 'pid=\K[0-9]+')
         echo -e "${yellow}👉 尝试强制释放残留进程 PID: $PID_REMAIN${reset}"
         kill -9 "$PID_REMAIN" 2>/dev/null
