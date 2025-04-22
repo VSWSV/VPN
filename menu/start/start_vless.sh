@@ -160,8 +160,6 @@ function generate_connection_links() {
     fi
 }
 
-}
-
 # 主流程
 header
 
