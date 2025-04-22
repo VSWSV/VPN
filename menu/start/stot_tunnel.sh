@@ -99,8 +99,8 @@ echo $! > "$PID_FILE"
 
 sleep 5
 
-if pgrep -f "$CLOUD_FLARED tunnel run" >/dev/null; then
-    PID=$(pgrep -f "$CLOUD_FLARED tunnel run")
+if pgrep -f "$CLOUD_FLARED tunnel" >/dev/null; then
+    PID=$(pgrep -f "$CLOUD_FLARED tunnel")
     success "隧道启动成功! (主进程 PID: ${green}$PID${reset})"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📌 隧道信息:"
