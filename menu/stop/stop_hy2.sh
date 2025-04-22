@@ -10,7 +10,7 @@ HY2_DIR="/root/VPN/HY2"
 CONFIG_PATH="$HY2_DIR/config/hysteria.yaml"
 PID_FILE="$HY2_DIR/pids/hysteria.pid"
 LOG_FILE="$HY2_DIR/logs/hysteria.log"
-PROCESS_NAME="/root/VPN/hysteria"  # ✅ 使用实际执行路径
+PROCESS_NAME="/root/VPN/hysteria"
 
 # 动态读取监听端口（如 listen: :39445）
 TARGET_PORT=$(grep -E "^listen:" "$CONFIG_PATH" | sed -E 's/.*:([0-9]+)/\1/')
