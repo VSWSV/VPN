@@ -139,7 +139,7 @@ function generate_connection_links() {
         if [[ "$SECURITY" == "reality" ]]; then
             echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-IPv4直连"
         else
-            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-IPv4直连4"
+            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-IPv4直连"
         fi
         echo ""
     else
