@@ -24,11 +24,6 @@ footer() {
 
 header
 
-# 第一次彻底尝试停止所有 cloudflared
-pkill -f cloudflared >/dev/null 2>&1
-sleep 1
-
-# 获取 PID
 if [ -f "$PID_FILE" ]; then
     PIDS=($(cat "$PID_FILE"))
 else
@@ -87,8 +82,7 @@ for PID in "${PIDS[@]}"; do
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 done
 
-# 第二次再彻底扫尾清理一次（防止遗漏）
-pkill -f cloudflared >/dev/null 2>&1
+pkill -f cloudflared
 
 footer
 read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
