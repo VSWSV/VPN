@@ -92,9 +92,9 @@ fi
 # 无进程时清理旧的
 kill_tunnel >/dev/null 2>&1
 
-# 启动服务
+# 启动服务（已修复 ✅）
 info "正在启动隧道: ${green}$TUNNEL_ID${reset}"
-nohup "$CLOUD_FLARED" tunnel run --config "$CONFIG_FILE" > "$LOG_FILE" 2>&1 &
+nohup "$CLOUD_FLARED" tunnel --config "$CONFIG_FILE" run "$TUNNEL_ID" > "$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 
 sleep 5
