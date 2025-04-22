@@ -173,11 +173,13 @@ if [[ "$security" != "none" ]]; then
         # 生成shortId
         short_id=$(openssl rand -hex 8)
         
+        # 将公钥写入配置文件
         tls_config='"security": "reality",
         "realitySettings": {
           "dest": "'$dest_domain:$dest_port'",
           "serverNames": ["'$sni'"],
           "privateKey": "'$private_key'",
+          "publicKey": "'$public_key'",
           "shortIds": ["'$short_id'"]
         }'
     else
