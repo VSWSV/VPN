@@ -4,10 +4,19 @@ clear
 cyan="\033[1;36m"; blue="\033[1;34m"; green="\033[1;32m"; yellow="\033[1;33m"
 red="\033[1;31m"; orange="\033[38;5;208m"; lightpink="\033[38;5;213m"; white="\033[1;37m"; reset="\033[0m"
 
+# 检查依赖
+if ! command -v jq &>/dev/null; then
+  echo -e "${red}✖ 请先安装 jq 工具：apt install -y jq${reset}"
+  exit 1
+fi
+
 # 目录配置
 VLESS_DIR="/root/VPN/VLESS"
 CONFIG_PATH="$VLESS_DIR/config/vless.json"
 CERTS_DIR="$VLESS_DIR/certs"
+
+# 捕获 Ctrl+C
+trap "echo -e '\n${red}操作已取消！${reset}'; exit 1" SIGINT
 
 function header() {
     clear
@@ -48,12 +57,25 @@ function generate_random_port() {
 }
 
 function generate_certs() {
-    echo
-    echo -e "${yellow}🛠️  正在为 $1 生成自签名证书...${reset}"
+    local sni="$1"
+    echo -e "${yellow}🛠️  正在为 $sni 生成自签名证书...${reset}"
     mkdir -p "$CERTS_DIR"
-    openssl ecparam -genkey -name prime256v1 -out "$CERTS_DIR/private.key" 2>/dev/null
-    openssl req -x509 -new -key "$CERTS_DIR/private.key" -out "$CERTS_DIR/cert.pem" \
-        -days 365 -subj "/CN=$1" 2>/dev/null
+    
+    if [[ -f "$CERTS_DIR/cert.pem" || -f "$CERTS_DIR/private.key" ]]; then
+        read -p "$(echo -e "${yellow}⚠️ 检测到已有证书，是否覆盖？(y/N): ${reset}")" -n 1 overwrite
+        echo
+        [[ "$overwrite" != [Yy] ]] && return
+    fi
+
+    if ! openssl ecparam -genkey -name prime256v1 -out "$CERTS_DIR/private.key" 2>/dev/null; then
+        show_error "生成私钥失败！"
+        exit 1
+    fi
+    if ! openssl req -x509 -new -key "$CERTS_DIR/private.key" -out "$CERTS_DIR/cert.pem" \
+        -days 365 -subj "/CN=$sni" 2>/dev/null; then
+        show_error "生成证书失败！"
+        exit 1
+    fi
     chmod 600 "$CERTS_DIR/"{cert.pem,private.key}
     show_status "证书已生成到 ${lightpink}$CERTS_DIR${reset}"
 }
@@ -71,8 +93,8 @@ if [ -f "$CONFIG_PATH" ]; then
     current_port=$(jq -r '.inbounds[0].port' "$CONFIG_PATH" 2>/dev/null || echo "获取失败")
     current_sni=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // empty' "$CONFIG_PATH" 2>/dev/null || echo "未设置")
     current_security=$(jq -r '.inbounds[0].streamSettings.security // empty' "$CONFIG_PATH" 2>/dev/null || echo "none")
-    current_ipv4=$(curl -s4 ifconfig.co || echo "获取失败")
-    current_ipv6=$(curl -s6 ifconfig.co || echo "获取失败")
+    current_ipv4=$(curl -4 -s ifconfig.co || echo "获取失败")
+    current_ipv6=$(curl -6 -s ifconfig.co || echo "获取失败")
 
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${orange}                              📝 当前配置预览                                  ${reset}"
@@ -139,6 +161,35 @@ while true; do
     fi
 done
 
+# 传输协议配置
+echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+echo -e " ${lightpink}⇨ 请选择传输协议:${reset}"
+echo -e "  ${green}① TCP (默认)${reset}"
+echo -e "  ${green}② WebSocket (WS)${reset}"
+echo -e "  ${green}③ gRPC${reset}"
+echo -e "  ${green}④ HTTP/2 (H2)${reset}"
+read -p "$(echo -e " ${blue}请选择：${reset}")" transport_choice
+
+case $transport_choice in
+    1) network="tcp" ;;
+    2)
+        network="ws"
+        read -p "$(echo -e " ${lightpink}⇨ 请输入WebSocket路径 (默认/vless-ws): ${reset}")" path
+        path=${path:-/vless-ws}
+        ;;
+    3)
+        network="grpc"
+        read -p "$(echo -e " ${lightpink}⇨ 请输入gRPC服务名称 (默认grpc-service): ${reset}")" serviceName
+        serviceName=${serviceName:-grpc-service}
+        ;;
+    4)
+        network="h2"
+        read -p "$(echo -e " ${lightpink}⇨ 请输入HTTP/2路径 (默认/h2-path): ${reset}")" path
+        path=${path:-/h2-path}
+        ;;
+    *) network="tcp" ;;
+esac
+
 # 安全协议配置
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 echo -e " ${lightpink}⇨ 请选择传输安全协议:${reset}"
@@ -171,9 +222,8 @@ if [[ "$security" != "none" ]]; then
         public_key=$(echo "$reality_keys" | awk '/Public key:/ {print $3}')
         
         # 生成shortId
-        short_id=$(openssl rand -hex 8)
+        short_id=$(openssl rand -hex 4)
         
-        # 将公钥写入配置文件
         tls_config='"security": "reality",
         "realitySettings": {
           "dest": "'$dest_domain:$dest_port'",
@@ -193,33 +243,36 @@ if [[ "$security" != "none" ]]; then
                 generate_certs "$sni"
                 tls_config='"security": "tls",
         "tlsSettings": {
-          "serverName": "'$sni'",
+          "serverName": "'"$sni"'",
           "certificates": [
             {
-              "certificateFile": "'$CERTS_DIR/cert.pem'",
-              "keyFile": "'$CERTS_DIR/private.key'"
+              "certificateFile": "'"$CERTS_DIR/cert.pem"'",
+              "keyFile": "'"$CERTS_DIR/private.key"'"
             }
           ]
         }'
                 ;;
             2)
                 while true; do
-                    read -p "$(echo -e " ${lightpink}⇨ 请输入证书路径: ${reset}")" cert_path
-                    read -p "$(echo -e " ${lightpink}⇨ 请输入私钥路径: ${reset}")" key_path
-                    if [ -f "$cert_path" ] && [ -f "$key_path" ]; then
+                    read -p "$(echo -e " ${lightpink}⇨ 请输入证书文件绝对路径: ${reset}")" cert_path
+                    read -p "$(echo -e " ${lightpink}⇨ 请输入私钥文件绝对路径: ${reset}")" key_path
+                    cert_path="${cert_path/#\~/$HOME}"
+                    key_path="${key_path/#\~/$HOME}"
+                    if [[ -f "$cert_path" && -f "$key_path" ]]; then
                         tls_config='"security": "tls",
             "tlsSettings": {
-              "serverName": "'$sni'",
+              "serverName": "'"$sni"'",
               "certificates": [
                 {
-                  "certificateFile": "'$cert_path'",
-                  "keyFile": "'$key_path'"
+                  "certificateFile": "'"$cert_path"'",
+                  "keyFile": "'"$key_path"'"
                 }
               ]
             }'
                         break
                     else
-                        show_error "证书文件不存在，请重新输入"
+                        [[ ! -f "$cert_path" ]] && show_error "证书文件不存在：$cert_path"
+                        [[ ! -f "$key_path" ]] && show_error "私钥文件不存在：$key_path"
                     fi
                 done
                 ;;
@@ -228,65 +281,107 @@ if [[ "$security" != "none" ]]; then
                 generate_certs "$sni"
                 tls_config='"security": "tls",
         "tlsSettings": {
-          "serverName": "'$sni'",
+          "serverName": "'"$sni"'",
           "certificates": [
             {
-              "certificateFile": "'$CERTS_DIR/cert.pem'",
-              "keyFile": "'$CERTS_DIR/private.key'"
+              "certificateFile": "'"$CERTS_DIR/cert.pem"'",
+              "keyFile": "'"$CERTS_DIR/private.key"'"
             }
           ]
         }'
                 ;;
         esac
+
+        # Cloudflare 支持
+        if [[ "$security" == "tls" && "$network" == "ws" ]]; then
+            read -p "$(echo -e " ${lightpink}⇨ 是否用于Cloudflare隧道？(y/N): ${reset}")" use_cf
+            if [[ "$use_cf" =~ [Yy] ]]; then
+                tls_config=${tls_config/'"certificates"/'"alpn": ["http/1.1"],\n          "certificates"'}
+                show_status "已启用Cloudflare兼容模式 (ALPN: http/1.1)"
+            fi
+        fi
     fi
 else
     tls_config='"security": "none"'
 fi
 
 # 生成配置文件
-cat > "$CONFIG_PATH" <<EOF
-{
-  "inbounds": [
-    {
-      "port": $port,
-      "protocol": "vless",
-      "settings": {
-        "clients": [
-          {
-            "id": "$uuid",
-            "flow": "xtls-rprx-vision"
-          }
-        ],
-        "decryption": "none"
-      },
-      "streamSettings": {
-        "network": "tcp",
-        $tls_config
+config_json=$(jq -n \
+  --argjson port "$port" \
+  --arg uuid "$uuid" \
+  --arg sni "$sni" \
+  --arg security "$security" \
+  --arg network "$network" \
+  --arg path "$path" \
+  --arg serviceName "$serviceName" \
+  --arg dest_domain "$dest_domain" \
+  --argjson dest_port "$dest_port" \
+  --arg private_key "$private_key" \
+  --arg public_key "$public_key" \
+  --arg short_id "$short_id" \
+  --arg certFile "$( [[ "$security" == "tls" && "$tls_choice" == "2" ]] && echo "$cert_path" || echo "$CERTS_DIR/cert.pem" )" \
+  --arg keyFile "$( [[ "$security" == "tls" && "$tls_choice" == "2" ]] && echo "$key_path" || echo "$CERTS_DIR/private.key" )" \
+  '{
+    "inbounds": [
+      {
+        "port": $port,
+        "protocol": "vless",
+        "settings": {
+          "clients": [{ "id": $uuid, "flow": "xtls-rprx-vision" }],
+          "decryption": "none"
+        },
+        "streamSettings": (
+          if $security == "reality" then
+            {
+              "network": $network,
+              "security": $security,
+              "realitySettings": {
+                "dest": $dest_domain + ":" + ($dest_port | tostring),
+                "serverNames": [$sni],
+                "privateKey": $private_key,
+                "publicKey": $public_key,
+                "shortIds": [$short_id]
+              }
+            }
+          else
+            {
+              "network": $network,
+              "security": $security,
+              ($security + "Settings"): (if $security == "tls" then
+                {
+                  "serverName": $sni,
+                  "certificates": [
+                    {
+                      "certificateFile": $certFile,
+                      "keyFile": $keyFile
+                    }
+                  ]
+                }
+              else empty end)
+            }
+          end
+        ) + (
+          if $network == "ws" then { "wsSettings": { "path": $path } }
+          elif $network == "grpc" then { "grpcSettings": { "serviceName": $serviceName } }
+          elif $network == "h2" then { "httpSettings": { "path": $path, "host": [$sni] } }
+          else {} end
+        )
       }
-    }
-  ],
-  "outbounds": [
-    {
-      "protocol": "freedom",
-      "settings": {}
-    }
-  ]
-}
-EOF
+    ],
+    "outbounds": [{ "protocol": "freedom" }]
+  }')
 
-# 验证配置文件
-if ! jq empty "$CONFIG_PATH" &>/dev/null; then
-    echo -e "${red}❌ 生成的配置文件无效，请检查参数${reset}"
+# 验证并写入配置
+if ! jq empty <<< "$config_json" 2>/dev/null; then
+    show_error "生成的配置文件无效，请检查参数"
     exit 1
 fi
-
+echo "$config_json" | jq . > "$CONFIG_PATH"
 chmod 600 "$CONFIG_PATH"
-echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-show_status "配置文件已保存到: ${lightpink}$CONFIG_PATH${reset}"
 
 # 显示连接信息
-ipv4=$(curl -s4 ifconfig.co || echo "获取失败")
-ipv6=$(curl -s6 ifconfig.co || echo "获取失败")
+ipv4=$(curl -4 -s ifconfig.co || echo "获取失败")
+ipv6=$(curl -6 -s ifconfig.co || echo "获取失败")
 
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 echo -e "${orange}                              🔗 客户端连接信息                                  ${reset}"
@@ -294,20 +389,26 @@ echo -e "${cyan}╠════════════════════�
 echo -e " ${lightpink}服务器地址: ${reset}${green}$sni${reset}"
 echo -e " ${lightpink}连接端口:   ${reset}${green}$port${reset}"
 echo -e " ${lightpink}用户ID：    ${reset}${green}$uuid${reset}"
-echo -e " ${lightpink}传输协议:   ${reset}${green}tcp${reset}"
+echo -e " ${lightpink}传输协议:   ${reset}${green}$network${reset}"
 echo -e " ${lightpink}安全协议:   ${reset}${green}$security${reset}"
+
+if [[ "$network" == "ws" ]]; then
+    echo -e " ${lightpink}WS路径：    ${reset}${green}$path${reset}"
+elif [[ "$network" == "grpc" ]]; then
+    echo -e " ${lightpink}gRPC服务名: ${reset}${green}$serviceName${reset}"
+elif [[ "$network" == "h2" ]]; then
+    echo -e " ${lightpink}H2路径：    ${reset}${green}$path${reset}"
+fi
 
 if [[ "$security" == "reality" ]]; then
     echo -e " ${lightpink}公钥：      ${reset}${green}$public_key${reset}"
     echo -e " ${lightpink}Short ID:   ${reset}${green}$short_id${reset}"
+elif [[ "$security" == "tls" && "$tls_choice" == "1" ]]; then
+    echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
 fi
 
 echo -e " ${lightpink}公网IPv4:   ${reset}${green}$ipv4${reset}"
 echo -e " ${lightpink}公网IPv6:   ${reset}${green}$ipv6${reset}"
-
-if [[ $security != "none" && $security != "reality" ]]; then
-    echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
-fi
 
 footer
 read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
