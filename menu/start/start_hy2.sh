@@ -151,9 +151,23 @@ fi
 
 # 启动服务
 echo -e "${yellow}🔄 正在启动服务...${reset}"
-nohup /root/VPN/hysteria server --config "$CONFIG_PATH" > "$LOG_PATH" 2>&1 &
+echo -e "${cyan}程序路径: ${lightpink}/root/VPN/hysteria${reset}"
+echo -e "${cyan}配置文件路径: ${lightpink}$CONFIG_PATH${reset}"
+
+{
+    echo "=== 启动时间: $(date '+%Y-%m-%d %H:%M:%S') ==="
+    echo "启动命令: /root/VPN/hysteria server --config $CONFIG_PATH"
+    echo "工作目录: $(pwd)"
+    echo "环境变量:"
+    export
+    echo "----------------------------------------"
+    nohup /root/VPN/hysteria server --config "$CONFIG_PATH"
+} >> "$LOG_PATH" 2>&1 &
+
 echo $! > "$PID_PATH"
-sleep 1
+sleep 2
+
+
 
 # 状态检查
 if ps -p $(cat "$PID_PATH") >/dev/null; then
@@ -177,9 +191,7 @@ if ps -p $(cat "$PID_PATH") >/dev/null; then
     echo -e "🔵 本地端口: ${lightpink}$PORT${reset}"
     echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
     echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
-    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${yellow}📝 订阅文件已生成: ${lightpink}$SUB_FILE${reset}"
-    echo -e "${yellow}🔗 订阅链接内容已使用Base64编码${reset}"
 else
     echo -e "${red}❌ 启动失败! 查看日志: ${lightpink}$LOG_PATH${reset}"
     echo -e "${yellow}可能原因:"
@@ -187,6 +199,12 @@ else
     echo -e "  2. 证书配置错误"
     echo -e "  3. 内核参数限制"
     echo -e "  4. 内存不足${reset}"
+    
+    echo -e "\n${cyan}=== 日志最后10行 ===${reset}"
+    tail -n 10 "$LOG_PATH" | sed 's/^/  /'
+    
+    # 清理无效PID文件
+    [ -f "$PID_PATH" ] && rm -f "$PID_PATH"
 fi
 
 footer
