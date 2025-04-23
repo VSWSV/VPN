@@ -113,7 +113,7 @@ PORT=$(grep -A5 'ingress:' "$CONFIG_FILE" | grep -E 'http://[^:]+:([0-9]+)' | se
 # 检查是否已有进程（使用增强版检查）
 if is_tunnel_running; then
     PID=$(cat "$PID_FILE" 2>/dev/null || pgrep -f "$CLOUD_FLARED tunnel run")
-    echo -e "${yellow}⚠️ 隧道已在运行中 (主进程 PID: ${green}$PID${yellow})${reset}"
+    echo -e "${yellow}🟢 服务正在运行 (主进程 PID: ${green}$PID${yellow})${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📌 隧道信息:"
     echo -e "🔵 本地端口: ${lightpink}$PORT${reset}"
