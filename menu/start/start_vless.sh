@@ -1,8 +1,5 @@
 #!/bin/bash
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 clear
-
-
 # 颜色定义
 cyan="\033[1;36m"; green="\033[1;32m"; yellow="\033[1;33m"
 red="\033[1;31m"; orange="\033[38;5;208m"; white="\033[1;37m"; lightpink="\033[38;5;213m"; reset="\033[0m"
@@ -70,7 +67,7 @@ function get_ips() {
 function verify_config() {
     [ -f "$CONFIG_PATH" ] || { echo -e "${red}❌ 配置文件不存在于: $CONFIG_PATH${reset}"; return 1; }
     
-    if ! jq -e '.inbounds[0]' "$CONFIG_PATH" &>/dev/null; then
+    if ! /usr/bin/jq -e '.inbounds[0]' "$CONFIG_PATH" &>/dev/null; then
         echo -e "${red}❌ 配置文件格式错误${reset}"
         echo -e "${yellow}请检查配置文件: $CONFIG_PATH${reset}"
         return 1
@@ -78,7 +75,7 @@ function verify_config() {
     
     local required_fields=("port" "settings.clients[0].id")
     for field in "${required_fields[@]}"; do
-        if ! jq -e ".inbounds[0].${field}" "$CONFIG_PATH" &>/dev/null; then
+        if ! /usr/bin/jq -e ".inbounds[0].${field}" "$CONFIG_PATH" &>/dev/null; then
             echo -e "${red}❌ 配置缺少必要字段: $field${reset}"
             return 1
         fi
@@ -114,17 +111,17 @@ function generate_connection_links() {
 
     # 增强参数提取
     local PORT UUID SNI FLOW SECURITY NETWORK PUBLIC_KEY SHORT_ID PATH HOST SERVICE_NAME
-    PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
-    UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
-    SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
-    FLOW=$(jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
-    SECURITY=$(jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
-    NETWORK=$(jq -r '.inbounds[0].streamSettings.network // "tcp"' "$CONFIG_PATH")
-    PUBLIC_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.publicKey // empty' "$CONFIG_PATH")
-    SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0] // empty' "$CONFIG_PATH")
-    PATH=$(jq -r '.inbounds[0].streamSettings.wsSettings.path // empty' "$CONFIG_PATH")
-    HOST=$(jq -r '.inbounds[0].streamSettings.wsSettings.headers.Host // empty' "$CONFIG_PATH")
-    SERVICE_NAME=$(jq -r '.inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$CONFIG_PATH")
+    PORT=$(/usr/bin/jq -r '.inbounds[0].port' "$CONFIG_PATH")
+    UUID=$(/usr/bin/jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
+    SNI=$(/usr/bin/jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
+    FLOW=$(/usr/bin/jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
+    SECURITY=$(/usr/bin/jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
+    NETWORK=$(/usr/bin/jq -r '.inbounds[0].streamSettings.network // "tcp"' "$CONFIG_PATH")
+    PUBLIC_KEY=$(/usr/bin/jq -r '.inbounds[0].streamSettings.realitySettings.publicKey // empty' "$CONFIG_PATH")
+    SHORT_ID=$(/usr/bin/jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0] // empty' "$CONFIG_PATH")
+    PATH=$(/usr/bin/jq -r '.inbounds[0].streamSettings.wsSettings.path // empty' "$CONFIG_PATH")
+    HOST=$(/usr/bin/jq -r '.inbounds[0].streamSettings.wsSettings.headers.Host // empty' "$CONFIG_PATH")
+    SERVICE_NAME=$(/usr/bin/jq -r '.inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$CONFIG_PATH")
 
     # 构建基础参数
     local common_params="type=$NETWORK&encryption=none"
@@ -198,7 +195,7 @@ if [ -f "$PID_PATH" ] && ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     # 网络信息
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📶 网络信息:"
-    echo -e "🔵 监听端口: ${lightpink}$(jq -r '.inbounds[0].port' "$CONFIG_PATH")${reset}"
+    echo -e "🔵 监听端口: ${lightpink}$(/usr/bin/jq -r '.inbounds[0].port' "$CONFIG_PATH")${reset}"
     echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
     echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
     
@@ -215,10 +212,10 @@ if ! verify_config; then
 fi
 
 # 提取配置参数
-PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
-UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
-SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
-SECURITY=$(jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
+PORT=$(/usr/bin/jq -r '.inbounds[0].port' "$CONFIG_PATH")
+UUID=$(/usr/bin/jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
+SNI=$(/usr/bin/jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
+SECURITY=$(/usr/bin/jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
 
 # 获取双栈IP
 read -r ipv4 ipv6 <<< "$(get_ips)"
