@@ -3,15 +3,8 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 clear
 
 # 颜色定义
-cyan="\033[1;36m"
-blue="\033[1;34m"
-green="\033[1;32m"
-yellow="\033[1;33m"
-red="\033[1;31m"
-orange="\033[38;5;208m"
-lightpink="\033[38;5;213m"
-white="\033[1;37m"
-reset="\033[0m"
+cyan="\033[1;36m"; blue="\033[1;34m"; green="\033[1;32m"; yellow="\033[1;33m"
+red="\033[1;31m"; orange="\033[38;5;208m"; lightpink="\033[38;5;213m"; white="\033[1;37m"; reset="\033[0m"
 
 # 检查依赖
 if ! command -v jq &>/dev/null; then
@@ -30,7 +23,7 @@ trap "echo -e '\n${red}操作已取消！${reset}'; exit 1" SIGINT
 function header() {
     clear
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-    echo -e "${orange}                              🌈 多协议 VLESS 节点配置                         ${reset}"
+    echo -e "${orange}                              🌈 配置 VLESS 节点 (Ubuntu 22.04)                 ${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -226,6 +219,18 @@ case $security_choice in
     *) security="tls"; show_error "无效选择，默认使用TLS" ;;
 esac
 
+# 协议组合校验（核心修复点）
+if [[ "$network" != "tcp" && "$security" == "reality" ]]; then
+    show_error "错误: REALITY 仅支持 TCP 传输！"
+    exit 1
+elif [[ "$network" == "ws" && -n "$flow" ]]; then
+    show_error "错误: WebSocket 不能使用 flow 参数！"
+    exit 1
+elif [[ "$network" == "grpc" && -n "$flow" ]]; then
+    show_error "错误: gRPC 不能使用 flow 参数！"
+    exit 1
+fi
+
 # TLS/REALITY配置
 if [[ "$security" != "none" ]]; then
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
@@ -261,7 +266,6 @@ if [[ "$security" != "none" ]]; then
         echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
         echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
         echo -e "  ${green}② 使用现有证书${reset}"
-        echo -e "  ${green}③ Cloudflare隧道模式 (空证书)${reset}"
         read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
         case $tls_choice in
             1)
@@ -305,17 +309,6 @@ if [[ "$security" != "none" ]]; then
                     fi
                 done
                 ;;
-            3)
-                tls_settings="{
-                  \"security\": \"tls\",
-                  \"tlsSettings\": {
-                    \"serverName\": \"$sni\",
-                    \"alpn\": [\"http/1.1\"],
-                    \"certificates\": []
-                  }
-                }"
-                show_status "已启用Cloudflare隧道兼容模式"
-                ;;
             *)
                 show_error "无效选择，默认使用自签名证书"
                 generate_certs "$sni"
@@ -333,32 +326,31 @@ if [[ "$security" != "none" ]]; then
                 }"
                 ;;
         esac
+
+        # Cloudflare 支持
+        if [[ "$security" == "tls" && "$network" == "ws" ]]; then
+            read -p "$(echo -e " ${lightpink}⇨ 是否用于Cloudflare隧道？(y/N): ${reset}")" use_cf
+            if [[ "$use_cf" =~ [Yy] ]]; then
+                tls_settings=$(echo "$tls_settings" | sed 's/"certificates"/"alpn": ["http\/1.1"],\n      "certificates"/')
+                show_status "已启用Cloudflare兼容模式 (ALPN: http/1.1)"
+            fi
+        fi
     fi
 else
     tls_settings='"security": "none"'
 fi
 
-# 生成配置文件
+# 生成配置文件（严格模式）
 case $network in
     "ws")
-        if [[ "$security" == "none" ]]; then
-            stream_settings="{
-              \"network\": \"ws\",
-              \"wsSettings\": {
-                \"path\": \"${path:-/vless-ws}\",
-                \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
-              }
-            }"
-        else
-            stream_settings="{
-              \"network\": \"ws\",
-              $(echo "$tls_settings" | sed '1d;$d'),
-              \"wsSettings\": {
-                \"path\": \"${path:-/vless-ws}\",
-                \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
-              }
-            }"
-        fi
+        stream_settings="{
+          \"network\": \"ws\",
+          $(echo "$tls_settings" | sed '1d;$d'),
+          \"wsSettings\": {
+            \"path\": \"${path:-/vless-ws}\",
+            \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
+          }
+        }"
         ;;
     "grpc")
         stream_settings="{
@@ -382,7 +374,7 @@ case $network in
     *)
         stream_settings="{
           \"network\": \"tcp\",
-          $( [ "$security" != "none" ] && echo "$tls_settings" | sed '1d;$d' )
+          $tls_settings
         }"
         ;;
 esac
@@ -396,7 +388,8 @@ config_json="{
         \"clients\": [
           {
             \"id\": \"$uuid\",
-            \"flow\": \"xtls-rprx-vision\"
+            $([ "$network" == "tcp" ] && echo "\"flow\": \"xtls-rprx-vision\",")
+            \"level\": 0
           }
         ],
         \"decryption\": \"none\"
@@ -444,11 +437,6 @@ if [[ "$security" == "reality" ]]; then
     echo -e " ${lightpink}Short ID:   ${reset}${green}$short_id${reset}"
 elif [[ "$security" == "tls" && "$tls_choice" == "1" ]]; then
     echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
-elif [[ "$security" == "tls" && "$tls_choice" == "3" ]]; then
-    echo -e " ${lightpink}隧道提示:   ${yellow}Cloudflare需配置:${reset}"
-    echo -e "   - 转发到 ${green}localhost:$port${reset}"
-    echo -e "   - DNS解析到隧道"
-    echo -e "   - SSL/TLS模式设为 ${green}Full${reset}"
 fi
 
 echo -e " ${lightpink}公网IPv4:   ${reset}${green}$ipv4${reset}"
