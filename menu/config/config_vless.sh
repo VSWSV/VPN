@@ -180,6 +180,8 @@ case $transport_choice in
         network="ws"
         read -p "$(echo -e " ${lightpink}⇨ 请输入WebSocket路径 (默认/vless-ws): ${reset}")" path
         path=${path:-/vless-ws}
+        read -p "$(echo -e " ${lightpink}⇨ 请输入Host头 (留空自动使用SNI): ${reset}")" host
+        host=${host:-$sni}
         serviceName=""
         ;;
     3)
@@ -332,7 +334,7 @@ case $network in
           $(echo "$tls_settings" | sed '1d;$d'),
           \"wsSettings\": {
             \"path\": \"${path:-/vless-ws}\",
-            \"headers\": {}
+            \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
           }
         }"
         ;;
@@ -372,58 +374,12 @@ config_json="{
         \"clients\": [
           {
             \"id\": \"$uuid\",
-            \"flow\": \"$flow\"
+            \"flow\": \"xtls-rprx-vision\"
           }
         ],
         \"decryption\": \"none\"
       },
-      \"streamSettings\": {
-        \"network\": \"$network\",
-        $(if [[ "$security" != "none" ]]; then
-          echo "\"security\": \"$security\","
-          if [[ "$security" == "reality" ]]; then
-            echo "\"realitySettings\": {
-              \"serverNames\": [\"$sni\"],
-              \"dest\": \"$dest_domain:$dest_port\",
-              \"privateKey\": \"$private_key\",
-              \"publicKey\": \"$public_key\",
-              \"shortIds\": [\"$short_id\"]
-            },"
-          else
-            echo "\"tlsSettings\": {
-              \"serverName\": \"$sni\",
-              \"certificates\": [
-                {
-                  \"certificateFile\": \"$cert_path\",
-                  \"keyFile\": \"$key_path\"
-                }
-              ]
-            },"
-          fi
-        fi)
-        $(case "$network" in
-          "ws")
-            echo "\"wsSettings\": {
-              \"path\": \"${path:-/vless-ws}\",
-              \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
-            }"
-            ;;
-          "grpc")
-            echo "\"grpcSettings\": {
-              \"serviceName\": \"${serviceName:-grpc-service}\"
-            }"
-            ;;
-          "h2")
-            echo "\"httpSettings\": {
-              \"path\": \"${path:-/h2-path}\",
-              \"host\": [\"$sni\"]
-            }"
-            ;;
-          *)
-            echo "\"tcpSettings\": {}"
-            ;;
-        esac)
-      }
+      \"streamSettings\": $stream_settings
     }
   ],
   \"outbounds\": [
@@ -432,7 +388,7 @@ config_json="{
       \"settings\": {}
     }
   ]
-}
+}"
 
 # 验证并写入配置
 if ! jq -e . >/dev/null 2>&1 <<<"$config_json"; then
