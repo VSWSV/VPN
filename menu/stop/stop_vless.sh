@@ -34,7 +34,7 @@ fi
 
 # 检查PID文件是否存在
 if [ ! -f "$PID_FILE" ]; then
-    echo -e "${yellow}⚠️  未找到PID文件，尝试通过进程匹配...${reset}"
+    echo -e "${yellow}⚠️ 未找到PID文件，尝试通过进程匹配...${reset}"
     VLESS_PIDS=($(pgrep -f "$PROCESS_NAME"))
     if [ ${#VLESS_PIDS[@]} -eq 0 ]; then
         echo -e "${green}✅ 未找到运行中的VLESS进程${reset}"
