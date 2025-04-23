@@ -22,7 +22,7 @@ trap "echo -e '\n${red}操作已取消！${reset}'; exit 1" SIGINT
 function header() {
     clear
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-    echo -e "${orange}                              🌈 配置 VLESS 节点 (Ubuntu 22.04)                 ${reset}"
+    echo -e "${orange}                              🌈 多协议 VLESS 节点配置                         ${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -35,7 +35,7 @@ function show_status() {
 }
 
 function show_error() {
-    echo -e "${red}✖ ${1}${reset}" | awk '{printf "%-60s %s\n", $0, ""}'
+    echo -e "${red}✖ ${1}${reset}" | awk '{printf "%-60s %s\n', $0, ""}'
 }
 
 function validate_input() {
@@ -253,6 +253,7 @@ if [[ "$security" != "none" ]]; then
         echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
         echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
         echo -e "  ${green}② 使用现有证书${reset}"
+        echo -e "  ${green}③ Cloudflare隧道模式 (空证书)${reset}"
         read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
         case $tls_choice in
             1)
@@ -296,6 +297,17 @@ if [[ "$security" != "none" ]]; then
                     fi
                 done
                 ;;
+            3)
+                tls_settings="{
+                  \"security\": \"tls\",
+                  \"tlsSettings\": {
+                    \"serverName\": \"$sni\",
+                    \"alpn\": [\"http/1.1\"],
+                    \"certificates\": []
+                  }
+                }"
+                show_status "已启用Cloudflare隧道兼容模式"
+                ;;
             *)
                 show_error "无效选择，默认使用自签名证书"
                 generate_certs "$sni"
@@ -313,18 +325,9 @@ if [[ "$security" != "none" ]]; then
                 }"
                 ;;
         esac
-
-        # Cloudflare 支持
-        if [[ "$security" == "tls" && "$network" == "ws" ]]; then
-            read -p "$(echo -e " ${lightpink}⇨ 是否用于Cloudflare隧道？(y/N): ${reset}")" use_cf
-            if [[ "$use_cf" =~ [Yy] ]]; then
-                tls_settings=$(echo "$tls_settings" | sed 's/"certificates"/"alpn": ["http\/1.1"],\n      "certificates"/')
-                show_status "已启用Cloudflare兼容模式 (ALPN: http/1.1)"
-            fi
-        fi
     fi
 else
-    tls_settings="\"security\": \"none\""
+    tls_settings='"security": "none"'
 fi
 
 # 生成配置文件
@@ -433,6 +436,11 @@ if [[ "$security" == "reality" ]]; then
     echo -e " ${lightpink}Short ID:   ${reset}${green}$short_id${reset}"
 elif [[ "$security" == "tls" && "$tls_choice" == "1" ]]; then
     echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
+elif [[ "$security" == "tls" && "$tls_choice" == "3" ]]; then
+    echo -e " ${lightpink}隧道提示:   ${yellow}Cloudflare需配置:${reset}"
+    echo -e "   - 转发到 ${green}localhost:$port${reset}"
+    echo -e "   - DNS解析到隧道"
+    echo -e "   - SSL/TLS模式设为 ${green}Full${reset}"
 fi
 
 echo -e " ${lightpink}公网IPv4:   ${reset}${green}$ipv4${reset}"
