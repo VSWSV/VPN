@@ -324,20 +324,30 @@ if [[ "$security" != "none" ]]; then
         fi
     fi
 else
-    tls_settings='"security": "none"'
+    tls_settings="\"security\": \"none\""
 fi
 
 # 生成配置文件
 case $network in
     "ws")
-        stream_settings="{
-          \"network\": \"ws\",
-          $(echo "$tls_settings" | sed '1d;$d'),
-          \"wsSettings\": {
-            \"path\": \"${path:-/vless-ws}\",
-            \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
-          }
-        }"
+        if [[ "$security" == "none" ]]; then
+            stream_settings="{
+              \"network\": \"ws\",
+              \"wsSettings\": {
+                \"path\": \"${path:-/vless-ws}\",
+                \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
+              }
+            }"
+        else
+            stream_settings="{
+              \"network\": \"ws\",
+              $(echo "$tls_settings" | sed '1d;$d'),
+              \"wsSettings\": {
+                \"path\": \"${path:-/vless-ws}\",
+                \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
+              }
+            }"
+        fi
         ;;
     "grpc")
         stream_settings="{
