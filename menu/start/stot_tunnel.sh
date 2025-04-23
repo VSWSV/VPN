@@ -25,7 +25,7 @@ verify_config() {
         echo -e "${red}❌ 缺少认证凭证文件: $CREDENTIALS_FILE"; return 1;
     fi
 
-    grep -q '^tunnel:' "$CONFIG_FILE" || { echo -e "${red}❌ 配置中缺少 tunnel 字段"; return 1; }
+    grep -q '^tunnel:' "$CONFIG_FILE" || { echo -e "${red}❌ 配置缺少必要字段"; return 1; }
 
     PORT=$(grep -A5 'ingress:' "$CONFIG_FILE" | grep -E 'http://[^:]+:([0-9]+)' | sed -E 's|.*:([0-9]+).*|\1|' | head -1)
     [ -z "$PORT" ] && PORT="未配置"
