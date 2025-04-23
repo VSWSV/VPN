@@ -12,6 +12,7 @@ CONFIG_FILE="$CLOUDFLARED_DIR/config.yml"
 LOG_FILE="$CLOUDFLARED_DIR/tunnel.log"
 CLOUD_FLARED="/root/VPN/cloudflared"
 PID_FILE="/root/VPN/pids/cloudflared.pid"
+LOCK_FILE="/tmp/cloudflared.lock"
 
 mkdir -p /root/VPN/pids
 
@@ -51,10 +52,47 @@ info() { echo -e "${yellow}🔹 $1${reset}"; }
 success() { echo -e "${lightpink}✅ $1${reset}"; }
 error() { echo -e "${red}❌ $1${reset}"; }
 
+# 检查进程是否真正运行
+is_tunnel_running() {
+    # 检查PID文件是否存在且进程存活
+    if [ -f "$PID_FILE" ]; then
+        local pid=$(cat "$PID_FILE")
+        if ps -p "$pid" >/dev/null 2>&1; then
+            # 进一步验证是否是cloudflared进程
+            if grep -q "$CLOUD_FLARED" /proc/$pid/cmdline 2>/dev/null; then
+                return 0
+            fi
+        fi
+    fi
+    
+    # 检查锁文件是否存在
+    if [ -f "$LOCK_FILE" ]; then
+        local lock_pid=$(cat "$LOCK_FILE")
+        if ps -p "$lock_pid" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
 # 杀掉已有进程
 kill_tunnel() {
+    # 杀死通过PID文件记录的进程
+    if [ -f "$PID_FILE" ]; then
+        local pid=$(cat "$PID_FILE")
+        kill "$pid" 2>/dev/null && sleep 1
+        if ps -p "$pid" >/dev/null 2>&1; then
+            kill -9 "$pid" 2>/dev/null
+        fi
+    fi
+    
+    # 杀死所有可能的残留进程
     pkill -f "$CLOUD_FLARED tunnel run" && sleep 1
     pgrep -f "$CLOUD_FLARED tunnel run" >/dev/null && pkill -9 -f "$CLOUD_FLARED tunnel run"
+    
+    # 清理锁文件
+    [ -f "$LOCK_FILE" ] && rm -f "$LOCK_FILE"
 }
 
 # 主逻辑开始
@@ -72,10 +110,9 @@ TUNNEL_ID=$(get_tunnel_id)
 PORT=$(grep -A5 'ingress:' "$CONFIG_FILE" | grep -E 'http://[^:]+:([0-9]+)' | sed -E 's|.*:([0-9]+).*|\1|' | head -1)
 [ -z "$PORT" ] && PORT="未配置"
 
-# 检查是否已有进程
-if pgrep -f "$CLOUD_FLARED tunnel run" >/dev/null; then
-    PID=$(pgrep -f "$CLOUD_FLARED tunnel run")
-    echo "$PID" > "$PID_FILE"
+# 检查是否已有进程（使用增强版检查）
+if is_tunnel_running; then
+    PID=$(cat "$PID_FILE" 2>/dev/null || pgrep -f "$CLOUD_FLARED tunnel run")
     echo -e "${yellow}⚠️ 隧道已在运行中 (主进程 PID: ${green}$PID${yellow})${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📌 隧道信息:"
@@ -89,19 +126,23 @@ if pgrep -f "$CLOUD_FLARED tunnel run" >/dev/null; then
     exit 0
 fi
 
-# 无进程时清理旧的
+# 清理旧的进程和文件
 kill_tunnel >/dev/null 2>&1
 
-# 启动服务（已修复 ✅）
+# 创建锁文件防止重复启动
+echo $$ > "$LOCK_FILE"
+
+# 启动服务
 info "正在启动隧道: ${green}$TUNNEL_ID${reset}"
 nohup "$CLOUD_FLARED" tunnel --config "$CONFIG_FILE" run "$TUNNEL_ID" > "$LOG_FILE" 2>&1 &
-echo $! > "$PID_FILE"
+TUNNEL_PID=$!
+echo "$TUNNEL_PID" > "$PID_FILE"
 
+# 等待启动结果
 sleep 5
 
-if pgrep -f "$CLOUD_FLARED tunnel" >/dev/null; then
-    PID=$(pgrep -f "$CLOUD_FLARED tunnel")
-    success "隧道启动成功! (主进程 PID: ${green}$PID${reset})"
+if is_tunnel_running; then
+    success "隧道启动成功! (主进程 PID: ${green}$TUNNEL_PID${reset})"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📌 隧道信息:"
     echo -e "🔵 本地端口: ${lightpink}$PORT${reset}"
@@ -133,7 +174,13 @@ else
 
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${lightpink}🔍 查看日志：${green}tail -n 20 $LOG_FILE${reset}"
+    
+    # 清理失败的启动
+    kill_tunnel >/dev/null 2>&1
 fi
+
+# 移除锁文件
+[ -f "$LOCK_FILE" ] && rm -f "$LOCK_FILE"
 
 footer
 read -p "$(echo -e "${cyan}按任意键返回...${reset}")" -n 1
