@@ -372,12 +372,58 @@ config_json="{
         \"clients\": [
           {
             \"id\": \"$uuid\",
-            \"flow\": \"xtls-rprx-vision\"
+            \"flow\": \"$flow\"
           }
         ],
         \"decryption\": \"none\"
       },
-      \"streamSettings\": $stream_settings
+      \"streamSettings\": {
+        \"network\": \"$network\",
+        $(if [[ "$security" != "none" ]]; then
+          echo "\"security\": \"$security\","
+          if [[ "$security" == "reality" ]]; then
+            echo "\"realitySettings\": {
+              \"serverNames\": [\"$sni\"],
+              \"dest\": \"$dest_domain:$dest_port\",
+              \"privateKey\": \"$private_key\",
+              \"publicKey\": \"$public_key\",
+              \"shortIds\": [\"$short_id\"]
+            },"
+          else
+            echo "\"tlsSettings\": {
+              \"serverName\": \"$sni\",
+              \"certificates\": [
+                {
+                  \"certificateFile\": \"$cert_path\",
+                  \"keyFile\": \"$key_path\"
+                }
+              ]
+            },"
+          fi
+        fi)
+        $(case "$network" in
+          "ws")
+            echo "\"wsSettings\": {
+              \"path\": \"${path:-/vless-ws}\",
+              \"headers\": {$( [ -n "$host" ] && echo "\"Host\": \"$host\"")}
+            }"
+            ;;
+          "grpc")
+            echo "\"grpcSettings\": {
+              \"serviceName\": \"${serviceName:-grpc-service}\"
+            }"
+            ;;
+          "h2")
+            echo "\"httpSettings\": {
+              \"path\": \"${path:-/h2-path}\",
+              \"host\": [\"$sni\"]
+            }"
+            ;;
+          *)
+            echo "\"tcpSettings\": {}"
+            ;;
+        esac)
+      }
     }
   ],
   \"outbounds\": [
@@ -386,7 +432,7 @@ config_json="{
       \"settings\": {}
     }
   ]
-}"
+}
 
 # 验证并写入配置
 if ! jq -e . >/dev/null 2>&1 <<<"$config_json"; then
