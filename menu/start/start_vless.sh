@@ -114,17 +114,24 @@ function generate_connection_links() {
     PORT=$(/usr/bin/jq -r '.inbounds[0].port' "$CONFIG_PATH")
     UUID=$(/usr/bin/jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
     SNI=$(/usr/bin/jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
-    FLOW=$(/usr/bin/jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
     SECURITY=$(/usr/bin/jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
     NETWORK=$(/usr/bin/jq -r '.inbounds[0].streamSettings.network // "tcp"' "$CONFIG_PATH")
+    
+    # 仅TCP协议使用flow
+    if [[ "$NETWORK" == "tcp" ]]; then
+        FLOW=$(/usr/bin/jq -r '.inbounds[0].settings.clients[0].flow // empty' "$CONFIG_PATH")
+    else
+        FLOW=""
+    fi
+
     PUBLIC_KEY=$(/usr/bin/jq -r '.inbounds[0].streamSettings.realitySettings.publicKey // empty' "$CONFIG_PATH")
     SHORT_ID=$(/usr/bin/jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0] // empty' "$CONFIG_PATH")
     PATH=$(/usr/bin/jq -r '.inbounds[0].streamSettings.wsSettings.path // empty' "$CONFIG_PATH")
     HOST=$(/usr/bin/jq -r '.inbounds[0].streamSettings.wsSettings.headers.Host // empty' "$CONFIG_PATH")
     SERVICE_NAME=$(/usr/bin/jq -r '.inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$CONFIG_PATH")
 
-    # 构建基础参数
-    local common_params="type=$NETWORK&encryption=none"
+    # 构建基础参数（强制跳过证书验证）
+    local common_params="type=$NETWORK&encryption=none&allowInsecure=true"
     [ -n "$FLOW" ] && common_params+="&flow=$FLOW"
 
     # 安全参数
