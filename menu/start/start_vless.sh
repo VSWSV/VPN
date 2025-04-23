@@ -1,5 +1,7 @@
 #!/bin/bash
 clear
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
 # 颜色定义
 cyan="\033[1;36m"; green="\033[1;32m"; yellow="\033[1;33m"
 red="\033[1;31m"; orange="\033[38;5;208m"; white="\033[1;37m"; lightpink="\033[38;5;213m"; reset="\033[0m"
