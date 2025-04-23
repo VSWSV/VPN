@@ -109,57 +109,64 @@ function config_prompt() {
 function generate_connection_links() {
     local ipv4=$1 ipv6=$2
 
-    # 从配置文件读取参数
-    local PORT UUID SNI FLOW SECURITY PUBLIC_KEY SHORT_ID DEST
+    # 从配置文件读取参数（增强提取逻辑）
+    local PORT UUID SNI FLOW SECURITY NETWORK PUBLIC_KEY SHORT_ID PATH HOST SERVICE_NAME
     PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
     UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
     SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
     FLOW=$(jq -r '.inbounds[0].settings.clients[0].flow // "xtls-rprx-vision"' "$CONFIG_PATH")
     SECURITY=$(jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
+    NETWORK=$(jq -r '.inbounds[0].streamSettings.network // "tcp"' "$CONFIG_PATH")
     PUBLIC_KEY=$(jq -r '.inbounds[0].streamSettings.realitySettings.publicKey // empty' "$CONFIG_PATH")
     SHORT_ID=$(jq -r '.inbounds[0].streamSettings.realitySettings.shortIds[0] // empty' "$CONFIG_PATH")
-    DEST=$(jq -r '.inbounds[0].streamSettings.realitySettings.dest // empty' "$CONFIG_PATH")
+    PATH=$(jq -r '.inbounds[0].streamSettings.wsSettings.path // empty' "$CONFIG_PATH")
+    HOST=$(jq -r '.inbounds[0].streamSettings.wsSettings.headers.Host // empty' "$CONFIG_PATH")
+    SERVICE_NAME=$(jq -r '.inbounds[0].streamSettings.grpcSettings.serviceName // empty' "$CONFIG_PATH")
 
-    local common_params="type=tcp&flow=$FLOW"
+    # 构建基础参数
+    local common_params="type=$NETWORK&encryption=none"
+    [ -n "$FLOW" ] && common_params+="&flow=$FLOW"
 
-    # 1. 域名连接
-    if [ -n "$SNI" ]; then
-        echo -e "${green}🌐 域名直连:${reset}"
-        if [[ "$SECURITY" == "reality" ]]; then
-            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-域名转发"
-        else
-            echo "vless://${UUID}@${SNI}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-域名转发"
-        fi
-        echo ""
-    fi
+    # 添加安全参数
+    case "$SECURITY" in
+        "tls")
+            common_params+="&security=tls&sni=$SNI&fp=chrome"
+            [ "$NETWORK" == "h2" ] && common_params+="&alpn=h2"
+            ;;
+        "reality")
+            common_params+="&security=reality&sni=$SNI&pbk=$PUBLIC_KEY&sid=$SHORT_ID&fp=chrome"
+            ;;
+    esac
 
-    # 2. IPv4连接
-    if [[ "$ipv4" != "未检测到" ]]; then
-        echo -e "${green}📡 IPv4直连:${reset}"
-        if [[ "$SECURITY" == "reality" ]]; then
-            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-IPv4直连"
-        else
-            echo "vless://${UUID}@${ipv4}:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-IPv4直连"
-        fi
-        echo ""
-    else
-        echo -e "${red}⚠️ IPv4地址未检测到${reset}"
-    fi
+    # 添加传输协议参数
+    case "$NETWORK" in
+        "ws")
+            [ -n "$PATH" ] && common_params+="&path=${PATH//\//%2F}"
+            [ -n "$HOST" ] && common_params+="&host=$HOST"
+            ;;
+        "grpc")
+            [ -n "$SERVICE_NAME" ] && common_params+="&mode=gun&serviceName=${SERVICE_NAME//\//%2F}"
+            ;;
+        "h2")
+            [ -n "$PATH" ] && common_params+="&path=${PATH//\//%2F}"
+            [ -n "$SNI" ] && common_params+="&host=$SNI"
+            ;;
+    esac
 
-    # 3. IPv6连接
-    if [[ "$ipv6" != "未检测到" ]]; then
-        echo -e "${green}📶 IPv6直连:${reset}"
-        if [[ "$SECURITY" == "reality" ]]; then
-            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=reality&sni=${SNI}&pbk=${PUBLIC_KEY}&sid=${SHORT_ID}&fp=chrome&spx=%2F#VES-IPv6直连"
-        else
-            echo "vless://${UUID}@[${ipv6}]:${PORT}?$common_params&security=$SECURITY&sni=${SNI}#VES-IPv6直连"
-        fi
-        echo ""
-    else
-        echo -e "${red}⚠️ IPv6地址未检测到${reset}"
-    fi
+    # 生成链接
+    generate_link "域名" "$SNI" "$PORT" "$common_params"
+    [ "$ipv4" != "未检测到" ] && generate_link "IPv4" "$ipv4" "$PORT" "$common_params"
+    [ "$ipv6" != "未检测到" ] && generate_link "IPv6" "[$ipv6]" "$PORT" "$common_params"
 }
 
+function generate_link() {
+    local type=$1 host=$2 port=$3 params=$4
+    local remark="VES-$type"
+    
+    echo -e "${green}🌐 $type连接:${reset}"
+    echo "vless://${UUID}@${host}:${port}?${params}#${remark}"
+    echo ""
+}
 # 主流程
 header
 
