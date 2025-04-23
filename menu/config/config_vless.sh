@@ -361,7 +361,7 @@ case $network in
     *)
         stream_settings="{
           \"network\": \"tcp\",
-          $tls_settings
+          $( [ "$security" != "none" ] && echo "$tls_settings" | sed '1d;$d' )
         }"
         ;;
 esac
