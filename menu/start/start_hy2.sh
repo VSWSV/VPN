@@ -31,7 +31,7 @@ function get_ips() {
 
 function verify_config() {
     [ -f "$CONFIG_PATH" ] || { echo -e "${red}❌ 配置文件不存在"; return 1; }
-    grep -q "password:" "$CONFIG_PATH" || { echo -e "${red}❌ 配置缺少password字段"; return 1; }
+    grep -q "password:" "$CONFIG_PATH" || { echo -e "${red}❌ 配置缺少必要字段"; return 1; }
     return 0
 }
 
