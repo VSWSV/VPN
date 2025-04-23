@@ -144,7 +144,7 @@ read -r ipv4 ipv6 <<< "$(get_ips)"
 if ss -tulnp | grep -q ":$PORT "; then
     echo -e "${red}❌ 端口 $PORT 已被其他程序占用${reset}"
     footer
-    read -p "$(echo -e "${white}按任意键返回...${reset}")" -n 1
+    read -p "$(echo -e "$cyan}按任意键返回...${reset}")" -n 1
     bash /root/VPN/menu/start_service.sh
     exit 1
 fi
