@@ -79,7 +79,6 @@ for PID in "${PIDS[@]}"; do
         fi
     fi
 
-    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 done
 
 pkill -f cloudflared
