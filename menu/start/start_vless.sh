@@ -109,7 +109,7 @@ function config_prompt() {
 function generate_connection_links() {
     local ipv4=$1 ipv6=$2
 
-    # 从配置文件读取参数（增强提取逻辑）
+    # 增强参数提取
     local PORT UUID SNI FLOW SECURITY NETWORK PUBLIC_KEY SHORT_ID PATH HOST SERVICE_NAME
     PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
     UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
@@ -127,7 +127,7 @@ function generate_connection_links() {
     local common_params="type=$NETWORK&encryption=none"
     [ -n "$FLOW" ] && common_params+="&flow=$FLOW"
 
-    # 添加安全参数
+    # 安全参数
     case "$SECURITY" in
         "tls")
             common_params+="&security=tls&sni=$SNI&fp=chrome"
@@ -138,7 +138,7 @@ function generate_connection_links() {
             ;;
     esac
 
-    # 添加传输协议参数
+    # 传输协议参数
     case "$NETWORK" in
         "ws")
             [ -n "$PATH" ] && common_params+="&path=${PATH//\//%2F}"
@@ -167,6 +167,7 @@ function generate_link() {
     echo "vless://${UUID}@${host}:${port}?${params}#${remark}"
     echo ""
 }
+
 # 主流程
 header
 
@@ -181,12 +182,6 @@ fi
 
 # 检查是否已在运行
 if [ -f "$PID_PATH" ] && ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
-    # 提取配置参数
-    PORT=$(jq -r '.inbounds[0].port' "$CONFIG_PATH")
-    UUID=$(jq -r '.inbounds[0].settings.clients[0].id' "$CONFIG_PATH")
-    SNI=$(jq -r '.inbounds[0].streamSettings.tlsSettings.serverName // .inbounds[0].streamSettings.realitySettings.serverNames[0] // empty' "$CONFIG_PATH")
-    SECURITY=$(jq -r '.inbounds[0].streamSettings.security // "none"' "$CONFIG_PATH")
-    
     # 获取双栈IP
     read -r ipv4 ipv6 <<< "$(get_ips)"
     
@@ -200,7 +195,7 @@ if [ -f "$PID_PATH" ] && ps -p "$(cat "$PID_PATH")" >/dev/null 2>&1; then
     # 网络信息
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${green}📶 网络信息:"
-    echo -e "🔵 监听端口: ${lightpink}$PORT${reset}"
+    echo -e "🔵 监听端口: ${lightpink}$(jq -r '.inbounds[0].port' "$CONFIG_PATH")${reset}"
     echo -e "${green}IPv4: ${lightpink}$ipv4${reset}"
     echo -e "${green}IPv6: ${lightpink}$ipv6${reset}"
     
