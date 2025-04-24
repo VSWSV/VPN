@@ -108,7 +108,7 @@ while true; do
       fi
     fi
 
-    # ⛔ 删除 config.yml 中所有匹配当前 full_domain 的配置段
+    # 删除旧配置段中所有 hostname 匹配的条目
 awk -v host="$full_domain" '
   BEGIN { skip = 0 }
   /^  - hostname:/ {
@@ -119,17 +119,17 @@ awk -v host="$full_domain" '
   skip == 0 { print }
 ' "$CONFIG_YML" > "$CONFIG_YML.tmp"
 
+# 将结果写回 config.yml
 mv "$CONFIG_YML.tmp" "$CONFIG_YML"
 
-# ✏️ 插入本次新配置（放在 404 之前）
-sed -i '/http_status:404/i \
-  - hostname: '"$full_domain"'
-    service: '"${proto}://localhost:$port"'' "$CONFIG_YML"
+# 生成临时条目块文件
+echo "  - hostname: $full_domain" >> "$CONFIG_YML"
+echo "    service: ${proto}://localhost:$port" >> "$CONFIG_YML"
 
-# 如果是 https，则追加 TLS 验证配置
+# 如果是 HTTPS，添加 noTLSVerify 部分
 if [[ "$proto" == "https" ]]; then
-  sed -i "/service: https:\/\/localhost:$port/a \    originRequest:
-      noTLSVerify: $skip_tls" "$CONFIG_YML"
+  echo "    originRequest:" >> "$CONFIG_YML"
+  echo "      noTLSVerify: $skip_tls" >> "$CONFIG_YML"
 fi
 
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
