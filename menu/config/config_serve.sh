@@ -1,7 +1,6 @@
 #!/bin/bash
 clear
 
-# 颜色定义
 green="\033[1;32m"   
 yellow="\033[1;33m" 
 red="\033[1;31m"  
@@ -11,11 +10,9 @@ soft_pink="\033[38;5;218m"
 orange="\033[38;5;214m"   
 reset="\033[0m"      
 
-# 文件路径
 CONFIG_INFO="/root/.cloudflared/config_info.txt"
 CONFIG_YML="/root/.cloudflared/config.yml"
 
-# 显示标题函数
 show_top_title() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
   echo -e "                                   ${orange}📡 隧道服务${reset}"
@@ -28,7 +25,6 @@ show_bottom_line() {
 
 show_top_title
 
-# 1. 配置文件检查
 if [[ ! -f "$CONFIG_INFO" || ! -f "$CONFIG_YML" ]]; then
   echo -e "${red}❌ 错误：缺少必要的配置文件${reset}"
   echo -e "${yellow}请确保以下文件存在："
@@ -40,14 +36,12 @@ if [[ ! -f "$CONFIG_INFO" || ! -f "$CONFIG_YML" ]]; then
   exit 1
 fi
 
-# 2. 获取配置信息
 CF_API_TOKEN=$(grep "API令牌" "$CONFIG_INFO" | awk -F '：' '{print $2}' | tr -d '\r')
 if [[ -z "$CF_API_TOKEN" ]]; then
   echo -e "${red}❌ 错误：未找到有效的Cloudflare API令牌${reset}"
   exit 1
 fi
 
-# 3. 验证Cloudflare Token
 verify_result=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
   -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
 
@@ -58,12 +52,10 @@ if ! echo "$verify_result" | grep -q '"success":true'; then
 fi
 echo -e "${green}✅ Cloudflare Token验证成功${reset}"
 
-# 4. 获取域名和隧道信息
 DOMAIN=$(grep "顶级域名" "$CONFIG_INFO" | awk -F '：' '{print $2}' | tr -d '\r')
 TUNNEL_ID=$(grep "隧道ID" "$CONFIG_INFO" | awk -F '：' '{print $2}' | tr -d '\r')
 TUNNEL_DOMAIN="${TUNNEL_ID}.cfargotunnel.com"
 
-# 5. 获取Zone ID
 zone_response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN" \
   -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
 
@@ -74,7 +66,6 @@ if [[ -z "$ZONE_ID" ]]; then
   exit 1
 fi
 
-# 6. 读取现有配置
 declare -a existing_keys=()
 while read -r line; do
   [[ $line =~ hostname ]] && h=$(echo "$line" | awk -F ': ' '{print $2}' | tr -d '\r')
@@ -83,7 +74,6 @@ while read -r line; do
   [[ $h && $s ]] && key="${h}|${s}|${t}" && existing_keys+=("$key") && h="" && s="" && t=""
 done < "$CONFIG_YML"
 
-# 7. 主配置循环
 declare -a result_lines=()
 while true; do
   echo -e "\n${yellow}请选择服务协议类型：${reset}"
@@ -100,7 +90,6 @@ while true; do
   done
   echo -e "${soft_pink}🔹 输入为: ${green}${proto^^}${reset}"
 
-  # 子域前缀输入验证
   while true; do
     read -p "🧩 请输入子域前缀: " prefix
     prefix=$(echo "$prefix" | tr 'A-Z' 'a-z' | tr -d ' ')
@@ -111,7 +100,7 @@ while true; do
       echo -e "${red}❌ 错误：子域前缀只能包含小写字母、数字和连字符(-)${reset}"
     else
       full_domain="$prefix.$DOMAIN"
-      # 检查是否已存在相同域名的配置
+
       if printf '%s\n' "${existing_keys[@]}" | grep -q "^$full_domain|"; then
         echo -e "${red}❌ 错误：该域名($full_domain)已存在配置，请使用其他前缀${reset}"
       else
@@ -121,7 +110,6 @@ while true; do
     fi
   done
 
-  # 端口输入验证
   while true; do
     read -p "🔢 请输入服务监听端口 (1-65535): " port
     if [[ ! "$port" =~ ^[0-9]+$ ]] || ((port < 1 || port > 65535)); then
@@ -132,7 +120,6 @@ while true; do
     fi
   done
 
-  # HTTPS额外选项
   skip_tls="false"
   if [[ "$proto" == "https" ]]; then
     while true; do
@@ -151,13 +138,11 @@ while true; do
 
   echo -e "\n${yellow}▶ 正在处理 $full_domain ...${reset}"
 
-  # 检查现有DNS记录
   record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$full_domain&type=$dns_type" \
     -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
 
   record_ids=$(echo "$record_info" | grep -o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')
 
-  # 处理已存在记录
   if [[ -n "$record_ids" ]]; then
     echo -e "${yellow}⚠️ 发现已存在的DNS记录：$full_domain${reset}"
     while true; do
@@ -189,15 +174,12 @@ while true; do
     done
   fi
 
-  # 创建临时文件
   TMP_FILE=$(mktemp)
   
-  # 更新配置文件
   {
-    # 保留文件头部
+
     sed -n '1,/^ingress:/p' "$CONFIG_YML"
     
-    # 添加新配置（直接跟在ingress:下方，后面加空行）
     echo "  - hostname: $full_domain"
     echo "    service: ${proto}://localhost:$port"
     if [[ "$proto" == "https" ]]; then
@@ -206,11 +188,9 @@ while true; do
     fi
     echo ""
     
-    # 保留原有配置（跳过开头的ingress:行）
     sed -n '/^ingress:/{n;:a;p;n;ba}' "$CONFIG_YML"
   } > "$TMP_FILE"
 
-  # 验证并替换配置文件
   if ! grep -q "hostname: $full_domain" "$TMP_FILE"; then
     echo -e "${red}❌ 错误：配置文件更新验证失败${reset}"
     exit 1
@@ -223,7 +203,6 @@ while true; do
     exit 1
   fi
 
-  # 创建DNS记录
   dns_data="{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}"
   dns_response=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
     -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
@@ -243,10 +222,8 @@ while true; do
     exit 1
   fi
 
-  # 添加到现有配置检查列表
   existing_keys+=("$key")
 
-  # 询问是否继续
   while true; do
     read -p "$(echo -e "➕ 是否继续添加其他服务？(${green}Y${reset}/${red}N${reset}): ")" cont
     case "$cont" in
@@ -259,7 +236,7 @@ done
 
   echo -e "\n${yellow}📋 本次添加的服务记录：${reset}"
   echo -e "${yellow}🛠️ 如需手动编辑，可使用命令: ${green}nano $CONFIG_YML${reset}"
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 
 for line in "${result_lines[@]}"; do
   echo -e "  ${green}$line${reset}"
