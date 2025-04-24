@@ -15,6 +15,45 @@ show_bottom_line() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
+# 配置文件清理函数
+sanitize_config() {
+  local temp_file=$(mktemp)
+  
+  # 保留文件头部
+  sed -n '/^tunnel:/,/^ingress:/p' "$CONFIG_YML" > "$temp_file"
+  echo "ingress:" >> "$temp_file"
+  
+  # 处理有效规则
+  declare -A unique_hosts
+  local in_block=0
+  local current_block=""
+  
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^\ \ -\ hostname:\ (.+) ]]; then
+      if [[ "$in_block" == 1 ]]; then
+        echo -e "$current_block" >> "$temp_file"
+      fi
+      current_host="${BASH_REMATCH[1]}"
+      unique_hosts["$current_host"]=1
+      current_block="$line"
+      in_block=1
+    elif [[ "$in_block" == 1 ]]; then
+      current_block+="\n$line"
+      if [[ "$line" =~ ^\ \ -\ service: ]]; then
+        in_block=0
+        echo -e "$current_block" >> "$temp_file"
+        current_block=""
+      fi
+    fi
+  done < <(grep -A10 "hostname:" "$CONFIG_YML" | grep -v -B1 "http_status:404" | grep -v "^--$")
+  
+  # 确保404在最后
+  echo "  - service: http_status:404" >> "$temp_file"
+  
+  # 替换原文件
+  mv "$temp_file" "$CONFIG_YML"
+}
+
 show_top_title
 
 # 配置文件检查
@@ -47,9 +86,6 @@ ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAI
 
 declare -a result_lines=()
 
-# 清理重复的ingress:行
-sed -i '/^ingress:/{N;/^ingress:\n*ingress:/d}' "$CONFIG_YML"
-
 while true; do
   echo -e "${yellow}请选择服务协议类型：${reset}"
   echo -e "  ${yellow}❶${reset} ${green}HTTP 服务${reset}"
@@ -70,10 +106,6 @@ while true; do
   if [[ "$proto" == "https" ]]; then
     read -p "🔒 跳过 TLS 验证？(y/n): " skip
     [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
-    # 明确写入TLS验证选项
-    tls_config="\n    originRequest:\n      noTLSVerify: $skip_tls"
-  else
-    tls_config=""
   fi
 
   # 备份原始配置
@@ -86,33 +118,27 @@ while true; do
     # 创建临时文件
     temp_file=$(mktemp)
     
-    # 1. 保留文件顶部配置（直到第一个ingress:）
-    while IFS= read -r line; do
-      echo "$line" >> "$temp_file"
-      [[ "$line" == "ingress:" ]] && break
-    done < "$CONFIG_YML"
+    # 1. 保留文件头部配置
+    sed -n '/^tunnel:/,/^ingress:/p' "$CONFIG_YML" > "$temp_file"
+    echo "ingress:" >> "$temp_file"
     
-    # 2. 处理ingress规则（排除当前子域名的旧配置）
-    skip_block=0
+    # 2. 保留其他hostname配置（排除当前子域名）
     while IFS= read -r line; do
-      # 检测到当前子域名的hostname时，标记跳过整个块
-      if [[ "$line" == *"hostname: $full_domain"* ]]; then
-        skip_block=1
-        echo -e "${yellow}🔄 发现旧配置，准备替换...${reset}"
-      # 检测到块结束（新条目或文件结束）
-      elif [[ "$skip_block" == 1 && ("$line" =~ ^[[:space:]]*-[[:space:]]*[^[:space:]] || -z "$line") ]]; then
-        skip_block=0
-      fi
-
-      # 非跳过部分写入临时文件（排除404行）
-      if [[ "$skip_block" == 0 && ! "$line" =~ "service: http_status:404" ]]; then
+      if [[ "$line" =~ ^\ \ -\ hostname:\ (.+) ]]; then
+        current_host="${BASH_REMATCH[1]}"
+        [[ "$current_host" != "$full_domain" ]] && echo "$line" >> "$temp_file"
+      elif [[ "$line" =~ ^\ \ -\ service: ]] && [[ ! "$line" =~ "http_status:404" ]]; then
         echo "$line" >> "$temp_file"
       fi
-    done < <(sed -n '/ingress:/,$p' "$CONFIG_YML")
+    done < <(grep -A10 "hostname:" "$CONFIG_YML" | grep -v -B1 "http_status:404" | grep -v "^--$")
     
     # 3. 添加新配置
-    echo -e "  - hostname: $full_domain" >> "$temp_file"
-    echo -e "    service: ${proto}://localhost:$port$tls_config" >> "$temp_file"
+    echo "  - hostname: $full_domain" >> "$temp_file"
+    echo "    service: ${proto}://localhost:$port" >> "$temp_file"
+    if [[ "$proto" == "https" ]]; then
+      echo "    originRequest:" >> "$temp_file"
+      echo "      noTLSVerify: $skip_tls" >> "$temp_file"
+    fi
     
     # 4. 确保404在最后
     echo "  - service: http_status:404" >> "$temp_file"
@@ -124,7 +150,6 @@ while true; do
     echo -e "${cyan}🌍 正在处理DNS记录：$full_domain → $TUNNEL_DOMAIN${reset}"
     record_name="$full_domain"
 
-    # 检查现有记录
     record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$record_name&type=$dns_type" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
 
@@ -145,10 +170,10 @@ while true; do
         done
       else
         echo -e "${cyan}⏩ 保留现有DNS记录${reset}"
+        continue
       fi
     fi
 
-    # 创建新记录
     create_result=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
       --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}")
@@ -163,9 +188,10 @@ while true; do
       echo "$create_result" | jq .
     fi
 
-    # 验证配置文件写入
+    # 验证配置文件
     if grep -q "hostname: $full_domain" "$CONFIG_YML"; then
       echo -e "${green}✅ 配置文件更新成功!${reset}"
+      sanitize_config  # 执行配置清理
     else
       echo -e "${red}❌ 配置文件更新失败，正在恢复备份...${reset}"
       mv "$CONFIG_YML.bak" "$CONFIG_YML"
