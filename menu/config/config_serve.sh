@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 clear
 green="\033[1;32m"; yellow="\033[1;33m"; red="\033[1;31m"
 cyan="\033[1;36m"; orange="\033[38;5;214m"; reset="\033[0m"
@@ -45,9 +45,6 @@ ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAI
   -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" |
   grep -o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')
 
-# 备份原始配置文件
-cp "$CONFIG_YML" "$CONFIG_YML.bak"
-
 declare -a result_lines=()
 
 while true; do
@@ -69,7 +66,9 @@ while true; do
   skip_tls="false"
   [[ "$proto" == "https" ]] && read -p "🔒 跳过 TLS 验证？(y/n): " skip && [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
 
-  # 处理每个前缀
+  # 备份原始配置
+  cp "$CONFIG_YML" "$CONFIG_YML.bak"
+
   for prefix in $input_prefixes; do
     prefix=$(echo "$prefix" | tr 'A-Z' 'a-z')
     full_domain="$prefix.$DOMAIN"
@@ -77,44 +76,30 @@ while true; do
     # 创建临时文件
     temp_file=$(mktemp)
     
-    # 处理原始文件，删除该前缀的所有现有配置
-    in_block=0
-    skip_next=0
+    # 1. 保留文件顶部配置（直到ingress:）
     while IFS= read -r line; do
-      # 检查是否是404服务行，如果是则跳过处理
-      if [[ $line == *"http_status:404"* ]]; then
-        echo "$line" >> "$temp_file"
-        continue
-      fi
-      
-      # 检查是否匹配当前前缀的hostname行
-      if [[ $line == *"hostname: $full_domain"* ]]; then
-        in_block=1
-        skip_next=1  # 跳过这一行
-        continue
-      fi
-      
-      # 如果在块中，跳过originRequest相关行
-      if [[ $in_block -eq 1 ]]; then
-        if [[ $line == *"originRequest:"* || $line == *"noTLSVerify:"* ]]; then
-          skip_next=1
-          continue
-        elif [[ $line == *"service:"* ]]; then
-          skip_next=1
-          in_block=0  # 块结束
-          continue
-        fi
-      fi
-      
-      # 如果不是要跳过的行，则写入临时文件
-      if [[ $skip_next -eq 0 ]]; then
-        echo "$line" >> "$temp_file"
-      else
-        skip_next=0
-      fi
+      echo "$line" >> "$temp_file"
+      [[ "$line" == "ingress:" ]] && break
     done < "$CONFIG_YML"
     
-    # 添加新的配置
+    # 2. 处理ingress规则（排除当前子域名的旧配置）
+    skip_block=0
+    while IFS= read -r line; do
+      # 检测到当前子域名的hostname时，标记跳过整个块
+      if [[ "$line" == *"hostname: $full_domain"* ]]; then
+        skip_block=1
+      # 检测到块结束（新条目或文件结束）
+      elif [[ "$skip_block" == 1 && ("$line" == "  - "* || "$line" == "" || "$line" == "#"*) ]]; then
+        skip_block=0
+      fi
+
+      # 非跳过部分写入临时文件（排除404行）
+      if [[ "$skip_block" == 0 && "$line" != "  - service: http_status:404" ]]; then
+        echo "$line" >> "$temp_file"
+      fi
+    done < <(sed -n '/ingress:/,$p' "$CONFIG_YML")
+    
+    # 3. 添加新配置
     echo "  - hostname: $full_domain" >> "$temp_file"
     echo "    service: ${proto}://localhost:$port" >> "$temp_file"
     if [[ "$proto" == "https" && "$skip_tls" == "true" ]]; then
@@ -122,10 +107,8 @@ while true; do
       echo "      noTLSVerify: true" >> "$temp_file"
     fi
     
-    # 确保404服务在最后
-    if ! grep -q "http_status:404" "$temp_file"; then
-      echo "  - service: http_status:404" >> "$temp_file"
-    fi
+    # 4. 确保404在最后
+    echo "  - service: http_status:404" >> "$temp_file"
     
     # 替换原文件
     mv "$temp_file" "$CONFIG_YML"
