@@ -79,7 +79,7 @@ while true; do
     full_domain="$prefix.$DOMAIN"
     key="$full_domain|$proto://localhost:$port|$skip_tls"
 
-    if printf '%s\n' "${{existing_keys[@]}}" | grep -q "^$key$"; then
+    if printf '%s\n' "${existing_keys[@]}}" | grep -q "^$key$"; then
       echo -e "${yellow}⏩ 跳过重复配置：$full_domain${reset}"
       continue
     fi
@@ -132,7 +132,7 @@ while true; do
       --data "{{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}}" > /dev/null
 
     existing_keys+=("$key")
-    result_lines+=("🌐 $full_domain ｜ 协议：${{proto^^}} ｜ 端口：$port ｜ DNS：$dns_type → $TUNNEL_DOMAIN")
+    result_lines+=("🌐 $full_domain ｜ 协议：${proto^^}} ｜ 端口：$port ｜ DNS：$dns_type → $TUNNEL_DOMAIN")
   done
 
   read -p "➕ 是否继续添加其他服务？(y/n): " cont
@@ -143,7 +143,7 @@ done
 grep -q "http_status:404" "$CONFIG_YML" || echo "  - service: http_status:404" >> "$CONFIG_YML"
 
 echo -e "\n${yellow}📋 以下为本次已成功添加的服务记录：${reset}"
-for line in "${{result_lines[@]}}"; do
+for line in "${result_lines[@]}}"; do
   echo -e "  ${green}$line${reset}"
 done
 
