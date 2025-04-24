@@ -45,13 +45,8 @@ ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAI
   -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" |
   grep -o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')
 
-declare -a existing_keys=()
-while read -r line; do
-  [[ $line =~ hostname ]] && h=$(echo "$line" | awk -F ': ' '{print $2}')
-  [[ $line =~ service ]] && s=$(echo "$line" | awk -F ': ' '{print $2}')
-  [[ $line =~ noTLSVerify ]] && t=$(echo "$line" | awk -F ': ' '{print $2}')
-  [[ $h && $s ]] && key="${h}|${s}|${t}" && existing_keys+=("$key") && h="" && s="" && t=""
-done < "$CONFIG_YML"
+# 备份原始配置文件
+cp "$CONFIG_YML" "$CONFIG_YML.bak"
 
 declare -a result_lines=()
 
@@ -74,18 +69,69 @@ while true; do
   skip_tls="false"
   [[ "$proto" == "https" ]] && read -p "🔒 跳过 TLS 验证？(y/n): " skip && [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
 
+  # 处理每个前缀
   for prefix in $input_prefixes; do
     prefix=$(echo "$prefix" | tr 'A-Z' 'a-z')
     full_domain="$prefix.$DOMAIN"
-    key="$full_domain|$proto://localhost:$port|$skip_tls"
-
-    if printf '%s\n' "${existing_keys[@]}" | grep -q "^$key$"; then
-      echo -e "${yellow}⏩ 跳过重复配置：$full_domain${reset}"
-      continue
+    
+    # 创建临时文件
+    temp_file=$(mktemp)
+    
+    # 处理原始文件，删除该前缀的所有现有配置
+    in_block=0
+    skip_next=0
+    while IFS= read -r line; do
+      # 检查是否是404服务行，如果是则跳过处理
+      if [[ $line == *"http_status:404"* ]]; then
+        echo "$line" >> "$temp_file"
+        continue
+      fi
+      
+      # 检查是否匹配当前前缀的hostname行
+      if [[ $line == *"hostname: $full_domain"* ]]; then
+        in_block=1
+        skip_next=1  # 跳过这一行
+        continue
+      fi
+      
+      # 如果在块中，跳过originRequest相关行
+      if [[ $in_block -eq 1 ]]; then
+        if [[ $line == *"originRequest:"* || $line == *"noTLSVerify:"* ]]; then
+          skip_next=1
+          continue
+        elif [[ $line == *"service:"* ]]; then
+          skip_next=1
+          in_block=0  # 块结束
+          continue
+        fi
+      fi
+      
+      # 如果不是要跳过的行，则写入临时文件
+      if [[ $skip_next -eq 0 ]]; then
+        echo "$line" >> "$temp_file"
+      else
+        skip_next=0
+      fi
+    done < "$CONFIG_YML"
+    
+    # 添加新的配置
+    echo "  - hostname: $full_domain" >> "$temp_file"
+    echo "    service: ${proto}://localhost:$port" >> "$temp_file"
+    if [[ "$proto" == "https" && "$skip_tls" == "true" ]]; then
+      echo "    originRequest:" >> "$temp_file"
+      echo "      noTLSVerify: true" >> "$temp_file"
     fi
-
+    
+    # 确保404服务在最后
+    if ! grep -q "http_status:404" "$temp_file"; then
+      echo "  - service: http_status:404" >> "$temp_file"
+    fi
+    
+    # 替换原文件
+    mv "$temp_file" "$CONFIG_YML"
+    
+    # DNS记录处理
     echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
-
     record_name="$full_domain"
 
     record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$record_name&type=$dns_type" \
@@ -108,18 +154,10 @@ while true; do
       fi
     fi
 
-    echo -e "\n  - hostname: $full_domain" >> "$CONFIG_YML"
-    echo "    service: ${proto}://localhost:$port" >> "$CONFIG_YML"
-    [[ "$proto" == "https" ]] && {
-      echo "    originRequest:" >> "$CONFIG_YML"
-      echo "      noTLSVerify: $skip_tls" >> "$CONFIG_YML"
-    }
-
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
       --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
 
-    existing_keys+=("$key")
     result_lines+=("🌐 $full_domain ｜ 协议：${proto^^} ｜ 端口：$port ｜ DNS：$dns_type → $TUNNEL_DOMAIN")
   done
 
@@ -128,11 +166,9 @@ while true; do
   echo ""
 done
 
-grep -q "http_status:404" "$CONFIG_YML" || echo "  - service: http_status:404" >> "$CONFIG_YML"
-
-  echo -e "\n${yellow}📋 以下为本次已成功添加的服务记录：${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-  echo -e "${yellow}📝 复制命令可快速编辑 ▶ ${green}nano /root/.cloudflared/config.yml${reset}"
+echo -e "\n${yellow}📋 以下为本次已成功添加的服务记录：${reset}"
+echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+echo -e "${yellow}📝 复制命令可快速编辑 ▶ ${green}nano /root/.cloudflared/config.yml${reset}"
 for line in "${result_lines[@]}"; do
   echo -e "  ${green}$line${reset}"
 done
