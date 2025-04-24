@@ -15,7 +15,7 @@ show_menu() {
   echo -e "                                  ${orange}🧰 超级工具箱${reset}"
   echo -e "${blue}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
   echo -e "  ${yellow}❶${reset} ${green}安装-升级${reset}                       ${yellow}❷${reset} ${green}启动-服务${reset}                       ${yellow}❸${reset} ${green}停止-服务${reset}"
-  echo -e "  ${yellow}❹${reset} ${green}配置-节点${reset}                       ${yellow}❺${reset} ${green}清理-维护${reset}                       ${yellow}❻${reset} ${green}网络-工具${reset}"
+  echo -e "  ${yellow}❹${reset} ${green}配置-设置${reset}                       ${yellow}❺${reset} ${green}清理-维护${reset}                       ${yellow}❻${reset} ${green}网络-工具${reset}"
   echo -e "  ${yellow}❼${reset} ${red}卸载${reset}                                                              ${yellow}⓿${reset} ${red}退出${reset}"
   echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
