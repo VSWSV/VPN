@@ -142,5 +142,5 @@ for line in "${result_lines[@]}"; do
 done
 
 show_bottom_line
-read -p "💬 按回车键返回配置菜单..." temp
+read -p "$(echo -e "💬${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/config_node.sh
