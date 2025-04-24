@@ -132,7 +132,7 @@ grep -q "http_status:404" "$CONFIG_YML" || echo "  - service: http_status:404" >
 
   echo -e "\n${yellow}📋 以下为本次已成功添加的服务记录：${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-  echo -e "${yellow}📝 使用命令快速打开 ▶ ${green}nano /root/.cloudflared/config.yml${reset}"
+  echo -e "${yellow}📝 复制命令可快速编辑 ▶ ${green}nano /root/.cloudflared/config.yml${reset}"
 for line in "${result_lines[@]}"; do
   echo -e "  ${green}$line${reset}"
 done
