@@ -67,9 +67,23 @@ while true; do
     *) echo -e "${red}❌ 无效输入${reset}"; continue ;;
   esac
 
-  read -p "🧩 子域前缀: " prefix
-  read -p "🔢 服务监听端口: " port
-  [[ ! "$port" =~ ^[0-9]+$ || $port -lt 1 || $port -gt 65535 ]] && echo -e "${red}❌ 非法端口号${reset}" && continue
+  while true; do
+    read -p "🧩 子域前缀: " prefix
+    # 验证输入是否包含空格或为空
+    if [[ "$prefix" =~ [[:space:]] ]]; then
+      echo -e "${red}❌ 子域前缀不能包含空格，请重新输入${reset}"
+    elif [[ -z "$prefix" ]]; then
+      echo -e "${red}❌ 子域前缀不能为空，请重新输入${reset}"
+    else
+      break
+    fi
+  done
+
+  while true; do
+    read -p "🔢 服务监听端口: " port
+    [[ ! "$port" =~ ^[0-9]+$ || $port -lt 1 || $port -gt 65535 ]] && \
+      echo -e "${red}❌ 非法端口号，请输入1-65535之间的数字${reset}" || break
+  done
 
   skip_tls="false"
   [[ "$proto" == "https" ]] && read -p "🔒 跳过 TLS 验证？(y/n): " skip && [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
