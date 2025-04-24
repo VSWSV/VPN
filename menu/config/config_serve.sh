@@ -1,5 +1,5 @@
 #!/bin/bash
-
+clear
 green="\033[1;32m"; yellow="\033[1;33m"; red="\033[1;31m"
 cyan="\033[1;36m"; orange="\033[38;5;214m"; reset="\033[0m"
 
