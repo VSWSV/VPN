@@ -85,7 +85,7 @@ while true; do
     case "$proto_opt" in
       1) proto="http"; dns_type="CNAME"; break ;;
       2) proto="https"; dns_type="CNAME"; break ;;
-      *) echo -e "${red}❌ 无效输入，请输入①或②${reset}" ;;
+      *) echo -e "${red}❌ 无效输入，重新选择！${reset}" ;;
     esac
   done
   echo -e "${soft_pink}🔹 输入为: ${green}${proto^^}${reset}"
