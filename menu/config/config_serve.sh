@@ -20,76 +20,50 @@ show_bottom_line() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 配置文件清理函数
-sanitize_config() {
-  local temp_file=$(mktemp)
-  
-  # 保留文件头部
-  sed -n '/^tunnel:/,/^ingress:/p' "$CONFIG_YML" | head -n -1 > "$temp_file"
-  echo "ingress:" >> "$temp_file"
-  
-  # 使用哈希表去重
-  declare -A host_blocks
-  local current_host=""
-  local current_block=""
-  
-  while IFS= read -r line; do
-    if [[ "$line" =~ ^\ \ -\ hostname:\ (.+) ]]; then
-      # 保存上一个块
-      [[ -n "$current_host" ]] && host_blocks["$current_host"]="$current_block"
-      current_host="${BASH_REMATCH[1]}"
-      current_block="$line"
-    elif [[ -n "$current_host" ]]; then
-      current_block+="\n$line"
-      if [[ "$line" =~ ^\ \ -\ service: ]]; then
-        host_blocks["$current_host"]="$current_block"
-        current_host=""
-        current_block=""
-      fi
-    fi
-  done < <(grep -A10 "hostname:" "$CONFIG_YML")
-  
-  # 写入去重后的配置
-  for block in "${host_blocks[@]}"; do
-    echo -e "$block" >> "$temp_file"
-  done
-  
-  # 确保404在最后（只保留一个）
-  grep "service: http_status:404" "$CONFIG_YML" | head -1 >> "$temp_file"
-  
-  # 替换原文件（保留权限）
-  cat "$temp_file" > "$CONFIG_YML"
-  rm "$temp_file"
-}
-
-# 重建配置文件函数
-rebuild_config_file() {
+# 配置文件处理函数
+update_config() {
   local domain=$1 proto=$2 port=$3 skip_tls=$4
   local temp_file=$(mktemp)
-  
-  # 保留文件头部
-  sed -n '/^tunnel:/,/^ingress:/p' "$CONFIG_YML" > "$temp_file"
-  
-  # 重建ingress规则
-  echo "ingress:" >> "$temp_file"
-  
-  # 保留其他域名配置
-  grep -A10 "hostname:" "$CONFIG_YML" | \
-    grep -v "hostname: $domain" | \
-    grep -v -B1 "http_status:404" >> "$temp_file"
-  
-  # 添加新配置
-  echo "  - hostname: $domain" >> "$temp_file"
-  echo "    service: ${proto}://localhost:$port" >> "$temp_file"
-  if [[ "$proto" == "https" ]]; then
-    echo "    originRequest:" >> "$temp_file"
-    echo "      noTLSVerify: $skip_tls" >> "$temp_file"
+  local found=0
+
+  # 处理现有配置
+  while IFS= read -r line; do
+    # 跳过相同域名的旧配置
+    if [[ "$line" =~ ^\ \ -\ hostname:\ $domain$ ]]; then
+      found=1
+      # 跳过接下来的3行（service + originRequest）
+      for _ in {1..3}; do
+        read -r line || break
+      done
+      continue
+    fi
+    
+    # 保留其他配置
+    echo "$line" >> "$temp_file"
+    
+    # 在404行前插入新配置
+    if [[ "$line" =~ ^\ \ -\ service:\ http_status:404$ ]]; then
+      echo "  - hostname: $domain" >> "$temp_file"
+      echo "    service: ${proto}://localhost:$port" >> "$temp_file"
+      if [[ "$proto" == "https" ]]; then
+        echo "    originRequest:" >> "$temp_file"
+        echo "      noTLSVerify: $skip_tls" >> "$temp_file"
+      fi
+    fi
+  done < "$CONFIG_YML"
+
+  # 如果没有找到404行，则添加到最后
+  if ! grep -q "http_status:404" "$temp_file"; then
+    echo "  - hostname: $domain" >> "$temp_file"
+    echo "    service: ${proto}://localhost:$port" >> "$temp_file"
+    if [[ "$proto" == "https" ]]; then
+      echo "    originRequest:" >> "$temp_file"
+      echo "      noTLSVerify: $skip_tls" >> "$temp_file"
+    fi
+    echo "  - service: http_status:404" >> "$temp_file"
   fi
-  
-  # 添加404
-  echo "  - service: http_status:404" >> "$temp_file"
-  
-  # 原子替换
+
+  # 替换原文件
   mv "$temp_file" "$CONFIG_YML"
 }
 
@@ -206,13 +180,12 @@ while true; do
       continue
     fi
 
-    # 重建配置文件
-    rebuild_config_file "$full_domain" "$proto" "$port" "$skip_tls"
+    # 更新配置文件
+    update_config "$full_domain" "$proto" "$port" "$skip_tls"
     
     # 验证配置文件
     if grep -q "hostname: $full_domain" "$CONFIG_YML"; then
       echo -e "${green}✅ 配置文件更新成功!${reset}"
-      sanitize_config  # 执行最终清理
     else
       echo -e "${red}❌ 配置文件更新失败，正在恢复备份...${reset}"
       mv "$CONFIG_YML.bak" "$CONFIG_YML"
