@@ -105,7 +105,13 @@ while true; do
     elif [[ "$prefix" =~ [^a-z0-9-] ]]; then
       echo -e "${red}❌ 错误：子域前缀只能包含小写字母、数字和连字符(-)${reset}"
     else
-      break
+      full_domain="$prefix.$DOMAIN"
+      # 检查是否已存在相同域名的配置
+      if printf '%s\n' "${existing_keys[@]}" | grep -q "^$full_domain|"; then
+        echo -e "${red}❌ 错误：该域名($full_domain)已存在配置，请使用其他前缀${reset}"
+      else
+        break
+      fi
     fi
   done
 
@@ -128,12 +134,6 @@ while true; do
 
   full_domain="$prefix.$DOMAIN"
   key="$full_domain|$proto://localhost:$port|$skip_tls"
-
-  # 检查重复配置
-  if printf '%s\n' "${existing_keys[@]}" | grep -q "^$key$"; then
-    echo -e "${cyan}⏩ 跳过：检测到重复配置 $full_domain → ${proto}://localhost:$port${reset}"
-    continue
-  fi
 
   echo -e "\n${yellow}▶ 正在处理 $full_domain ...${reset}"
 
@@ -208,8 +208,12 @@ while true; do
     --data "$dns_data")
 
   if echo "$dns_response" | grep -q '"success":true'; then
+    if [[ "$proto" == "http" ]]; then
+      result_lines+=("🌐 $full_domain ｜ ${proto^^} ｜ 端口:$port")
+    else
+      result_lines+=("🌐 $full_domain ｜ ${proto^^} ｜ 端口:$port ｜ TLS验证:$([ "$skip_tls" = "true" ] && echo "跳过" || echo "启用")")
+    fi
     echo -e "${green}✅ DNS记录创建成功: $full_domain → $TUNNEL_DOMAIN${reset}"
-    result_lines+=("🌐 $full_domain ｜ ${proto^^} ｜ 端口:$port ｜ TLS验证:$([ "$skip_tls" = "true" ] && echo "跳过" || echo "启用")")
   else
     echo -e "${red}❌ DNS记录创建失败: $full_domain${reset}"
     echo -e "${yellow}响应: ${dns_response}${reset}"
