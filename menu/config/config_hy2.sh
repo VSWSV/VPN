@@ -232,11 +232,10 @@ show_status "配置文件已保存到: ${lightpink}$CONFIG_PATH${reset}"
 # 显示连接信息
 ipv4=$(curl -s4 ifconfig.co || echo "获取失败")
 ipv6=$(curl -s6 ifconfig.co || echo "获取失败")
-
+echo -e "${yellow}📝 复制命令可快速编辑 ▶ ${green}nano /root/VPN/HY2/config/hysteria.yaml${reset}"
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 echo -e "${orange}                              🔗 客户端连接信息                                  ${reset}"
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-echo -e "${yellow}📝 复制命令可快速编辑 ▶ ${green}nano /root/VPN/HY2/config/hysteria.yaml${reset}"
 echo -e " ${lightpink}服务器地址: ${reset}${green}$sni${reset}"
 echo -e " ${lightpink}连接端口:   ${reset}${green}$port${reset}"
 echo -e " ${lightpink}认证密码:   ${reset}${green}$uuid${reset}"
