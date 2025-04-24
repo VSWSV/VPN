@@ -47,6 +47,9 @@ ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAI
 
 declare -a result_lines=()
 
+# 清理重复的ingress:行
+sed -i '/^ingress:/{N;/^ingress:\n*ingress:/d}' "$CONFIG_YML"
+
 while true; do
   echo -e "${yellow}请选择服务协议类型：${reset}"
   echo -e "  ${yellow}❶${reset} ${green}HTTP 服务${reset}"
@@ -64,7 +67,14 @@ while true; do
   [[ ! "$port" =~ ^[0-9]+$ || $port -lt 1 || $port -gt 65535 ]] && echo -e "${red}❌ 非法端口号${reset}" && continue
 
   skip_tls="false"
-  [[ "$proto" == "https" ]] && read -p "🔒 跳过 TLS 验证？(y/n): " skip && [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
+  if [[ "$proto" == "https" ]]; then
+    read -p "🔒 跳过 TLS 验证？(y/n): " skip
+    [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
+    # 明确写入TLS验证选项
+    tls_config="\n    originRequest:\n      noTLSVerify: $skip_tls"
+  else
+    tls_config=""
+  fi
 
   # 备份原始配置
   cp "$CONFIG_YML" "$CONFIG_YML.bak"
@@ -76,7 +86,7 @@ while true; do
     # 创建临时文件
     temp_file=$(mktemp)
     
-    # 1. 保留文件顶部配置（直到ingress:）
+    # 1. 保留文件顶部配置（直到第一个ingress:）
     while IFS= read -r line; do
       echo "$line" >> "$temp_file"
       [[ "$line" == "ingress:" ]] && break
@@ -88,24 +98,21 @@ while true; do
       # 检测到当前子域名的hostname时，标记跳过整个块
       if [[ "$line" == *"hostname: $full_domain"* ]]; then
         skip_block=1
+        echo -e "${yellow}🔄 发现旧配置，准备替换...${reset}"
       # 检测到块结束（新条目或文件结束）
-      elif [[ "$skip_block" == 1 && ("$line" == "  - "* || "$line" == "" || "$line" == "#"*) ]]; then
+      elif [[ "$skip_block" == 1 && ("$line" =~ ^[[:space:]]*-[[:space:]]*[^[:space:]] || -z "$line") ]]; then
         skip_block=0
       fi
 
       # 非跳过部分写入临时文件（排除404行）
-      if [[ "$skip_block" == 0 && "$line" != "  - service: http_status:404" ]]; then
+      if [[ "$skip_block" == 0 && ! "$line" =~ "service: http_status:404" ]]; then
         echo "$line" >> "$temp_file"
       fi
     done < <(sed -n '/ingress:/,$p' "$CONFIG_YML")
     
     # 3. 添加新配置
-    echo "  - hostname: $full_domain" >> "$temp_file"
-    echo "    service: ${proto}://localhost:$port" >> "$temp_file"
-    if [[ "$proto" == "https" && "$skip_tls" == "true" ]]; then
-      echo "    originRequest:" >> "$temp_file"
-      echo "      noTLSVerify: true" >> "$temp_file"
-    fi
+    echo -e "  - hostname: $full_domain" >> "$temp_file"
+    echo -e "    service: ${proto}://localhost:$port$tls_config" >> "$temp_file"
     
     # 4. 确保404在最后
     echo "  - service: http_status:404" >> "$temp_file"
@@ -114,34 +121,55 @@ while true; do
     mv "$temp_file" "$CONFIG_YML"
     
     # DNS记录处理
-    echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
+    echo -e "${cyan}🌍 正在处理DNS记录：$full_domain → $TUNNEL_DOMAIN${reset}"
     record_name="$full_domain"
 
+    # 检查现有记录
     record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$record_name&type=$dns_type" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
 
     record_ids=$(echo "$record_info" | grep -o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')
 
     if [[ -n "$record_ids" ]]; then
-      echo -e "${yellow}⚠️ DNS记录已存在：$record_name${reset}"
+      echo -e "${yellow}⚠️ 发现已有DNS记录：$record_name${reset}"
       read -p "是否删除并重建？(y/n): " confirm
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
         for rid in $record_ids; do
-          curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$rid" \
-            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" > /dev/null
+          delete_result=$(curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$rid" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
+          if echo "$delete_result" | grep -q '"success":true'; then
+            echo -e "${green}✅ 成功删除旧记录: $rid${reset}"
+          else
+            echo -e "${red}❌ 删除记录失败: $rid${reset}"
+          fi
         done
-        echo -e "${green}✅ 已删除旧记录，准备写入新记录...${reset}"
       else
-        echo -e "${cyan}⏩ 跳过添加：$record_name${reset}"
-        continue
+        echo -e "${cyan}⏩ 保留现有DNS记录${reset}"
       fi
     fi
 
-    curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+    # 创建新记录
+    create_result=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-      --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
+      --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}")
 
-    result_lines+=("🌐 $full_domain ｜ 协议：${proto^^} ｜ 端口：$port ｜ DNS：$dns_type → $TUNNEL_DOMAIN")
+    if echo "$create_result" | grep -q '"success":true'; then
+      record_id=$(echo "$create_result" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+      echo -e "${green}✅ DNS记录创建成功! (ID: $record_id)${reset}"
+      result_lines+=("🌐 $full_domain ｜ 协议：${proto^^} ｜ 端口：$port ｜ TLS验证：$([ "$skip_tls" == "true" ] && echo "跳过" || echo "启用")")
+    else
+      echo -e "${red}❌ DNS记录创建失败!${reset}"
+      echo -e "${yellow}响应结果:${reset}"
+      echo "$create_result" | jq .
+    fi
+
+    # 验证配置文件写入
+    if grep -q "hostname: $full_domain" "$CONFIG_YML"; then
+      echo -e "${green}✅ 配置文件更新成功!${reset}"
+    else
+      echo -e "${red}❌ 配置文件更新失败，正在恢复备份...${reset}"
+      mv "$CONFIG_YML.bak" "$CONFIG_YML"
+    fi
   done
 
   read -p "➕ 是否继续添加其他服务？(y/n): " cont
