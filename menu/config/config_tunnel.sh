@@ -438,6 +438,7 @@ handle_cname_record() {
 
 final_info() {
     info "📦 所有步骤已完成，以下为生成的配置信息："
+    echo -e "${yellow}📝 复制命令可快速编辑 ▶ ${green}nano /root/.cloudflared/config_info.txt${reset}"
     echo -e "${lightpink}账户邮箱：${green}$CF_EMAIL${reset}"
     echo -e "${lightpink}API 令牌：${green}$CF_API_TOKEN${reset}"
     echo -e "${lightpink}顶级域名：${green}$CF_ZONE${reset}"
