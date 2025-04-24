@@ -67,61 +67,59 @@ while true; do
     *) echo -e "${red}❌ 无效输入${reset}"; continue ;;
   esac
 
-  read -p "🧩 子域前缀（多个空格）: " input_prefixes
+  read -p "🧩 子域前缀: " prefix
   read -p "🔢 服务监听端口: " port
   [[ ! "$port" =~ ^[0-9]+$ || $port -lt 1 || $port -gt 65535 ]] && echo -e "${red}❌ 非法端口号${reset}" && continue
 
   skip_tls="false"
   [[ "$proto" == "https" ]] && read -p "🔒 跳过 TLS 验证？(y/n): " skip && [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
 
-  for prefix in $input_prefixes; do
-    prefix=$(echo "$prefix" | tr 'A-Z' 'a-z')
-    full_domain="$prefix.$DOMAIN"
-    key="$full_domain|$proto://localhost:$port|$skip_tls"
+  prefix=$(echo "$prefix" | tr 'A-Z' 'a-z')
+  full_domain="$prefix.$DOMAIN"
+  key="$full_domain|$proto://localhost:$port|$skip_tls"
 
-    if printf '%s\n' "${existing_keys[@]}" | grep -q "^$key$"; then
-      echo -e "${yellow}⏩ 跳过重复配置：$full_domain${reset}"
+  if printf '%s\n' "${existing_keys[@]}" | grep -q "^$key$"; then
+    echo -e "${yellow}⏩ 跳过重复配置：$full_domain${reset}"
+    continue
+  fi
+
+  echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
+
+  record_name="$full_domain"
+
+  record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$record_name&type=$dns_type" \
+    -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
+
+  record_ids=$(echo "$record_info" | grep -o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')
+
+  if [[ -n "$record_ids" ]]; then
+    echo -e "${yellow}⚠️ DNS记录已存在：$record_name${reset}"
+    read -p "是否删除并重建？(y/n): " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+      for rid in $record_ids; do
+        curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$rid" \
+          -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" > /dev/null
+      done
+      echo -e "${green}✅ 已删除旧记录，准备写入新记录...${reset}"
+    else
+      echo -e "${cyan}⏩ 跳过添加：$record_name${reset}"
       continue
     fi
+  fi
 
-    echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
+  echo -e "\n  - hostname: $full_domain" >> "$CONFIG_YML"
+  echo "    service: ${proto}://localhost:$port" >> "$CONFIG_YML"
+  [[ "$proto" == "https" ]] && {
+    echo "    originRequest:" >> "$CONFIG_YML"
+    echo "      noTLSVerify: $skip_tls" >> "$CONFIG_YML"
+  }
 
-    record_name="$full_domain"
+  curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+    -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+    --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
 
-    record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$record_name&type=$dns_type" \
-      -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
-
-    record_ids=$(echo "$record_info" | grep -o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')
-
-    if [[ -n "$record_ids" ]]; then
-      echo -e "${yellow}⚠️ DNS记录已存在：$record_name${reset}"
-      read -p "是否删除并重建？(y/n): " confirm
-      if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        for rid in $record_ids; do
-          curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$rid" \
-            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" > /dev/null
-        done
-        echo -e "${green}✅ 已删除旧记录，准备写入新记录...${reset}"
-      else
-        echo -e "${cyan}⏩ 跳过添加：$record_name${reset}"
-        continue
-      fi
-    fi
-
-    echo -e "\n  - hostname: $full_domain" >> "$CONFIG_YML"
-    echo "    service: ${proto}://localhost:$port" >> "$CONFIG_YML"
-    [[ "$proto" == "https" ]] && {
-      echo "    originRequest:" >> "$CONFIG_YML"
-      echo "      noTLSVerify: $skip_tls" >> "$CONFIG_YML"
-    }
-
-    curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-      -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-      --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
-
-    existing_keys+=("$key")
-    result_lines+=("🌐 $full_domain ｜ 协议：${proto^^} ｜ 端口：$port ｜ DNS：$dns_type → $TUNNEL_DOMAIN")
-  done
+  existing_keys+=("$key")
+  result_lines+=("🌐 $full_domain ｜ 协议：${proto^^} ｜ 端口：$port ｜ DNS：$dns_type → $TUNNEL_DOMAIN")
 
   read -p "➕ 是否继续添加其他服务？(y/n): " cont
   [[ "$cont" =~ ^[Nn]$ ]] && break
