@@ -11,26 +11,30 @@ show_top_title() {
   printf "${orange}%*s📡 配置子域隧道%*s\n" $(( (83 - 20) / 2 )) "" $(( (83 - 20 + 1) / 2 )) ""
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
-
 show_bottom_line() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
 show_top_title
 
-[[ ! -f "$CONFIG_INFO" || ! -f "$CONFIG_YML" ]] && echo -e "${red}❌ 缺少配置文件${reset}" && exit 1
+# 配置文件检查
+if [[ ! -f "$CONFIG_INFO" || ! -f "$CONFIG_YML" ]]; then
+  echo -e "${red}❌ 缺少配置文件${reset}"
+  show_bottom_line
+  read -p "💬 按回车键返回配置菜单..." temp
+  bash /root/VPN/menu/config_node.sh
+  exit 0
+fi
 
 CF_API_TOKEN=$(grep "API令牌" "$CONFIG_INFO" | awk -F '：' '{print $2}' | tr -d '\r')
 [[ -z "$CF_API_TOKEN" ]] && echo -e "${red}❌ API令牌为空${reset}" && exit 1
 
 verify_result=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
   -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
-
 if ! echo "$verify_result" | grep -q '"success":true'; then
   echo -e "${red}❌ Cloudflare Token 验证失败${reset}"
   exit 1
 fi
-
 echo -e "${green}✅ Cloudflare Token 验证成功${reset}"
 
 DOMAIN=$(grep "顶级域名" "$CONFIG_INFO" | awk -F '：' '{print $2}' | tr -d '\r')
