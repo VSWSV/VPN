@@ -24,42 +24,51 @@ show_bottom_line() {
 update_config() {
   local domain=$1 proto=$2 port=$3 skip_tls=$4
   local temp_file=$(mktemp)
-  local found=0
+  local in_target_block=0
+  local skip_next_lines=0
 
-  # 处理现有配置
+  # 1. 保留文件头部（tunnel/credentials/logfile）
+  sed -n '/^tunnel:/,/^ingress:/p' "$CONFIG_YML" > "$temp_file"
+  
+  # 2. 添加新配置（直接插入到ingress:下方）
+  echo "  - hostname: $domain" >> "$temp_file"
+  echo "    service: ${proto}://localhost:$port" >> "$temp_file"
+  if [[ "$proto" == "https" ]]; then
+    echo "    originRequest:" >> "$temp_file"
+    echo "      noTLSVerify: $skip_tls" >> "$temp_file"
+  fi
+
+  # 3. 处理现有配置（跳过相同域名的旧配置）
   while IFS= read -r line; do
-    # 跳过相同域名的旧配置
-    if [[ "$line" =~ ^\ \ -\ hostname:\ $domain$ ]]; then
-      found=1
-      # 跳过接下来的3行（service + originRequest）
-      for _ in {1..3}; do
-        read -r line || break
-      done
+    # 跳过ingress:行（已经处理过）
+    if [[ "$line" == "ingress:" ]]; then
       continue
     fi
-    
-    # 保留其他配置
-    echo "$line" >> "$temp_file"
-    
-    # 在404行前插入新配置
-    if [[ "$line" =~ ^\ \ -\ service:\ http_status:404$ ]]; then
-      echo "  - hostname: $domain" >> "$temp_file"
-      echo "    service: ${proto}://localhost:$port" >> "$temp_file"
-      if [[ "$proto" == "https" ]]; then
-        echo "    originRequest:" >> "$temp_file"
-        echo "      noTLSVerify: $skip_tls" >> "$temp_file"
-      fi
-    fi
-  done < "$CONFIG_YML"
 
-  # 如果没有找到404行，则添加到最后
-  if ! grep -q "http_status:404" "$temp_file"; then
-    echo "  - hostname: $domain" >> "$temp_file"
-    echo "    service: ${proto}://localhost:$port" >> "$temp_file"
-    if [[ "$proto" == "https" ]]; then
-      echo "    originRequest:" >> "$temp_file"
-      echo "      noTLSVerify: $skip_tls" >> "$temp_file"
+    # 检测到相同域名的配置块
+    if [[ "$line" =~ ^\ \ -\ hostname:\ $domain$ ]]; then
+      in_target_block=1
+      skip_next_lines=3  # 跳过service/originRequest行
+      continue
     fi
+
+    # 跳过目标块的内容
+    if [[ $in_target_block -eq 1 && $skip_next_lines -gt 0 ]]; then
+      skip_next_lines=$((skip_next_lines-1))
+      continue
+    fi
+
+    # 块结束检测
+    if [[ $in_target_block -eq 1 && "$line" =~ ^\ \ - ]]; then
+      in_target_block=0
+    fi
+
+    # 写入其他配置
+    echo "$line" >> "$temp_file"
+  done < <(sed -n '/^ingress:/,$p' "$CONFIG_YML")
+
+  # 4. 确保404在最后（如果不存在则添加）
+  if ! grep -q "service: http_status:404" "$temp_file"; then
     echo "  - service: http_status:404" >> "$temp_file"
   fi
 
