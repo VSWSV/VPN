@@ -108,12 +108,29 @@ while true; do
       fi
     fi
 
-    echo -e "\n  - hostname: $full_domain" >> "$CONFIG_YML"
-    echo "    service: ${proto}://localhost:$port" >> "$CONFIG_YML"
-    [[ "$proto" == "https" ]] && {
-      echo "    originRequest:" >> "$CONFIG_YML"
-      echo "      noTLSVerify: $skip_tls" >> "$CONFIG_YML"
-    }
+    # ⛔ 删除 config.yml 中所有匹配当前 full_domain 的配置段
+awk -v host="$full_domain" '
+  BEGIN { skip = 0 }
+  /^  - hostname:/ {
+    if ($0 ~ host) { skip = 1; next }
+    else { skip = 0 }
+  }
+  /^  - service: http_status:404/ { skip = 0 }
+  skip == 0 { print }
+' "$CONFIG_YML" > "$CONFIG_YML.tmp"
+
+mv "$CONFIG_YML.tmp" "$CONFIG_YML"
+
+# ✏️ 插入本次新配置（放在 404 之前）
+sed -i '/http_status:404/i \
+  - hostname: '"$full_domain"'
+    service: '"${proto}://localhost:$port"'' "$CONFIG_YML"
+
+# 如果是 https，则追加 TLS 验证配置
+if [[ "$proto" == "https" ]]; then
+  sed -i "/service: https:\/\/localhost:$port/a \    originRequest:
+      noTLSVerify: $skip_tls" "$CONFIG_YML"
+fi
 
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
