@@ -21,7 +21,7 @@ show_top_title
 if [[ ! -f "$CONFIG_INFO" || ! -f "$CONFIG_YML" ]]; then
   echo -e "${red}❌ 缺少配置文件${reset}"
   show_bottom_line
-  read -p "$(echo -e "💬${cyan}按回车键返回...${reset}")" dummy
+  read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
   bash /root/VPN/menu/config_node.sh
   exit 0
 fi
@@ -142,5 +142,5 @@ for line in "${result_lines[@]}"; do
 done
 
 show_bottom_line
-read -p "$(echo -e "💬${cyan}按回车键返回...${reset}")" dummy
+read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/config_node.sh
