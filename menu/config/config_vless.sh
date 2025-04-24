@@ -36,7 +36,7 @@ function show_status() {
 }
 
 function show_error() {
-    echo -e "${red}✖ ${1}${reset}" | awk '{printf "%-60s %s\n", $0, ""}'
+    echo -e "${red}✖ ${1}${reset}" | awk '{printf "%-60s %s\n', $0, ""}'
 }
 
 function validate_input() {
@@ -71,15 +71,16 @@ function generate_certs() {
 
     if ! openssl ecparam -genkey -name prime256v1 -out "$CERTS_DIR/private.key" 2>/dev/null; then
         show_error "生成私钥失败！"
-        exit 1
+        return 1
     fi
     if ! openssl req -x509 -new -key "$CERTS_DIR/private.key" -out "$CERTS_DIR/cert.pem" \
         -days 365 -subj "/CN=$sni" 2>/dev/null; then
         show_error "生成证书失败！"
-        exit 1
+        return 1
     fi
     chmod 600 "$CERTS_DIR/"{cert.pem,private.key}
     show_status "证书已生成到 ${lightpink}$CERTS_DIR${reset}"
+    return 0
 }
 
 # 初始化目录
@@ -164,71 +165,95 @@ while true; do
 done
 
 # 传输协议配置
-echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-echo -e " ${lightpink}⇨ 请选择传输协议:${reset}"
-echo -e "  ${green}① TCP (默认)${reset}"
-echo -e "  ${green}② WebSocket (WS)${reset}"
-echo -e "  ${green}③ gRPC${reset}"
-echo -e "  ${green}④ HTTP/2 (H2)${reset}"
-read -p "$(echo -e " ${blue}请选择：${reset}")" transport_choice
+while true; do
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e " ${lightpink}⇨ 请选择传输协议:${reset}"
+    echo -e "  ${green}① TCP (默认)${reset}"
+    echo -e "  ${green}② WebSocket (WS)${reset}"
+    echo -e "  ${green}③ gRPC${reset}"
+    echo -e "  ${green}④ HTTP/2 (H2)${reset}"
+    read -p "$(echo -e " ${blue}请选择：${reset}")" transport_choice
 
-case $transport_choice in
-    1) 
-        network="tcp"
-        path=""
-        serviceName=""
-        ;;
-    2)
-        network="ws"
-        read -p "$(echo -e " ${lightpink}⇨ 请输入WebSocket路径 (默认/vless-ws): ${reset}")" path
-        path=${path:-/vless-ws}
-        read -p "$(echo -e " ${lightpink}⇨ 请输入Host头 (留空自动使用SNI): ${reset}")" host
-        host=${host:-$sni}
-        serviceName=""
-        ;;
-    3)
-        network="grpc"
-        read -p "$(echo -e " ${lightpink}⇨ 请输入gRPC服务名称 (默认grpc-service): ${reset}")" serviceName
-        serviceName=${serviceName:-grpc-service}
-        path=""
-        ;;
-    4)
-        network="h2"
-        read -p "$(echo -e " ${lightpink}⇨ 请输入HTTP/2路径 (默认/h2-path): ${reset}")" path
-        path=${path:-/h2-path}
-        serviceName=""
-        ;;
-    *) 
-        network="tcp"
-        path=""
-        serviceName=""
-        ;;
-esac
+    case $transport_choice in
+        1) 
+            network="tcp"
+            path=""
+            serviceName=""
+            break
+            ;;
+        2)
+            network="ws"
+            read -p "$(echo -e " ${lightpink}⇨ 请输入WebSocket路径 (默认/vless-ws): ${reset}")" path
+            path=${path:-/vless-ws}
+            read -p "$(echo -e " ${lightpink}⇨ 请输入Host头 (留空自动使用SNI): ${reset}")" host
+            host=${host:-$sni}
+            serviceName=""
+            break
+            ;;
+        3)
+            network="grpc"
+            read -p "$(echo -e " ${lightpink}⇨ 请输入gRPC服务名称 (默认grpc-service): ${reset}")" serviceName
+            serviceName=${serviceName:-grpc-service}
+            path=""
+            break
+            ;;
+        4)
+            network="h2"
+            read -p "$(echo -e " ${lightpink}⇨ 请输入HTTP/2路径 (默认/h2-path): ${reset}")" path
+            path=${path:-/h2-path}
+            serviceName=""
+            break
+            ;;
+        *) 
+            network="tcp"
+            path=""
+            serviceName=""
+            show_error "无效选择，默认使用TCP"
+            break
+            ;;
+    esac
+done
 
 # 安全协议配置
-echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-echo -e " ${lightpink}⇨ 请选择传输安全协议:${reset}"
-echo -e "  ${green}① TLS (推荐)${reset}"
-echo -e "  ${green}② REALITY (最新技术)${reset}"
-echo -e "  ${yellow}③ none (不加密)${reset}"
-read -p "$(echo -e " ${blue}请选择：${reset}")" security_choice
-case $security_choice in
-    1) security="tls" ;;
-    2) security="reality" ;;
-    3) security="none"; show_error "警告: 禁用加密将导致连接不安全!" ;;
-    *) security="tls"; show_error "无效选择，默认使用TLS" ;;
-esac
+while true; do
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e " ${lightpink}⇨ 请选择传输安全协议:${reset}"
+    echo -e "  ${green}① TLS (推荐)${reset}"
+    echo -e "  ${green}② REALITY (最新技术)${reset}"
+    echo -e "  ${yellow}③ none (不加密)${reset}"
+    read -p "$(echo -e " ${blue}请选择：${reset}")" security_choice
+    
+    case $security_choice in
+        1) 
+            security="tls" 
+            break
+            ;;
+        2) 
+            security="reality" 
+            break
+            ;;
+        3) 
+            security="none"
+            show_error "警告: 禁用加密将导致连接不安全!"
+            break
+            ;;
+        *) 
+            show_error "无效选择，请重新选择"
+            ;;
+    esac
+done
 
-# 协议组合校验（核心修复点）
+# 协议组合校验
 if [[ "$network" != "tcp" && "$security" == "reality" ]]; then
     show_error "错误: REALITY 仅支持 TCP 传输！"
-    exit 1
+    security="tls"
+    show_status "已自动切换为 TLS 安全协议"
 elif [[ "$network" == "ws" && -n "$flow" ]]; then
     show_error "错误: WebSocket 不能使用 flow 参数！"
-    exit 1
+    flow=""
 elif [[ "$network" == "grpc" && -n "$flow" ]]; then
     show_error "错误: gRPC 不能使用 flow 参数！"
-    exit 1
+    flow=""
 fi
 
 # TLS/REALITY配置
@@ -237,95 +262,97 @@ if [[ "$security" != "none" ]]; then
     
     if [[ "$security" == "reality" ]]; then
         # REALITY配置
-        echo -e "${yellow}🛠️  正在配置 REALITY 参数...${reset}"
-        read -p "$(echo -e " ${lightpink}⇨ 请输入目标网站 (如:www.google.com): ${reset}")" dest_domain
-        read -p "$(echo -e " ${lightpink}⇨ 请输入目标端口 (默认443): ${reset}")" dest_port
-        dest_port=${dest_port:-443}
-        
-        # 生成REALITY密钥对
-        echo -e "${yellow}🔑 正在生成REALITY密钥...${reset}"
-        reality_keys=$(/root/VPN/xray/xray x25519)
-        private_key=$(echo "$reality_keys" | awk '/Private key:/ {print $3}')
-        public_key=$(echo "$reality_keys" | awk '/Public key:/ {print $3}')
-        
-        # 生成shortId
-        short_id=$(openssl rand -hex 4)
-        
-        tls_settings="{
-          \"security\": \"reality\",
-          \"realitySettings\": {
-            \"dest\": \"$dest_domain:$dest_port\",
-            \"serverNames\": [\"$sni\"],
-            \"privateKey\": \"$private_key\",
-            \"publicKey\": \"$public_key\",
-            \"shortIds\": [\"$short_id\"]
-          }
-        }"
+        while true; do
+            echo -e "${yellow}🛠️  正在配置 REALITY 参数...${reset}"
+            read -p "$(echo -e " ${lightpink}⇨ 请输入目标网站 (如:www.google.com): ${reset}")" dest_domain
+            read -p "$(echo -e " ${lightpink}⇨ 请输入目标端口 (默认443): ${reset}")" dest_port
+            dest_port=${dest_port:-443}
+            
+            if [[ -z "$dest_domain" ]]; then
+                show_error "目标网站不能为空"
+                continue
+            fi
+            
+            # 生成REALITY密钥对
+            echo -e "${yellow}🔑 正在生成REALITY密钥...${reset}"
+            reality_keys=$(/root/VPN/xray/xray x25519)
+            private_key=$(echo "$reality_keys" | awk '/Private key:/ {print $3}')
+            public_key=$(echo "$reality_keys" | awk '/Public key:/ {print $3}')
+            
+            # 生成shortId
+            short_id=$(openssl rand -hex 4)
+            
+            tls_settings="{
+              \"security\": \"reality\",
+              \"realitySettings\": {
+                \"dest\": \"$dest_domain:$dest_port\",
+                \"serverNames\": [\"$sni\"],
+                \"privateKey\": \"$private_key\",
+                \"publicKey\": \"$public_key\",
+                \"shortIds\": [\"$short_id\"]
+              }
+            }"
+            break
+        done
     else
         # TLS配置
-        echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
-        echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
-        echo -e "  ${green}② 使用现有证书${reset}"
-        read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
-        case $tls_choice in
-            1)
-                generate_certs "$sni"
-                tls_settings="{
-                  \"security\": \"tls\",
-                  \"tlsSettings\": {
-                    \"serverName\": \"$sni\",
-                    \"certificates\": [
-                      {
-                        \"certificateFile\": \"$CERTS_DIR/cert.pem\",
-                        \"keyFile\": \"$CERTS_DIR/private.key\"
-                      }
-                    ]
-                  }
-                }"
-                ;;
-            2)
-                while true; do
-                    read -p "$(echo -e " ${lightpink}⇨ 请输入证书文件绝对路径: ${reset}")" cert_path
-                    read -p "$(echo -e " ${lightpink}⇨ 请输入私钥文件绝对路径: ${reset}")" key_path
-                    cert_path="${cert_path/#\~/$HOME}"
-                    key_path="${key_path/#\~/$HOME}"
-                    if [[ -f "$cert_path" && -f "$key_path" ]]; then
+        while true; do
+            echo -e " ${lightpink}⇨ 请选择证书配置:${reset}"
+            echo -e "  ${green}① 使用自签名证书 (推荐测试用)${reset}"
+            echo -e "  ${green}② 使用现有证书${reset}"
+            read -p "$(echo -e " ${blue}请选择：${reset}")" tls_choice
+            
+            case $tls_choice in
+                1)
+                    if generate_certs "$sni"; then
                         tls_settings="{
                           \"security\": \"tls\",
                           \"tlsSettings\": {
                             \"serverName\": \"$sni\",
                             \"certificates\": [
                               {
-                                \"certificateFile\": \"$cert_path\",
-                                \"keyFile\": \"$key_path\"
+                                \"certificateFile\": \"$CERTS_DIR/cert.pem\",
+                                \"keyFile\": \"$CERTS_DIR/private.key\"
                               }
                             ]
                           }
                         }"
                         break
                     else
-                        [[ ! -f "$cert_path" ]] && show_error "证书文件不存在：$cert_path"
-                        [[ ! -f "$key_path" ]] && show_error "私钥文件不存在：$key_path"
+                        show_error "证书生成失败，请重试"
                     fi
-                done
-                ;;
-            *)
-                show_error "无效选择，默认使用自签名证书"
-                generate_certs "$sni"
-                tls_settings="{
-                  \"security\": \"tls\",
-                  \"tlsSettings\": {
-                    \"serverName\": \"$sni\",
-                    \"certificates\": [
-                      {
-                        \"certificateFile\": \"$CERTS_DIR/cert.pem\",
-                        \"keyFile\": \"$CERTS_DIR/private.key\"
-                      }
-                    ]
-                  }
-                }"
-                ;;
-        esac
+                    ;;
+                2)
+                    while true; do
+                        read -p "$(echo -e " ${lightpink}⇨ 请输入证书文件绝对路径: ${reset}")" cert_path
+                        read -p "$(echo -e " ${lightpink}⇨ 请输入私钥文件绝对路径: ${reset}")" key_path
+                        cert_path="${cert_path/#\~/$HOME}"
+                        key_path="${key_path/#\~/$HOME}"
+                        if [[ -f "$cert_path" && -f "$key_path" ]]; then
+                            tls_settings="{
+                              \"security\": \"tls\",
+                              \"tlsSettings\": {
+                                \"serverName\": \"$sni\",
+                                \"certificates\": [
+                                  {
+                                    \"certificateFile\": \"$cert_path\",
+                                    \"keyFile\": \"$key_path\"
+                                  }
+                                ]
+                              }
+                            }"
+                            break 2
+                        else
+                            [[ ! -f "$cert_path" ]] && show_error "证书文件不存在：$cert_path"
+                            [[ ! -f "$key_path" ]] && show_error "私钥文件不存在：$key_path"
+                        fi
+                    done
+                    ;;
+                *)
+                    show_error "无效选择，请重新选择"
+                    ;;
+            esac
+        done
 
         # Cloudflare 支持
         if [[ "$security" == "tls" && "$network" == "ws" ]]; then
@@ -388,7 +415,7 @@ config_json="{
         \"clients\": [
           {
             \"id\": \"$uuid\",
-            $([ "$network" == "tcp" ] && echo "\"flow\": \"xtls-rprx-vision\",")
+            $([ "$network" == "tcp" ] && echo "\"flow\": \"xtls-rprx-vision\","),
             \"level\": 0
           }
         ],
