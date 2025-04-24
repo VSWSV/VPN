@@ -87,8 +87,8 @@ done < "$CONFIG_YML"
 declare -a result_lines=()
 while true; do
   echo -e "\n${yellow}请选择服务协议类型：${reset}"
-  echo -e "  ${blue}①${reset} ${green}HTTP 服务${reset}"
-  echo -e "  ${blue}②${reset} ${green}HTTPS 服务${reset}"
+  echo -e "  ${blue}①${blue} ${green}HTTP 服务${reset}"
+  echo -e "  ${blue}②${blue} ${green}HTTPS 服务${reset}"
 
   while true; do
     read -p "请输入编号: " proto_opt
