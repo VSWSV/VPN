@@ -11,6 +11,7 @@ show_top_title() {
   printf "${orange}%*s📡 配置子域隧道%*s\n" $(( (83 - 20) / 2 )) "" $(( (83 - 20 + 1) / 2 )) ""
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
+
 show_bottom_line() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
@@ -29,6 +30,7 @@ if ! echo "$verify_result" | grep -q '"success":true'; then
   echo -e "${red}❌ Cloudflare Token 验证失败${reset}"
   exit 1
 fi
+
 echo -e "${green}✅ Cloudflare Token 验证成功${reset}"
 
 DOMAIN=$(grep "顶级域名" "$CONFIG_INFO" | awk -F '：' '{print $2}' | tr -d '\r')
@@ -39,7 +41,6 @@ ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$DOMAI
   -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" |
   grep -o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')
 
-# 获取已有配置用于去重判断
 declare -a existing_keys=()
 while read -r line; do
   [[ $line =~ hostname ]] && h=$(echo "$line" | awk -F ': ' '{print $2}')
@@ -68,39 +69,45 @@ while true; do
 
   read -p "🧩 子域前缀（多个空格）: " input_prefixes
   read -p "🔢 服务监听端口: " port
-  [[ ! "$port" =~ ^[0-9]+$ ]] && echo -e "${red}❌ 端口必须为数字${reset}" && continue
+  [[ ! "$port" =~ ^[0-9]+$ || $port -lt 1 || $port -gt 65535 ]] && echo -e "${red}❌ 非法端口号${reset}" && continue
 
   skip_tls="false"
   [[ "$proto" == "https" ]] && read -p "🔒 跳过 TLS 验证？(y/n): " skip && [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
 
   for prefix in $input_prefixes; do
     full_domain="$prefix.$DOMAIN"
-    key="${full_domain}|${proto}://localhost:$port|$skip_tls"
+    key="$full_domain|$proto://localhost:$port|$skip_tls"
 
     if printf '%s\n' "${existing_keys[@]}" | grep -q "^$key$"; then
       echo -e "${yellow}⏩ 跳过重复配置：$full_domain${reset}"
       continue
     fi
 
-    # 写入配置文件
+    echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
+
+    exists=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$full_domain" \
+      -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
+
+    if echo "$exists" | grep -q '"name":"'$full_domain'"'; then
+      echo -e "${yellow}⚠️ DNS记录已存在：$full_domain${reset}"
+      read -p "是否删除并重建？(y/n): " confirm
+      if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        record_id=$(echo "$exists" | grep -o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')
+        curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$record_id" \
+          -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" > /dev/null
+        echo -e "${green}✅ 已删除旧记录，准备写入新记录...${reset}"
+      else
+        echo -e "${cyan}⏩ 跳过添加：$full_domain${reset}"
+        continue
+      fi
+    fi
+
     echo -e "\n  - hostname: $full_domain" >> "$CONFIG_YML"
     echo "    service: ${proto}://localhost:$port" >> "$CONFIG_YML"
     [[ "$proto" == "https" ]] && {
       echo "    originRequest:" >> "$CONFIG_YML"
       echo "      noTLSVerify: $skip_tls" >> "$CONFIG_YML"
     }
-
-    # 添加 Cloudflare DNS 记录
-    echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
-
-    exists=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$full_domain" \
-      -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
-
-    if echo "$exists" | grep -q "\"name\":\"$full_domain\""; then
-      record_id=$(echo "$exists" | grep -o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')
-      curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$record_id" \
-        -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" > /dev/null
-    fi
 
     if [[ "$dns_type" == "CNAME" ]]; then
       curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
@@ -110,19 +117,7 @@ while true; do
       srv="_${proto}._tcp.$full_domain"
       curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-        --data "{
-          \"type\":\"SRV\",
-          \"name\":\"$srv\",
-          \"data\":{
-            \"service\":\"_$proto\",
-            \"proto\":\"_tcp\",
-            \"name\":\"$full_domain\",
-            \"priority\":10,
-            \"weight\":5,
-            \"port\":$port,
-            \"target\":\"$TUNNEL_DOMAIN\"
-          }
-        }" > /dev/null
+        --data "{\"type\":\"SRV\",\"name\":\"$srv\",\"data\":{\"service\":\"_$proto\",\"proto\":\"_tcp\",\"name\":\"$full_domain\",\"priority\":10,\"weight\":5,\"port\":$port,\"target\":\"$TUNNEL_DOMAIN\"}}" > /dev/null
     fi
 
     existing_keys+=("$key")
@@ -131,12 +126,12 @@ while true; do
 
   read -p "➕ 是否继续添加其他服务？(y/n): " cont
   [[ "$cont" =~ ^[Nn]$ ]] && break
+
+  echo ""
 done
 
-# Fallback 添加（如未存在）
 grep -q "http_status:404" "$CONFIG_YML" || echo "  - service: http_status:404" >> "$CONFIG_YML"
 
-# 展示已添加内容
 echo -e "\n${yellow}📋 以下为本次已成功添加的服务记录：${reset}"
 for line in "${result_lines[@]}"; do
   echo -e "  ${green}$line${reset}"
