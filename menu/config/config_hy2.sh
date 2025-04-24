@@ -245,5 +245,5 @@ echo -e " ${lightpink}公网IPv6:   ${reset}${green}$ipv6${reset}"
 [ $tls_choice -eq 1 ] && echo -e " ${lightpink}证书提示:   ${yellow}客户端需启用 insecure 选项${reset}"
 
 footer
-read -p "$(echo -e "${cyan}按回车键返回...${reset}")" dummy
+read -p "$(echo -e "💬${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/config_node.sh
