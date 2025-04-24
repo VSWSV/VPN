@@ -36,7 +36,7 @@ function show_status() {
 }
 
 function show_error() {
-    echo -e "${red}✖ ${1}${reset}" | awk '{printf "%-60s %s\n', $0, ""}'
+    echo -e "${red}✖ ${1}${reset}" | awk '{printf "%-60s %s\n", $0, ""}'
 }
 
 function validate_input() {
@@ -66,7 +66,7 @@ function generate_certs() {
     if [[ -f "$CERTS_DIR/cert.pem" || -f "$CERTS_DIR/private.key" ]]; then
         read -p "$(echo -e "${yellow}⚠️ 检测到已有证书，是否覆盖？(y/N): ${reset}")" -n 1 overwrite
         echo
-        [[ "$overwrite" != [Yy] ]] && return
+        [[ "$overwrite" != [Yy] ]] && return 0
     fi
 
     if ! openssl ecparam -genkey -name prime256v1 -out "$CERTS_DIR/private.key" 2>/dev/null; then
