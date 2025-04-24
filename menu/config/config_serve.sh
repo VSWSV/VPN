@@ -79,6 +79,7 @@ while true; do
   [[ "$proto" == "https" ]] && read -p "🔒 跳过 TLS 验证？(y/n): " skip && [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
 
   for prefix in $input_prefixes; do
+    prefix=$(echo "$prefix" | tr 'A-Z' 'a-z')  # 统一小写
     full_domain="$prefix.$DOMAIN"
     key="$full_domain|$proto://localhost:$port|$skip_tls"
 
@@ -89,14 +90,19 @@ while true; do
 
     echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
 
-    # 查找是否已存在该类型记录
-    record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$full_domain&type=$dns_type" \
+    if [[ "$dns_type" == "CNAME" ]]; then
+      record_name="$prefix"
+    else
+      record_name="_${proto}._tcp.$prefix"
+    fi
+
+    record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$record_name&type=$dns_type" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
 
     record_ids=$(echo "$record_info" | grep -o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')
 
     if [[ -n "$record_ids" ]]; then
-      echo -e "${yellow}⚠️ DNS记录已存在：$full_domain${reset}"
+      echo -e "${yellow}⚠️ DNS记录已存在：$record_name${reset}"
       read -p "是否删除并重建？(y/n): " confirm
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
         for rid in $record_ids; do
@@ -105,7 +111,7 @@ while true; do
         done
         echo -e "${green}✅ 已删除旧记录，准备写入新记录...${reset}"
       else
-        echo -e "${cyan}⏩ 跳过添加：$full_domain${reset}"
+        echo -e "${cyan}⏩ 跳过添加：$record_name${reset}"
         continue
       fi
     fi
@@ -120,9 +126,9 @@ while true; do
     if [[ "$dns_type" == "CNAME" ]]; then
       curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-        --data "{\"type\":\"CNAME\",\"name\":\"$full_domain\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
+        --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
     else
-      srv="_${proto}._tcp"
+      srv="_${proto}._tcp.$prefix"
       curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
         --data "{
