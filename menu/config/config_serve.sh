@@ -89,18 +89,20 @@ while true; do
 
     echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
 
-    # ✅ 精准检查已有 DNS 记录
+    # 查找是否已存在该类型记录
     record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$full_domain&type=$dns_type" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
 
-    record_id=$(echo "$record_info" | grep -o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')
+    record_ids=$(echo "$record_info" | grep -o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')
 
-    if [[ -n "$record_id" ]]; then
+    if [[ -n "$record_ids" ]]; then
       echo -e "${yellow}⚠️ DNS记录已存在：$full_domain${reset}"
       read -p "是否删除并重建？(y/n): " confirm
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$record_id" \
-          -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" > /dev/null
+        for rid in $record_ids; do
+          curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$rid" \
+            -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" > /dev/null
+        done
         echo -e "${green}✅ 已删除旧记录，准备写入新记录...${reset}"
       else
         echo -e "${cyan}⏩ 跳过添加：$full_domain${reset}"
@@ -120,10 +122,22 @@ while true; do
         -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
         --data "{\"type\":\"CNAME\",\"name\":\"$full_domain\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
     else
-      srv="_${proto}._tcp.$full_domain"
+      srv="_${proto}._tcp"
       curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
         -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-        --data "{\"type\":\"SRV\",\"name\":\"$srv\",\"data\":{\"service\":\"_$proto\",\"proto\":\"_tcp\",\"name\":\"$full_domain\",\"priority\":10,\"weight\":5,\"port\":$port,\"target\":\"$TUNNEL_DOMAIN\"}}" > /dev/null
+        --data "{
+          \"type\": \"SRV\",
+          \"name\": \"$srv\",
+          \"data\": {
+            \"service\": \"_$proto\",
+            \"proto\": \"_tcp\",
+            \"name\": \"$full_domain\",
+            \"priority\": 10,
+            \"weight\": 5,
+            \"port\": $port,
+            \"target\": \"$TUNNEL_DOMAIN\"
+          }
+        }" > /dev/null
     fi
 
     existing_keys+=("$key")
@@ -132,7 +146,6 @@ while true; do
 
   read -p "➕ 是否继续添加其他服务？(y/n): " cont
   [[ "$cont" =~ ^[Nn]$ ]] && break
-
   echo ""
 done
 
