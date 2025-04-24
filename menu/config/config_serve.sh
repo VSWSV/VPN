@@ -59,15 +59,11 @@ while true; do
   echo -e "${yellow}请选择服务协议类型：${reset}"
   echo -e "  ${yellow}❶${reset} ${green}HTTP 服务${reset}"
   echo -e "  ${yellow}❷${reset} ${green}HTTPS 服务${reset}"
-  echo -e "  ${yellow}❸${reset} ${green}TCP 服务${reset}"
-  echo -e "  ${yellow}❹${reset} ${green}SSH 服务${reset}"
 
   read -p "请输入编号: " proto_opt
   case "$proto_opt" in
     1) proto="http"; dns_type="CNAME" ;;
     2) proto="https"; dns_type="CNAME" ;;
-    3) proto="tcp"; dns_type="SRV" ;;
-    4) proto="ssh"; dns_type="SRV" ;;
     *) echo -e "${red}❌ 无效输入${reset}"; continue ;;
   esac
 
@@ -79,7 +75,7 @@ while true; do
   [[ "$proto" == "https" ]] && read -p "🔒 跳过 TLS 验证？(y/n): " skip && [[ "$skip" =~ ^[Yy]$ ]] && skip_tls="true"
 
   for prefix in $input_prefixes; do
-    prefix=$(echo "$prefix" | tr 'A-Z' 'a-z')  # 统一小写
+    prefix=$(echo "$prefix" | tr 'A-Z' 'a-z')
     full_domain="$prefix.$DOMAIN"
     key="$full_domain|$proto://localhost:$port|$skip_tls"
 
@@ -90,11 +86,7 @@ while true; do
 
     echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
 
-    if [[ "$dns_type" == "CNAME" ]]; then
-      record_name="$prefix"
-    else
-      record_name="_${proto}._tcp.$prefix"
-    fi
+    record_name="$full_domain"
 
     record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$record_name&type=$dns_type" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
@@ -123,28 +115,9 @@ while true; do
       echo "      noTLSVerify: $skip_tls" >> "$CONFIG_YML"
     }
 
-    if [[ "$dns_type" == "CNAME" ]]; then
-      curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-        -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-        --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
-    else
-      srv="_${proto}._tcp.$prefix"
-      curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-        -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
-        --data "{
-          \"type\": \"SRV\",
-          \"name\": \"$srv\",
-          \"data\": {
-            \"service\": \"_$proto\",
-            \"proto\": \"_tcp\",
-            \"name\": \"$full_domain\",
-            \"priority\": 10,
-            \"weight\": 5,
-            \"port\": $port,
-            \"target\": \"$TUNNEL_DOMAIN\"
-          }
-        }" > /dev/null
-    fi
+    curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+      -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" \
+      --data "{\"type\":\"CNAME\",\"name\":\"$prefix\",\"content\":\"$TUNNEL_DOMAIN\",\"ttl\":120,\"proxied\":true}" > /dev/null
 
     existing_keys+=("$key")
     result_lines+=("🌐 $full_domain ｜ 协议：${proto^^} ｜ 端口：$port ｜ DNS：$dns_type → $TUNNEL_DOMAIN")
