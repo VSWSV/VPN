@@ -443,5 +443,5 @@ echo -e " ${lightpink}公网IPv4:   ${reset}${green}$ipv4${reset}"
 echo -e " ${lightpink}公网IPv6:   ${reset}${green}$ipv6${reset}"
 
 footer
-read -p "$(echo -e "💬${cyan}按回车键返回...${reset}")" dummy
+read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/config_node.sh
