@@ -2,14 +2,14 @@
 clear
 
 # 颜色定义
-green="\033[1;32m"   # 成功 - 绿色
-yellow="\033[1;33m"  # 警告/需确认 - 黄色
-red="\033[1;31m"     # 错误 - 红色
-cyan="\033[1;36m"    # 跳过/信息 - 青色
-blue="\033[1;34m"    # 选项 - 蓝色
-pink="\033[1;35m"    # 输入反馈 - 粉色
-orange="\033[38;5;214m"  # 标题 - 橙色
-reset="\033[0m"      # 重置颜色
+green="\033[1;32m"   
+yellow="\033[1;33m" 
+red="\033[1;31m"  
+cyan="\033[1;36m"   
+soft_blue="\033[38;5;111m"  
+soft_pink="\033[38;5;218m" 
+orange="\033[38;5;214m"   
+reset="\033[0m"      
 
 # 文件路径
 CONFIG_INFO="/root/.cloudflared/config_info.txt"
@@ -87,8 +87,8 @@ done < "$CONFIG_YML"
 declare -a result_lines=()
 while true; do
   echo -e "\n${yellow}请选择服务协议类型：${reset}"
-  echo -e "  ${blue}① ${blue} ${green}HTTP 服务${reset}"
-  echo -e "  ${blue}② ${blue} ${green}HTTPS 服务${reset}"
+  echo -e "  ${soft_blue}① ${soft_blue} ${green}HTTP 服务${reset}"
+  echo -e "  ${soft_blue}② ${soft_blue} ${green}HTTPS 服务${reset}"
 
   while true; do
     read -p "请输入编号: " proto_opt
@@ -98,7 +98,7 @@ while true; do
       *) echo -e "${red}❌ 无效输入，请输入①或②${reset}" ;;
     esac
   done
-  echo -e "${pink}🔹 输入为: ${green}${proto^^}${reset}"
+  echo -e "${soft_pink}🔹 输入为: ${green}${proto^^}${reset}"
 
   # 子域前缀输入验证
   while true; do
@@ -115,7 +115,7 @@ while true; do
       if printf '%s\n' "${existing_keys[@]}" | grep -q "^$full_domain|"; then
         echo -e "${red}❌ 错误：该域名($full_domain)已存在配置，请使用其他前缀${reset}"
       else
-        echo -e "${pink}🔹 输入为: ${green}$prefix${reset}"
+        echo -e "${soft_pink}🔹 输入为: ${green}$prefix${reset}"
         break
       fi
     fi
@@ -127,7 +127,7 @@ while true; do
     if [[ ! "$port" =~ ^[0-9]+$ ]] || ((port < 1 || port > 65535)); then
       echo -e "${red}❌ 错误：端口必须是1-65535之间的数字${reset}"
     else
-      echo -e "${pink}🔹 输入为: ${green}$port${reset}"
+      echo -e "${soft_pink}🔹 输入为: ${green}$port${reset}"
       break
     fi
   done
@@ -136,14 +136,14 @@ while true; do
   skip_tls="false"
   if [[ "$proto" == "https" ]]; then
     while true; do
-      read -p "🔒 跳过TLS验证？(${green}Y${reset}/${red}N${reset}): " skip
+      read -p "$(echo -e "🔒 跳过TLS验证？(${green}Y${reset}/${red}N${reset}): ")" skip
       case "$skip" in
         [Yy]) skip_tls="true"; tls_status="跳过"; break ;;
         [Nn]) skip_tls="false"; tls_status="启用"; break ;;
         *) echo -e "${red}❌ 无效输入，请输入Y或N${reset}" ;;
       esac
     done
-    echo -e "${pink}🔹 输入为: ${green}$tls_status${reset}"
+    echo -e "${soft_pink}🔹 输入为: ${green}$tls_status${reset}"
   fi
 
   full_domain="$prefix.$DOMAIN"
@@ -161,7 +161,7 @@ while true; do
   if [[ -n "$record_ids" ]]; then
     echo -e "${yellow}⚠️ 发现已存在的DNS记录：$full_domain${reset}"
     while true; do
-      read -p "是否删除并重建？(${green}Y${reset}/${red}N${reset}): " confirm
+      read -p "$(echo -e "是否删除并重建？(${green}Y${reset}/${red}N${reset}): ")" confirm
       case "$confirm" in
         [Yy]) 
           for rid in $record_ids; do
@@ -248,7 +248,7 @@ while true; do
 
   # 询问是否继续
   while true; do
-    read -p "➕ 是否继续添加其他服务？(${green}Y${reset}/${red}N${reset}): " cont
+    read -p "$(echo -e "➕ 是否继续添加其他服务？(${green}Y${reset}/${red}N${reset}): ")" cont
     case "$cont" in
       [Yy]) break ;;
       [Nn]) break 2 ;;
