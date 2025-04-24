@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 clear
 green="\033[1;32m"; yellow="\033[1;33m"; red="\033[1;31m"
 cyan="\033[1;36m"; orange="\033[38;5;214m"; reset="\033[0m"
@@ -89,14 +89,16 @@ while true; do
 
     echo -e "${cyan}🌍 DNS 添加中：$full_domain → $TUNNEL_DOMAIN${reset}"
 
-    exists=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$full_domain" \
+    # ✅ 精准检查已有 DNS 记录
+    record_info=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=$full_domain&type=$dns_type" \
       -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json")
 
-    if echo "$exists" | grep -q '"name":"'$full_domain'"'; then
+    record_id=$(echo "$record_info" | grep -o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')
+
+    if [[ -n "$record_id" ]]; then
       echo -e "${yellow}⚠️ DNS记录已存在：$full_domain${reset}"
       read -p "是否删除并重建？(y/n): " confirm
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        record_id=$(echo "$exists" | grep -o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')
         curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$record_id" \
           -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" > /dev/null
         echo -e "${green}✅ 已删除旧记录，准备写入新记录...${reset}"
