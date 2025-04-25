@@ -127,15 +127,27 @@ main_install() {
     systemctl restart apache2
   "
 
-  # 显示安装结果
-  draw_separator
-  echo -e "${orange}📦 安装目录结构:${reset}"
-  if command -v tree &>/dev/null; then
-    tree -L 2 "$INSTALL_DIR"
-  else
-    ls -lhR "$INSTALL_DIR" | grep -v "^$"
-  fi
+# 显示安装结果
+draw_separator
+echo -e "${orange}📦 安装目录结构:${reset}"
+
+if command -v tree &>/dev/null; then
+  tree_output=$(tree -L 2 "$INSTALL_DIR")
+  echo "$tree_output"
   
+  dirs=$(echo "$tree_output" | grep -o '[0-9]\+ directories' | grep -o '[0-9]\+')
+  files=$(echo "$tree_output" | grep -o '[0-9]\+ files' | grep -o '[0-9]\+')
+
+  if [[ -n "$dirs" && -n "$files" ]]; then
+    echo -e "共计：\033[1;95m${dirs}\033[0m \033[1;33m个目录\033[0m，\033[1;95m${files}\033[0m \033[1;33m个文件\033[0m"
+  else
+    echo -e "${red}✗ 无法解析目录和文件数量，请检查 tree 输出是否正常${reset}"
+  fi
+else
+  echo -e "${yellow}⚠ 未安装 tree，使用 ls 替代显示：${reset}"
+  ls -lhR "$INSTALL_DIR" | grep -v "^$"
+fi
+
   draw_separator
   echo -e "${orange}🔍 服务状态检查:${reset}"
   systemctl is-active postfix &>/dev/null && echo -e "${green}✓ Postfix运行正常${reset}" || echo -e "${red}✗ Postfix未运行${reset}"
