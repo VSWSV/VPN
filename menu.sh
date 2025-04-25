@@ -32,7 +32,7 @@ while true; do
     break ;;
     4) bash /root/VPN/menu/config_node.sh
     break;;
-    5) bash /root/VPN/menu/maintain.sh
+    5) bash /root/VPN/menu/mail.sh
     break ;;
     6) bash /root/VPN/menu/network_tools.sh
     break ;;
