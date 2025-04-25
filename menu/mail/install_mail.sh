@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ==============================================
-# Roundcube邮局系统完美安装脚本
-# 版本：v4.5
-# 最后更新：2023-10-26
+# Roundcube邮局系统安装脚本（纯净色彩版）
+# 版本：v4.6
+# 最后更新：2023-10-27
 # 特点：
-#   1. 100%无颜色代码泄露
-#   2. 完整的彩色目录树
+#   1. 100%稳定的颜色输出
+#   2. 完整的目录结构展示
 #   3. 准确的中文统计
 # ==============================================
 
@@ -16,51 +16,47 @@ LOG_FILE="$INSTALL_DIR/install.log"
 mkdir -p "$INSTALL_DIR" && chmod 700 "$INSTALL_DIR"
 > "$LOG_FILE"
 
-# ------------------------- 颜色定义 -------------------------
-# 使用tput更安全的颜色定义
-BLUE=$(tput setaf 4)
-GREEN=$(tput setaf 2)
-YELLOW=$(tput setaf 3)
-RED=$(tput setaf 1)
-ORANGE=$(tput setaf 208)
-CYAN=$(tput setaf 6)
-MAGENTA=$(tput setaf 5)
-RESET=$(tput sgr0)
+# ------------------------- 颜色定义（使用ANSI标准）-----------------
+BLUE="\033[1;34m"
+GREEN="\033[1;32m"
+YELLOW="\033[1;33m"
+RED="\033[1;31m"
+ORANGE="\033[38;5;214m"
+CYAN="\033[1;36m"
+MAGENTA="\033[1;35m"
+RESET="\033[0m"
 
-# ------------------------- 安全彩色输出函数 -------------------------
-color_echo() {
+# ------------------------- 安全颜色输出函数 -------------------------
+cecho() {
   local color=$1
   shift
-  echo "${color}$*${RESET}"
+  echo -e "${color}$*${RESET}"
 }
 
-# ------------------------- 彩色目录树函数 -------------------------
-safe_colored_tree() {
-  # 先获取原始tree输出（禁用颜色）
-  local raw_output=$(tree -L 2 --noreport "$1")
+# ------------------------- 目录树显示函数 -------------------------
+show_dir_structure() {
+  echo -e "${ORANGE}📦 安装目录结构:${RESET}"
   
-  # 处理输出
-  while IFS= read -r line; do
-    case $line in
-      *DIRECTORY*)
-        count=${line%% *}
-        color_echo "$MAGENTA" "${line//$count directories/$count 个目录}"
-        ;;
-      *file*)
-        count=${line%% *}
-        color_echo "$CYAN" "${line//$count files/$count 个文件}"
-        ;;
-      *──\ */*)
-        color_echo "$BLUE" "$line"
-        ;;
-      *──\ *.*)
-        color_echo "$GREEN" "$line"
-        ;;
-      *)
-        echo "$line"
-        ;;
-    esac
-  done <<< "$raw_output"
+  if command -v tree &>/dev/null; then
+    # 使用tree命令（带颜色）
+    echo -e "${BLUE}"
+    tree -L 2 --noreport "$INSTALL_DIR"
+    echo -e "${RESET}"
+    
+    # 获取统计信息并中文化
+    local dir_count=$(find "$INSTALL_DIR" -type d | wc -l)
+    local file_count=$(find "$INSTALL_DIR" -type f | wc -l)
+    echo -e "${MAGENTA}$dir_count 个目录 ${CYAN}$file_count 个文件${RESET}"
+  else
+    # 备用ls方案
+    echo -e "${BLUE}"
+    ls -lhp "$INSTALL_DIR" | grep -v "^total"
+    echo -e "${RESET}"
+    
+    local dir_count=$(find "$INSTALL_DIR" -type d | wc -l)
+    local file_count=$(find "$INSTALL_DIR" -type f | wc -l)
+    echo -e "${MAGENTA}$dir_count 个目录 ${CYAN}$file_count 个文件${RESET}"
+  fi
 }
 
 # ------------------------- 进度动画 -------------------------
@@ -79,17 +75,17 @@ progress_spinner() {
 
 # ------------------------- 边框函数 -------------------------
 draw_header() {
-  echo "${CYAN}╔═════════════════════════════════════════════════════════════════════════════════╗${RESET}"
-  color_echo "$ORANGE" "                   📮 Roundcube邮局系统安装脚本 v4.5"
-  echo "${CYAN}╠═════════════════════════════════════════════════════════════════════════════════╣${RESET}"
+  echo -e "${CYAN}╔═════════════════════════════════════════════════════════════════════════════════╗${RESET}"
+  cecho "$ORANGE" "                   📮 Roundcube邮局系统安装脚本 v4.6"
+  echo -e "${CYAN}╠═════════════════════════════════════════════════════════════════════════════════╣${RESET}"
 }
 
 draw_separator() {
-  echo "${CYAN}╠═════════════════════════════════════════════════════════════════════════════════╣${RESET}"
+  echo -e "${CYAN}╠═════════════════════════════════════════════════════════════════════════════════╣${RESET}"
 }
 
 draw_footer() {
-  echo "${CYAN}╚═════════════════════════════════════════════════════════════════════════════════╝${RESET}"
+  echo -e "${CYAN}╚═════════════════════════════════════════════════════════════════════════════════╝${RESET}"
 }
 
 # ------------------------- 安装步骤 -------------------------
@@ -97,8 +93,8 @@ install_step() {
   local step_name="$1"
   local install_cmd="$2"
   
-  color_echo "$YELLOW" "▶ $step_name..."
-  echo -n "${BLUE}▷ 进度:${RESET} "
+  cecho "$YELLOW" "▶ $step_name..."
+  echo -ne "${BLUE}▷ 进度:${RESET} "
   
   (eval "$install_cmd" >> "$LOG_FILE" 2>&1) &
   progress_spinner $!
@@ -109,7 +105,7 @@ install_step() {
     return 0
   else
     printf "\r${RED}✗ $step_name失败${RESET}\n"
-    color_echo "$YELLOW" "▶ 错误日志:"
+    cecho "$YELLOW" "▶ 错误日志:"
     tail -n 5 "$LOG_FILE" | sed "s/error\|fail/${RED}&${RESET}/g"
     return 1
   fi
@@ -149,7 +145,7 @@ main_install() {
   # 4. 部署Roundcube
   install_step "部署Webmail" "
     rm -rf $INSTALL_DIR/roundcube* &&
-    wget -q https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz &&
+    wget -q --tries=3 --timeout=30 https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz &&
     tar -xzf $INSTALL_DIR/roundcube.tar.gz -C $INSTALL_DIR &&
     mv $INSTALL_DIR/roundcubemail-1.6.3 $INSTALL_DIR/roundcube &&
     chown -R www-data:www-data $INSTALL_DIR/roundcube &&
@@ -165,23 +161,13 @@ main_install() {
 
   # 显示安装结果
   draw_separator
-  color_echo "$ORANGE" "📦 安装目录结构:"
-  if command -v tree &>/dev/null; then
-    safe_colored_tree "$INSTALL_DIR"
-  else
-    ls -lh "$INSTALL_DIR" | awk -v blue="$BLUE" -v green="$GREEN" -v reset="$RESET" '{
-      if($1 ~ /^d/) print blue $0 reset;
-      else print green $0 reset
-    }'
-    color_echo "$MAGENTA" "$(find "$INSTALL_DIR" -type d | wc -l) 个目录"
-    color_echo "$CYAN" "$(find "$INSTALL_DIR" -type f | wc -l) 个文件"
-  fi
+  show_dir_structure
   
   draw_separator
-  color_echo "$ORANGE" "🔍 服务状态检查:"
-  systemctl is-active postfix &>/dev/null && color_echo "$GREEN" "✓ Postfix运行正常" || color_echo "$RED" "✗ Postfix未运行"
-  systemctl is-active dovecot &>/dev/null && color_echo "$GREEN" "✓ Dovecot运行正常" || color_echo "$RED" "✗ Dovecot未运行"
-  systemctl is-active apache2 &>/dev/null && color_echo "$GREEN" "✓ Apache运行正常" || color_echo "$RED" "✗ Apache未运行"
+  cecho "$ORANGE" "🔍 服务状态检查:"
+  systemctl is-active postfix &>/dev/null && cecho "$GREEN" "✓ Postfix运行正常" || cecho "$RED" "✗ Postfix未运行"
+  systemctl is-active dovecot &>/dev/null && cecho "$GREEN" "✓ Dovecot运行正常" || cecho "$RED" "✗ Dovecot未运行"
+  systemctl is-active apache2 &>/dev/null && cecho "$GREEN" "✓ Apache运行正常" || cecho "$RED" "✗ Apache未运行"
   
   draw_footer
 }
