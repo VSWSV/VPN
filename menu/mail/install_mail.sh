@@ -21,21 +21,27 @@ cecho() {
 }
 
 show_dir_structure() {
-  echo -e "${ORANGE}安装目录结构:${RESET}"
+  echo -e "${ORANGE}📦 安装目录结构:${RESET}"
   if command -v tree &>/dev/null; then
     echo -e "${BLUE}"
     tree -L 2 --noreport "$INSTALL_DIR"
     echo -e "${RESET}"
     local dir_count=$(find "$INSTALL_DIR" -type d | wc -l)
     local file_count=$(find "$INSTALL_DIR" -type f | wc -l)
-    echo -e "${MAGENTA}$dir_count 个目录 ${CYAN}$file_count 个文件${RESET}"
+    echo -ne "${BLUE}${dir_count} 个目录${RESET}  "
+    echo -e "${GREEN}${file_count} 个文件${RESET}"
   else
     echo -e "${BLUE}"
     ls -lhp "$INSTALL_DIR" | grep -v "^total"
     echo -e "${RESET}"
     local dir_count=$(find "$INSTALL_DIR" -type d | wc -l)
     local file_count=$(find "$INSTALL_DIR" -type f | wc -l)
-    echo -e "${MAGENTA}$dir_count 个目录 ${CYAN}$file_count 个文件${RESET}"
+    echo -ne "${BLUE}${dir_count} 个目录${RESET}  "
+    echo -e "${GREEN}${file_count} 个文件${RESET}"
+  fi
+
+  if [ -d "$INSTALL_DIR/roundcube/roundcube" ]; then
+    cecho "$RED" "🔴 检测到异常目录：roundcube/roundcube（请检查）"
   fi
 }
 
