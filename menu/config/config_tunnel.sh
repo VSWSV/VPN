@@ -49,7 +49,7 @@ check_config_and_cert() {
         printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "文件路径：" "$CONFIG_FILE"
         printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "生成时间：" "$(date -r "$CONFIG_FILE" '+%Y-%m-%d %H:%M:%S')"
         [[ -f "$CONFIG_YML" ]] && printf "${lightpink}%-15s${reset}${green}%s${reset}\n" "配置文件：" "$CONFIG_YML"
-        echo -e "${lightpink}配置信息：${reset}"
+        echo -e "${yellow}📝 复制命令可快速编辑 ▶ ${green}nano /root/.cloudflared/config_info.txt${reset}"
 
         max_len=0
         while IFS= read -r line; do
