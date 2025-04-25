@@ -117,5 +117,5 @@ main_install() {
 
 main_install
 
-read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
+read -p "$(echo -e "💬 ${CYAN}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/mail.sh
