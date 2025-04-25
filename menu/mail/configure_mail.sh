@@ -346,9 +346,5 @@ main_menu() {
   done
 }
 
-# 脚本入口
-if [ "$(id -u)" != "0" ]; then
-  cecho "$red" "⚠ 必须使用root用户运行此脚本！"
-  exit 1
-fi
 main_menu
+ 
