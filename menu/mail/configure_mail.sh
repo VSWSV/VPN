@@ -12,7 +12,7 @@ show_dns_instructions() {
   
   # 使用更清晰的表格布局
   printf "${blue}%-12s ${yellow}%-15s ${green}%-40s${reset}\n" "记录类型" "主机名" "值"
-  echo -e "${blue}──────────────────────────────────────────────────────────────────────${reset}"
+ echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
   printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "A记录" "@" "$(hostname -I | awk '{print $1}')"
   printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "A记录" "mail" "$(hostname -I | awk '{print $1}')"
   printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "MX记录" "@" "mail.$domain (优先级10)"
