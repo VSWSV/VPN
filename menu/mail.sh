@@ -31,9 +31,9 @@ while true; do
             break ;;
         3) bash /root/VPN/menu/mail/configure_mail.sh
            break ;;
-        4) bash /root/VPN/menu/mail/test_mail.sh
+        4) bash /root/VPN/menu/mail/mail_control.sh
             break ;;
-        5) bash /root/VPN/menu/mail/install_mail.sh
+        5) bash /root/VPN/menu/mail/test_mail.sh
             break ;;
         6) bash /root/VPN/menu/mail/install_mail.sh
             break ;;
