@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # ==============================================
-# Roundcube邮局系统完美安装脚本
-# 版本：v4.2
+# Roundcube邮局系统完美安装脚本（中文版）
+# 版本：v4.3
 # 最后更新：2023-10-26
-# 修复内容：
-#   1. 彻底解决Roundcube部署失败问题
-#   2. 增强错误处理和重试机制
-#   3. 优化目录清理逻辑
+# 特点：
+#   1. 中英文混合界面
+#   2. 目录/文件颜色区分
+#   3. 错误显示为红色
 # ==============================================
 
 # ------------------------- 初始化设置 -------------------------
@@ -23,7 +23,23 @@ yellow="\033[1;33m"
 red="\033[1;31m"
 orange="\033[38;5;214m"
 cyan="\033[1;36m"
+magenta="\033[1;35m"
 reset="\033[0m"
+
+# ------------------------- 彩色树状图函数 -------------------------
+colored_tree() {
+  local path="$1"
+  command -v tree &>/dev/null || {
+    echo -e "${red}未找到tree命令，正在安装...${reset}"
+    apt install -y tree >/dev/null 2>&1
+  }
+  
+  tree -L 2 -C "$path" | sed -E '
+    s/([0-9]+) directories/'"${magenta}\1 个目录${reset}"'/g;
+    s/([0-9]+) files/'"${cyan}\1 个文件${reset}"'/g;
+    s/(^[├└]──.*\/)/'"${blue}\1${reset}"'/g;
+    s/(^[├└]──.*\..*$)/'"${green}\1${reset}"'/g'
+}
 
 # ------------------------- 精确进度条 -------------------------
 real_progress() {
@@ -43,7 +59,7 @@ real_progress() {
 # ------------------------- 边框函数 -------------------------
 draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                   ${orange}📮 Roundcube邮局系统终极安装脚本 v4.2${reset}"
+  echo -e "                   ${orange}📮 Roundcube邮局系统安装脚本 v4.3${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -57,10 +73,10 @@ draw_footer() {
 
 # ------------------------- 安全清理函数 -------------------------
 safe_clean() {
-  # 清理可能存在的旧安装
-  [ -d "$INSTALL_DIR/roundcube" ] && rm -rf "$INSTALL_DIR/roundcube"
-  [ -d "$INSTALL_DIR/roundcubemail-1.6.3" ] && rm -rf "$INSTALL_DIR/roundcubemail-1.6.3"
-  [ -f "$INSTALL_DIR/roundcube.tar.gz" ] && rm -f "$INSTALL_DIR/roundcube.tar.gz"
+  echo -e "${yellow}▶ 正在清理旧安装文件...${reset}"
+  [ -d "$INSTALL_DIR/roundcube" ] && rm -rf "$INSTALL_DIR/roundcube" && echo -e "${blue}↳ 已清除旧roundcube目录${reset}"
+  [ -d "$INSTALL_DIR/roundcubemail-1.6.3" ] && rm -rf "$INSTALL_DIR/roundcubemail-1.6.3" && echo -e "${blue}↳ 已清除旧安装包${reset}"
+  [ -f "$INSTALL_DIR/roundcube.tar.gz" ] && rm -f "$INSTALL_DIR/roundcube.tar.gz" && echo -e "${blue}↳ 已清除旧压缩包${reset}"
 }
 
 # ------------------------- 安装步骤 -------------------------
@@ -75,7 +91,6 @@ install_step() {
   while [ $retry_count -lt $max_retries ]; do
     echo -ne "${blue}▷ 进度:${reset} "
     
-    # 显示动态进度图标
     (eval "$install_cmd" >> "$LOG_FILE" 2>&1) &
     real_progress $!
     wait $!
@@ -85,13 +100,16 @@ install_step() {
       return 0
     else
       ((retry_count++))
-      printf "\r${yellow}⚠ 尝试 ${retry_count}/${max_retries} 失败${reset}\n"
+      printf "\r${yellow}⚠ 第${retry_count}次尝试失败${reset}\n"
       sleep 2
     fi
   done
   
   printf "\r${red}✗ ${step_name}失败${reset}\n"
-  echo -e "${yellow}⚠ 错误日志: tail -n 20 $LOG_FILE${reset}" | tee -a "$LOG_FILE"
+  echo -e "${yellow}▶ 错误日志: tail -n 20 $LOG_FILE${reset}" | tee -a "$LOG_FILE"
+  echo -e "${red}══════════════════ 最后5行错误日志 ══════════════════${reset}"
+  tail -n 5 "$LOG_FILE" | sed "s/error\|failed/${red}&${reset}/gi"
+  echo -e "${red}═══════════════════════════════════════════════════${reset}"
   return 1
 }
 
@@ -128,10 +146,13 @@ main_install() {
   # 4. 安全清理
   safe_clean
 
-  # 5. 部署Roundcube（增强版）
+  # 5. 部署Roundcube
   install_step "部署Webmail" "
+    echo -e '${blue}▶ 下载Roundcube...${reset}' &&
     wget -q --tries=3 --timeout=30 https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz &&
+    echo -e '${blue}▶ 解压文件...${reset}' &&
     tar -xzf $INSTALL_DIR/roundcube.tar.gz -C $INSTALL_DIR &&
+    echo -e '${blue}▶ 设置目录...${reset}' &&
     mv $INSTALL_DIR/roundcubemail-1.6.3 $INSTALL_DIR/roundcube &&
     chown -R www-data:www-data $INSTALL_DIR/roundcube &&
     chmod -R 755 $INSTALL_DIR/roundcube &&
@@ -147,16 +168,8 @@ main_install() {
   # 显示安装结果
   draw_separator
   echo -e "${orange}📦 安装目录结构:${reset}"
-if command -v tree &>/dev/null; then
-  tree -L 2 "$INSTALL_DIR" | sed '
-    s/directories/个目录/g;
-    s/files/个文件/g;
-    s/ directory/ 个目录/g;
-    s/ file/ 个文件/g'
-else
-  ls -lhR "$INSTALL_DIR" | grep -v "^$"
-  echo -e "${blue}（共 $(find "$INSTALL_DIR" -type d | wc -l) 个目录，$(find "$INSTALL_DIR" -type f | wc -l) 个文件）${reset}"
-fi
+  colored_tree "$INSTALL_DIR"
+  
   draw_separator
   echo -e "${orange}🔍 服务状态检查:${reset}"
   systemctl is-active postfix &>/dev/null && echo -e "${green}✓ Postfix运行正常${reset}" || echo -e "${red}✗ Postfix未运行${reset}"
