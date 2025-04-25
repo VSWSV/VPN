@@ -42,7 +42,7 @@ draw_footer() {
 }
 
 safe_clean() {
-  # 清理可能存在的旧安装
+
   [ -d "$INSTALL_DIR/roundcube" ] && rm -rf "$INSTALL_DIR/roundcube"
   [ -d "$INSTALL_DIR/roundcubemail-1.6.3" ] && rm -rf "$INSTALL_DIR/roundcubemail-1.6.3"
   [ -f "$INSTALL_DIR/roundcube.tar.gz" ] && rm -f "$INSTALL_DIR/roundcube.tar.gz"
@@ -59,7 +59,6 @@ install_step() {
   while [ $retry_count -lt $max_retries ]; do
     echo -ne "${blue}▷ 进度:${reset} "
     
-    # 显示动态进度图标
     (eval "$install_cmd" >> "$LOG_FILE" 2>&1) &
     real_progress $!
     wait $!
@@ -79,21 +78,19 @@ install_step() {
   return 1
 }
 
+# ------------------------- 主安装流程 -------------------------
 main_install() {
   draw_header
   
-  # 0. 安装tree命令
   if ! command -v tree &>/dev/null; then
     install_step "安装tree工具" "apt install -y tree"
   fi
 
-  # 1. 系统检测
   install_step "系统环境检测" "
     [ \"$(id -u)\" != \"0\" ] && { echo '必须使用root权限'; exit 1; }
     grep -q 'Ubuntu 22.04' /etc/os-release || echo '⚠ 非Ubuntu 22.04系统'
   "
 
-  # 2. 安装核心组件
   install_step "安装邮件服务" "
     apt update -y &&
     DEBIAN_FRONTEND=noninteractive apt install -y \
@@ -101,17 +98,14 @@ main_install() {
       dovecot-core dovecot-imapd dovecot-pop3d dovecot-mysql
   "
 
-  # 3. 安装Web环境
   install_step "安装Web服务" "
     apt install -y \
       apache2 libapache2-mod-php \
       php php-{mysql,intl,json,curl,zip,gd,mbstring,xml,imap}
   "
 
-  # 4. 安全清理
   safe_clean
 
-  # 5. 部署Roundcube（增强版）
   install_step "部署Webmail" "
     wget -q --tries=3 --timeout=30 https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz &&
     tar -xzf $INSTALL_DIR/roundcube.tar.gz -C $INSTALL_DIR &&
@@ -121,33 +115,24 @@ main_install() {
     rm -f $INSTALL_DIR/roundcube.tar.gz
   "
 
-  # 6. 创建符号链接
+
   install_step "配置Web访问" "
     ln -sfT $INSTALL_DIR/roundcube /var/www/roundcube &&
     systemctl restart apache2
   "
 
-# 显示安装结果
-draw_separator
 echo -e "${orange}📦 安装目录结构:${reset}"
-
 if command -v tree &>/dev/null; then
-  tree_output=$(tree -L 2 "$INSTALL_DIR")
-  echo "$tree_output"
-  
-  dirs=$(echo "$tree_output" | grep -o '[0-9]\+ directories' | grep -o '[0-9]\+')
-  files=$(echo "$tree_output" | grep -o '[0-9]\+ files' | grep -o '[0-9]\+')
-
-  if [[ -n "$dirs" && -n "$files" ]]; then
-    echo -e "共计：\033[1;95m${dirs}\033[0m \033[1;33m个目录\033[0m，\033[1;95m${files}\033[0m \033[1;33m个文件\033[0m"
-  else
-    echo -e "${red}✗ 无法解析目录和文件数量，请检查 tree 输出是否正常${reset}"
-  fi
+  tree -L 2 "$INSTALL_DIR" | sed '
+    s/directories/个目录/g;
+    s/files/个文件/g;
+    s/ directory/ 个目录/g;
+    s/ file/ 个文件/g'
 else
-  echo -e "${yellow}⚠ 未安装 tree，使用 ls 替代显示：${reset}"
   ls -lhR "$INSTALL_DIR" | grep -v "^$"
+  echo -e "${blue}（共 $(find "$INSTALL_DIR" -type d | wc -l) 个目录，$(find "$INSTALL_DIR" -type f | wc -l) 个文件）${reset}"
 fi
-
+  
   draw_separator
   echo -e "${orange}🔍 服务状态检查:${reset}"
   systemctl is-active postfix &>/dev/null && echo -e "${green}✓ Postfix运行正常${reset}" || echo -e "${red}✗ Postfix未运行${reset}"
@@ -160,5 +145,6 @@ fi
 clear
 main_install
 
+# ======================== 最终交互 ========================
 read -p "按回车返回主菜单..."
 bash /root/VPN/menu/mail.sh
