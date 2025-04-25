@@ -101,6 +101,7 @@ if [ -f "$CONFIG_PATH" ]; then
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "${orange}                              📝 当前配置预览                                  ${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${yellow}📝 复制命令可快速编辑 ▶ ${green}nano /root/VPN/VLESS/config/vless.json${reset}"
     echo -e " ${lightpink}UUID：     ${reset}${green}$current_uuid${reset}"
     echo -e " ${lightpink}端口：     ${reset}${green}$current_port${reset}"
     echo -e " ${lightpink}域名：     ${reset}${green}$current_sni${reset}"
