@@ -147,12 +147,16 @@ main_install() {
   # 显示安装结果
   draw_separator
   echo -e "${orange}📦 安装目录结构:${reset}"
-  if command -v tree &>/dev/null; then
-    tree -L 2 "$INSTALL_DIR"
-  else
-    ls -lhR "$INSTALL_DIR" | grep -v "^$"
-  fi
-  
+if command -v tree &>/dev/null; then
+  tree -L 2 "$INSTALL_DIR" | sed '
+    s/directories/个目录/g;
+    s/files/个文件/g;
+    s/ directory/ 个目录/g;
+    s/ file/ 个文件/g'
+else
+  ls -lhR "$INSTALL_DIR" | grep -v "^$"
+  echo -e "${blue}（共 $(find "$INSTALL_DIR" -type d | wc -l) 个目录，$(find "$INSTALL_DIR" -type f | wc -l) 个文件）${reset}"
+fi
   draw_separator
   echo -e "${orange}🔍 服务状态检查:${reset}"
   systemctl is-active postfix &>/dev/null && echo -e "${green}✓ Postfix运行正常${reset}" || echo -e "${red}✗ Postfix未运行${reset}"
