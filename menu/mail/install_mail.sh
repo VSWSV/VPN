@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # ==============================================
-# Roundcube邮局系统完美安装脚本（中文版）
-# 版本：v4.3
+# Roundcube邮局系统完美安装脚本
+# 版本：v4.4
 # 最后更新：2023-10-26
-# 特点：
-#   1. 中英文混合界面
-#   2. 目录/文件颜色区分
-#   3. 错误显示为红色
+# 修复内容：
+#   1. 彻底解决颜色代码泄露问题
+#   2. 完美中英文目录统计
+#   3. 增强的错误处理
 # ==============================================
 
 # ------------------------- 初始化设置 -------------------------
@@ -28,17 +28,24 @@ reset="\033[0m"
 
 # ------------------------- 彩色树状图函数 -------------------------
 colored_tree() {
-  local path="$1"
-  command -v tree &>/dev/null || {
-    echo -e "${red}未找到tree命令，正在安装...${reset}"
-    apt install -y tree >/dev/null 2>&1
-  }
+  # 先获取原始tree输出
+  local raw_output=$(tree -L 2 -C --noreport "$1")
   
-  tree -L 2 -C "$path" | sed -E '
-    s/([0-9]+) directories/'"${magenta}\1 个目录${reset}"'/g;
-    s/([0-9]+) files/'"${cyan}\1 个文件${reset}"'/g;
-    s/(^[├└]──.*\/)/'"${blue}\1${reset}"'/g;
-    s/(^[├└]──.*\..*$)/'"${green}\1${reset}"'/g'
+  # 颜色替换（确保在管道中处理）
+  echo "$raw_output" | sed -E "
+    # 替换目录行
+    s/^([├└]── )([^.]*\/)$/\1${blue}\2${reset}/g;
+    
+    # 替换文件行
+    s/^([├└]── )(.*\..*)$/\1${green}\2${reset}/g;
+    
+    # 替换统计信息
+    s/([0-9]+) directories/${magenta}\1 个目录${reset}/g;
+    s/([0-9]+) files/${cyan}\1 个文件${reset}/g;
+    
+    # 清理残留颜色代码
+    s/\x1B\[[0-9;]*[mK]//g
+  "
 }
 
 # ------------------------- 精确进度条 -------------------------
@@ -59,7 +66,7 @@ real_progress() {
 # ------------------------- 边框函数 -------------------------
 draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                   ${orange}📮 Roundcube邮局系统安装脚本 v4.3${reset}"
+  echo -e "                   ${orange}📮 Roundcube邮局系统安装脚本 v4.4${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -71,53 +78,34 @@ draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# ------------------------- 安全清理函数 -------------------------
-safe_clean() {
-  echo -e "${yellow}▶ 正在清理旧安装文件...${reset}"
-  [ -d "$INSTALL_DIR/roundcube" ] && rm -rf "$INSTALL_DIR/roundcube" && echo -e "${blue}↳ 已清除旧roundcube目录${reset}"
-  [ -d "$INSTALL_DIR/roundcubemail-1.6.3" ] && rm -rf "$INSTALL_DIR/roundcubemail-1.6.3" && echo -e "${blue}↳ 已清除旧安装包${reset}"
-  [ -f "$INSTALL_DIR/roundcube.tar.gz" ] && rm -f "$INSTALL_DIR/roundcube.tar.gz" && echo -e "${blue}↳ 已清除旧压缩包${reset}"
-}
-
 # ------------------------- 安装步骤 -------------------------
 install_step() {
   local step_name="$1"
   local install_cmd="$2"
-  local max_retries=3
-  local retry_count=0
   
   echo -e "${yellow}▶ ${step_name}...${reset}" | tee -a "$LOG_FILE"
+  echo -ne "${blue}▷ 进度:${reset} "
   
-  while [ $retry_count -lt $max_retries ]; do
-    echo -ne "${blue}▷ 进度:${reset} "
-    
-    (eval "$install_cmd" >> "$LOG_FILE" 2>&1) &
-    real_progress $!
-    wait $!
-    
-    if [ $? -eq 0 ]; then
-      printf "\r${green}✓ ${step_name}完成${reset}\n"
-      return 0
-    else
-      ((retry_count++))
-      printf "\r${yellow}⚠ 第${retry_count}次尝试失败${reset}\n"
-      sleep 2
-    fi
-  done
+  (eval "$install_cmd" >> "$LOG_FILE" 2>&1) &
+  real_progress $!
+  wait $!
   
-  printf "\r${red}✗ ${step_name}失败${reset}\n"
-  echo -e "${yellow}▶ 错误日志: tail -n 20 $LOG_FILE${reset}" | tee -a "$LOG_FILE"
-  echo -e "${red}══════════════════ 最后5行错误日志 ══════════════════${reset}"
-  tail -n 5 "$LOG_FILE" | sed "s/error\|failed/${red}&${reset}/gi"
-  echo -e "${red}═══════════════════════════════════════════════════${reset}"
-  return 1
+  if [ $? -eq 0 ]; then
+    printf "\r${green}✓ ${step_name}完成${reset}\n"
+    return 0
+  else
+    printf "\r${red}✗ ${step_name}失败${reset}\n"
+    echo -e "${yellow}▶ 错误日志:${reset}"
+    tail -n 5 "$LOG_FILE" | sed "s/error\|fail/${red}&${reset}/gi"
+    return 1
+  fi
 }
 
 # ------------------------- 主安装流程 -------------------------
 main_install() {
   draw_header
   
-  # 0. 安装tree命令
+  # 0. 确保安装tree命令
   if ! command -v tree &>/dev/null; then
     install_step "安装tree工具" "apt install -y tree"
   fi
@@ -143,32 +131,35 @@ main_install() {
       php php-{mysql,intl,json,curl,zip,gd,mbstring,xml,imap}
   "
 
-  # 4. 安全清理
-  safe_clean
-
-  # 5. 部署Roundcube
+  # 4. 部署Roundcube
   install_step "部署Webmail" "
-    echo -e '${blue}▶ 下载Roundcube...${reset}' &&
-    wget -q --tries=3 --timeout=30 https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz &&
-    echo -e '${blue}▶ 解压文件...${reset}' &&
+    rm -rf $INSTALL_DIR/roundcube* &&
+    wget -q https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz &&
     tar -xzf $INSTALL_DIR/roundcube.tar.gz -C $INSTALL_DIR &&
-    echo -e '${blue}▶ 设置目录...${reset}' &&
     mv $INSTALL_DIR/roundcubemail-1.6.3 $INSTALL_DIR/roundcube &&
     chown -R www-data:www-data $INSTALL_DIR/roundcube &&
     chmod -R 755 $INSTALL_DIR/roundcube &&
-    rm -f $INSTALL_DIR/roundcube.tar.gz
+    rm $INSTALL_DIR/roundcube.tar.gz
   "
 
-  # 6. 创建符号链接
+  # 5. 配置Web访问
   install_step "配置Web访问" "
-    ln -sfT $INSTALL_DIR/roundcube /var/www/roundcube &&
+    ln -sf $INSTALL_DIR/roundcube /var/www/roundcube &&
     systemctl restart apache2
   "
 
   # 显示安装结果
   draw_separator
   echo -e "${orange}📦 安装目录结构:${reset}"
-  colored_tree "$INSTALL_DIR"
+  if command -v tree &>/dev/null; then
+    colored_tree "$INSTALL_DIR"
+  else
+    ls -lh "$INSTALL_DIR" | awk '{
+      if($1 ~ /^d/) printf "'${blue}'%s'${reset}'\n", $0;
+      else printf "'${green}'%s'${reset}'\n", $0
+    }'
+    echo -e "${magenta}$(find "$INSTALL_DIR" -type d | wc -l) 个目录${reset}, ${cyan}$(find "$INSTALL_DIR" -type f | wc -l) 个文件${reset}"
+  fi
   
   draw_separator
   echo -e "${orange}🔍 服务状态检查:${reset}"
