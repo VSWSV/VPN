@@ -117,5 +117,5 @@ main_install() {
 
 main_install
 
-read -p "按回车返回主菜单..."
+read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/mail.sh
