@@ -80,7 +80,7 @@ install_step() {
   else
     printf "\r${RED}✗ $step_name失败${RESET}\n"
     cecho "$YELLOW" "▶ 错误日志:"
-    tail -n 5 "$LOG_FILE" | sed "s/error\|fail/${RED}&${RESET}/g"
+    tail -n 10 "$LOG_FILE" | grep -Ei "error|fail|cp:|cannot|denied" | sed "s/error\|fail\|cp:\|cannot\|denied/${RED}&${RESET}/g"
     return 1
   fi
 }
@@ -88,13 +88,16 @@ install_step() {
 main_install() {
   clear
   draw_header
+  rm -rf "$INSTALL_DIR/roundcube"
+  rm -rf "/var/www/roundcube"
+  mkdir -p "$INSTALL_DIR/roundcube"
   if ! command -v tree &>/dev/null; then
     install_step "安装tree工具" "apt install -y tree"
   fi
   install_step "系统环境检测" "[ \"$(id -u)\" != \"0\" ] && { echo '必须使用root权限'; exit 1; }; grep -q 'Ubuntu 22.04' /etc/os-release || echo '⚠ 非Ubuntu 22.04系统'"
   install_step "安装邮件服务" "apt update -y && DEBIAN_FRONTEND=noninteractive apt install -y postfix postfix-mysql dovecot-core dovecot-imapd dovecot-pop3d dovecot-mysql"
   install_step "安装Web服务" "apt install -y apache2 libapache2-mod-php php php-{mysql,intl,json,curl,zip,gd,mbstring,xml,imap}"
-  install_step "部署Webmail" "rm -rf $INSTALL_DIR/roundcube* && wget -q --tries=3 --timeout=30 https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz && tar -xzf $INSTALL_DIR/roundcube.tar.gz -C $INSTALL_DIR && mv $INSTALL_DIR/roundcubemail-1.6.3 $INSTALL_DIR/roundcube && chown -R www-data:www-data $INSTALL_DIR/roundcube && chmod -R 755 $INSTALL_DIR/roundcube && rm $INSTALL_DIR/roundcube.tar.gz"
+  install_step "部署Webmail" "wget -q --tries=3 --timeout=30 https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz && tar -xzf $INSTALL_DIR/roundcube.tar.gz -C $INSTALL_DIR/roundcube --strip-components=1 && chown -R www-data:www-data $INSTALL_DIR/roundcube && chmod -R 755 $INSTALL_DIR/roundcube && rm $INSTALL_DIR/roundcube.tar.gz"
   install_step "配置Web访问" "cp -r $INSTALL_DIR/roundcube /var/www/roundcube && systemctl restart apache2"
   draw_separator
   show_dir_structure
