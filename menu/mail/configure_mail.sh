@@ -1,114 +1,139 @@
 #!/bin/bash
 
-INSTALL_DIR="/root/VPN/MAIL"
-CONFIG_FILE="/etc/postfix/main.cf"
-DOVECOT_CONFIG="/etc/dovecot/dovecot.conf"
-ROUNDCUBE_CONFIG="/var/www/roundcube/config/config.inc.php"
+# ...（保留之前的颜色定义和函数）
 
-# 颜色定义
-blue="\033[1;34m"
-green="\033[1;32m"
-yellow="\033[1;33m"
-red="\033[1;31m"
-orange="\033[38;5;214m"
-cyan="\033[1;36m"
-magenta="\033[1;35m"
-reset="\033[0m"
-
-cecho() {
-  local color=$1
-  shift
-  echo -e "${color}$*${reset}"
-}
-
-configure_domain() {
+show_dns_instructions() {
   clear
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "$orange" "                                 📧 邮局域名配置${reset}"
+  echo -e "$orange" "                                 🌐 DNS配置指南${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
   
-  read -p "$(echo -e "${yellow}✨ 请输入您的邮件域名 (例如: example.com): ${reset}")" domain
-  echo -e "${blue}📝 输入为: ${green}$domain${reset}"
+  cecho "$green" "请为域名 ${yellow}$domain${green} 添加以下DNS记录：\n"
   
-  read -p "$(echo -e "${yellow}✨ 请输入服务器主机名 (例如: mail.example.com): ${reset}")" hostname
-  echo -e "${blue}📝 输入为: ${green}$hostname${reset}"
+  # 使用更清晰的表格布局
+  printf "${blue}%-12s ${yellow}%-15s ${green}%-40s${reset}\n" "记录类型" "主机名" "值"
+  echo -e "${blue}──────────────────────────────────────────────────────────────────────${reset}"
+  printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "A记录" "@" "$(hostname -I | awk '{print $1}')"
+  printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "A记录" "mail" "$(hostname -I | awk '{print $1}')"
+  printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "MX记录" "@" "mail.$domain (优先级10)"
+  printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "TXT记录" "@" "v=spf1 mx ~all"
+  printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "TXT记录" "_dmarc" "v=DMARC1; p=none; rua=mailto:postmaster@$domain"
+  printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "PTR记录" "$(hostname -I | awk '{print $1}')" "mail.$domain"
   
-  # 配置Postfix
-  sed -i "s/myhostname = .*/myhostname = $hostname/" $CONFIG_FILE
-  sed -i "s/mydomain = .*/mydomain = $domain/" $CONFIG_FILE
+  cecho "$yellow" "\n🔔 重要提示："
+  echo -e "${blue}• 请将${yellow}您的域名${blue}替换为实际域名（当前显示: ${yellow}$domain${blue}）"
+  echo -e "${blue}• PTR记录需要联系服务器提供商设置"
+  echo -e "${blue}• 测试命令: ${green}dig MX $domain${blue} 或 ${green}nslookup mail.$domain"
   
-  # 配置Dovecot
-  echo "ssl_cert = </etc/letsencrypt/live/$hostname/fullchain.pem" >> $DOVECOT_CONFIG
-  echo "ssl_key = </etc/letsencrypt/live/$hostname/privkey.pem" >> $DOVECOT_CONFIG
-  
-  # 配置Roundcube
-  if [ -f $ROUNDCUBE_CONFIG ]; then
-    sed -i "s/\$config\['default_host'\] = .*/\$config\['default_host'\] = 'ssl:\/\/$hostname';/" $ROUNDCUBE_CONFIG
-    sed -i "s/\$config\['smtp_server'\] = .*/\$config\['smtp_server'\] = 'tls:\/\/$hostname';/" $ROUNDCUBE_CONFIG
-  fi
-  
-  echo -e "${green}✅ 域名配置完成!${reset}"
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-  
-  read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
-  bash /root/VPN/menu/mail.sh
+  read -p "$(echo -e "💬 ${cyan}按回车键继续...${reset}")" dummy
 }
 
-configure_database() {
+setup_multi_domain() {
   clear
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "$orange" "                                 🗃️ 数据库配置${reset}"
+  echo -e "$orange" "                                 🌍 多域名配置${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
   
-  read -p "$(echo -e "${yellow}✨ 请输入MySQL root密码: ${reset}")" -s rootpass
-  echo -e "\n${blue}📝 输入为: ${green}[密码已隐藏]${reset}"
+  cecho "$green" "当前主域名: ${yellow}$domain${reset}"
+  cecho "$blue" "已配置子域名:"
+  mysql -uroot -p"$rootpass" $DB_NAME -e "SELECT name AS '已配置域名' FROM virtual_domains;" 2>/dev/null || \
+  cecho "$red" "尚未配置任何子域名"
   
-  read -p "$(echo -e "${yellow}✨ 请输入新数据库名称: ${reset}")" dbname
-  echo -e "${blue}📝 输入为: ${green}$dbname${reset}"
-  
-  read -p "$(echo -e "${yellow}✨ 请输入新数据库用户名: ${reset}")" dbuser
-  echo -e "${blue}📝 输入为: ${green}$dbuser${reset}"
-  
-  read -p "$(echo -e "${yellow}✨ 请输入新数据库密码: ${reset}")" -s dbpass
-  echo -e "\n${blue}📝 输入为: ${green}[密码已隐藏]${reset}"
-  
-  mysql -uroot -p"$rootpass" <<EOF
-CREATE DATABASE $dbname;
-CREATE USER '$dbuser'@'localhost' IDENTIFIED BY '$dbpass';
-GRANT ALL PRIVILEGES ON $dbname.* TO '$dbuser'@'localhost';
-FLUSH PRIVILEGES;
-EOF
-  
-  # 导入Roundcube数据库结构
-  mysql -uroot -p"$rootpass" $dbname < /var/www/roundcube/SQL/mysql.initial.sql
-  
-  # 更新Roundcube配置
-  sed -i "s/\$config\['db_dsnw'\] = .*/\$config\['db_dsnw'\] = 'mysql:\/\/$dbuser:$dbpass@localhost\/$dbname';/" $ROUNDCUBE_CONFIG
-  
-  echo -e "${green}✅ 数据库配置完成!${reset}"
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-  
-  read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
-  bash /root/VPN/menu/mail.sh
-}
-
-main_menu() {
-  clear
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "$orange" "                                 ⚙️ 邮局配置菜单${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-  echo -e "${green}① 配置邮件域名${reset}"
-  echo -e "${green}② 配置数据库${reset}"
-  echo -e "${green}③ 返回主菜单${reset}"
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+  echo -e "\n${green}① 添加新子域名"
+  echo -e "${green}② 设置全局收件人"
+  echo -e "${green}③ 返回上级菜单${reset}"
   
   read -p "$(echo -e "${yellow}✨ 请选择操作 [1-3]: ${reset}")" choice
   case $choice in
-    1) configure_domain ;;
-    2) configure_database ;;
-    3) bash /root/VPN/menu/mail.sh ;;
-    *) echo -e "${red}✗ 无效选择!${reset}"; sleep 1; main_menu ;;
+    1)
+      read -p "$(echo -e "${yellow}✨ 请输入要添加的子域名 (如 sales.$domain): ${reset}")" subdomain
+      # 验证域名格式
+      if [[ $subdomain =~ ^[a-zA-Z0-9]+\.$domain$ ]]; then
+        mysql -uroot -p"$rootpass" $DB_NAME -e "INSERT INTO virtual_domains (name) VALUES ('$subdomain');"
+        cecho "$green" "✅ 子域名 ${yellow}$subdomain${green} 添加成功！"
+        
+        # 自动配置DNS提示
+        cecho "$blue" "\n请为该子域名添加DNS记录："
+        printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "A记录" "${subdomain%.*}" "$(hostname -I | awk '{print $1}')"
+        printf "${green}%-12s ${reset}%-15s ${green}%-40s${reset}\n" "MX记录" "${subdomain%.*}" "mail.$domain (优先级10)"
+      else
+        cecho "$red" "❌ 格式错误！必须是主域名的子域名 (如 sales.$domain)"
+      fi
+      ;;
+    2)
+      read -p "$(echo -e "${yellow}✨ 请输入全局收件邮箱 (如 catch-all@$domain): ${reset}")" catch_all
+      # 验证邮箱格式
+      if [[ $catch_all =~ ^[a-zA-Z0-9._%+-]+@$domain$ ]]; then
+        mysql -uroot -p"$rootpass" $DB_NAME <<EOF
+INSERT INTO virtual_aliases (domain_id, source, destination) 
+SELECT id, '@\$domain', '$catch_all' FROM virtual_domains WHERE name='$domain';
+EOF
+        cecho "$green" "✅ 全局收件设置成功！所有发送到${yellow}*@$domain${green}的邮件将转发到 ${yellow}$catch_all"
+      else
+        cecho "$red" "❌ 必须是有效的邮箱地址 (如 catch-all@$domain)"
+      fi
+      ;;
+    3)
+      return ;;
+    *)
+      cecho "$red" "无效选择！"; sleep 1 ;;
+  esac
+  
+  read -p "$(echo -e "💬 ${cyan}按回车键继续...${reset}")" dummy
+  setup_multi_domain
+}
+
+show_web_access() {
+  clear
+  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+  echo -e "$orange" "                                 🌐 访问信息${reset}"
+  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+  
+  cecho "$green" "Webmail访问地址:"
+  cecho "$yellow" "https://mail.$domain/roundcube"
+  
+  cecho "$green" "\n管理后台地址:"
+  cecho "$yellow" "https://mail.$domain/roundcube/?_task=settings"
+  
+  cecho "$green" "\nSMTP/POP3/IMAP服务器地址:"
+  cecho "$yellow" "mail.$domain"
+  cecho "$blue" "端口:"
+  cecho "$yellow" "SMTP: 587 (STARTTLS), 465 (SSL)" 
+  cecho "$yellow" "IMAP: 993 (SSL)"
+  cecho "$yellow" "POP3: 995 (SSL)"
+  
+  cecho "$green" "\n📌 首次登录建议使用管理员邮箱:"
+  cecho "$yellow" "postmaster@$domain"
+  
+  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+  read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
+}
+
+# 在main_menu中添加新选项
+main_menu() {
+  clear
+  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+  echo -e "$orange" "                                 ⚙️ 邮局配置向导${reset}"
+  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+  echo -e "${green}① DNS配置指南${reset}"
+  echo -e "${green}② 配置主域名${reset}"
+  echo -e "${green}③ 数据库设置${reset}"
+  echo -e "${green}④ 多域名配置${reset}"
+  echo -e "${green}⑤ 访问信息${reset}"
+  echo -e "${green}⑥ 返回主菜单${reset}"
+  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+  
+  read -p "$(echo -e "${yellow}✨ 请选择操作 [1-6]: ${reset}")" choice
+  case $choice in
+    1) show_dns_instructions; main_menu ;;
+    2) configure_domain; main_menu ;;
+    3) setup_database; main_menu ;;
+    4) setup_multi_domain; main_menu ;;
+    5) show_web_access; main_menu ;;
+    6) bash /root/VPN/menu/mail.sh ;;
+    *) cecho "$red" "无效选择!"; sleep 1; main_menu ;;
   esac
 }
 
-main_menu
+# ...（保留其他函数）
