@@ -5,7 +5,6 @@ LOG_FILE="$INSTALL_DIR/install.log"
 mkdir -p "$INSTALL_DIR" && chmod 700 "$INSTALL_DIR"
 > "$LOG_FILE"
 
-# ------------------------- 颜色定义 -------------------------
 blue="\033[1;34m"
 green="\033[1;32m"
 yellow="\033[1;33m"
@@ -14,7 +13,6 @@ orange="\033[38;5;214m"
 cyan="\033[1;36m"
 reset="\033[0m"
 
-# ------------------------- 精确进度条 -------------------------
 real_progress() {
   local pid=$1
   local delay=0.2
@@ -29,10 +27,9 @@ real_progress() {
   printf "    \b\b\b\b" 2>/dev/null
 }
 
-# ------------------------- 边框函数 -------------------------
 draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                   ${orange}📮 Roundcube邮局系统终极安装脚本 v4.1${reset}"
+  echo -e "                   ${orange}📮 Roundcube邮局系统终极安装脚本 v4.2${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -44,30 +41,44 @@ draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# ------------------------- 安装步骤 -------------------------
+safe_clean() {
+  # 清理可能存在的旧安装
+  [ -d "$INSTALL_DIR/roundcube" ] && rm -rf "$INSTALL_DIR/roundcube"
+  [ -d "$INSTALL_DIR/roundcubemail-1.6.3" ] && rm -rf "$INSTALL_DIR/roundcubemail-1.6.3"
+  [ -f "$INSTALL_DIR/roundcube.tar.gz" ] && rm -f "$INSTALL_DIR/roundcube.tar.gz"
+}
+
 install_step() {
   local step_name="$1"
   local install_cmd="$2"
+  local max_retries=3
+  local retry_count=0
   
   echo -e "${yellow}▶ ${step_name}...${reset}" | tee -a "$LOG_FILE"
-  echo -ne "${blue}▷ 进度:${reset} "
   
-  # 显示动态进度图标
-  (eval "$install_cmd" >> "$LOG_FILE" 2>&1) &
-  real_progress $!
-  wait $!
+  while [ $retry_count -lt $max_retries ]; do
+    echo -ne "${blue}▷ 进度:${reset} "
+    
+    # 显示动态进度图标
+    (eval "$install_cmd" >> "$LOG_FILE" 2>&1) &
+    real_progress $!
+    wait $!
+    
+    if [ $? -eq 0 ]; then
+      printf "\r${green}✓ ${step_name}完成${reset}\n"
+      return 0
+    else
+      ((retry_count++))
+      printf "\r${yellow}⚠ 尝试 ${retry_count}/${max_retries} 失败${reset}\n"
+      sleep 2
+    fi
+  done
   
-  if [ $? -eq 0 ]; then
-    printf "\r${green}✓ ${step_name}完成${reset}\n"
-    return 0
-  else
-    printf "\r${red}✗ ${step_name}失败${reset}\n"
-    echo -e "${yellow}⚠ 错误日志: tail -n 10 $LOG_FILE${reset}" | tee -a "$LOG_FILE"
-    return 1
-  fi
+  printf "\r${red}✗ ${step_name}失败${reset}\n"
+  echo -e "${yellow}⚠ 错误日志: tail -n 20 $LOG_FILE${reset}" | tee -a "$LOG_FILE"
+  return 1
 }
 
-# ------------------------- 主安装流程 -------------------------
 main_install() {
   draw_header
   
@@ -97,19 +108,22 @@ main_install() {
       php php-{mysql,intl,json,curl,zip,gd,mbstring,xml,imap}
   "
 
-  # 4. 部署Roundcube
+  # 4. 安全清理
+  safe_clean
+
+  # 5. 部署Roundcube（增强版）
   install_step "部署Webmail" "
-    wget -q https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz &&
+    wget -q --tries=3 --timeout=30 https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O $INSTALL_DIR/roundcube.tar.gz &&
     tar -xzf $INSTALL_DIR/roundcube.tar.gz -C $INSTALL_DIR &&
-    mv $INSTALL_DIR/roundcubemail-* $INSTALL_DIR/roundcube &&
+    mv $INSTALL_DIR/roundcubemail-1.6.3 $INSTALL_DIR/roundcube &&
     chown -R www-data:www-data $INSTALL_DIR/roundcube &&
     chmod -R 755 $INSTALL_DIR/roundcube &&
-    rm $INSTALL_DIR/roundcube.tar.gz
+    rm -f $INSTALL_DIR/roundcube.tar.gz
   "
 
-  # 5. 创建符号链接
+  # 6. 创建符号链接
   install_step "配置Web访问" "
-    ln -sf $INSTALL_DIR/roundcube /var/www/roundcube
+    ln -sfT $INSTALL_DIR/roundcube /var/www/roundcube &&
     systemctl restart apache2
   "
 
@@ -124,17 +138,15 @@ main_install() {
   
   draw_separator
   echo -e "${orange}🔍 服务状态检查:${reset}"
-  systemctl is-active postfix && echo -e "${green}✓ Postfix运行正常${reset}" || echo -e "${red}✗ Postfix未运行${reset}"
-  systemctl is-active dovecot && echo -e "${green}✓ Dovecot运行正常${reset}" || echo -e "${red}✗ Dovecot未运行${reset}"
-  systemctl is-active apache2 && echo -e "${green}✓ Apache运行正常${reset}" || echo -e "${red}✗ Apache未运行${reset}"
+  systemctl is-active postfix &>/dev/null && echo -e "${green}✓ Postfix运行正常${reset}" || echo -e "${red}✗ Postfix未运行${reset}"
+  systemctl is-active dovecot &>/dev/null && echo -e "${green}✓ Dovecot运行正常${reset}" || echo -e "${red}✗ Dovecot未运行${reset}"
+  systemctl is-active apache2 &>/dev/null && echo -e "${green}✓ Apache运行正常${reset}" || echo -e "${red}✗ Apache未运行${reset}"
   
   draw_footer
 }
 
-# ======================== 执行安装 ========================
 clear
 main_install
 
-# ======================== 最终交互 ========================
 read -p "按回车返回主菜单..."
 bash /root/VPN/menu/mail.sh
