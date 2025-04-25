@@ -15,8 +15,8 @@ show_menu() {
     echo -e "${pink}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
     echo -e "                                  ${orange}✉️ 邮局-系统${reset}"
     echo -e "${pink}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-    echo -e "  ${yellow}❶${reset} ${green}安装${reset}                   ${yellow}❷${reset} ${green}清理系统缓存${reset}                  ${yellow}❸${reset} ${green}释放内存缓存${reset}"
-    echo -e "  ${yellow}❹${reset} ${green}查看错误日志${reset}                   ${yellow}❺${reset} ${green}清理临时文件${reset}                  ${yellow}❻${reset} ${green}清除代理缓存${reset}"
+    echo -e "  ${yellow}❶${reset} ${green}邮局系统安装${reset}                   ${yellow}❷${reset} ${green}邮局系统升级${reset}                  ${yellow}❸${reset} ${green}邮局域名配置${reset}"
+    echo -e "  ${yellow}❹${reset} ${green}服务启停状态${reset}                   ${yellow}❺${reset} ${green}服务控制菜单${reset}                  ${yellow}❻${reset} ${green}返回主菜单${reset}"
     echo -e "  ${yellow}❼${reset} ${green}清理所有日志${reset}                   ${yellow}❽${reset} ${green}查看磁盘空间${reset}                  ${yellow}⓿${reset} ${red}返回主菜单${reset}"
     echo -e "${pink}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
@@ -27,15 +27,15 @@ while true; do
     case $opt in
         1) bash /root/VPN/menu/mail/install_mail.sh
             break ;;
-        2) bash /root/VPN/menu/maintain/clean_system_cache.sh
+        2) bash /root/VPN/menu/mail/upgrade_mail.sh
             break ;;
-        3) bash /root/VPN/menu/maintain/release_mem.sh
+        3) bash /root/VPN/menu/mail/configure_mail.sh
            break ;;
-        4) bash /root/VPN/menu/maintain/show_errors.sh
+        4) bash /root/VPN/menu/mail/test_mail.sh
             break ;;
-        5) bash /root/VPN/menu/maintain/temp_clean.sh
+        5) bash /root/VPN/menu/mail/install_mail.sh
             break ;;
-        6) bash /root/VPN/menu/maintain/clear_proxy_cache.sh
+        6) bash /root/VPN/menu/mail/install_mail.sh
             break ;;
         7) bash /root/VPN/menu/maintain/clean_all_logs.sh
             break ;;
