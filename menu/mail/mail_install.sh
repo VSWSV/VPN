@@ -25,7 +25,6 @@ else
   sleep 0.5
 fi
 
-draw_header
 
 success_all=0
 fail_all=0
