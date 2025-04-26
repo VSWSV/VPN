@@ -75,9 +75,15 @@ stop_and_remove_service opendkim
 stop_and_remove_service opendkim-tools
 stop_and_remove_service certbot
 
-# 删除文件目录
+# 删除应用文件目录
 remove_directory /root/VPN/MAIL
 remove_directory /var/www/html/roundcube
+
+# 删除配置文件目录
+remove_directory /etc/postfix
+remove_directory /etc/dovecot
+remove_directory /etc/apache2
+remove_directory /etc/roundcube
 
 # 清理残余
 echo -n "🔍 清理残余缓存..."
