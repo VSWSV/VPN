@@ -91,30 +91,63 @@ install_category "🛢️ 安装数据库服务..." mariadb-server
 install_category "🌐 安装Web服务器..." apache2
 install_category "🧩 安装PHP及扩展..." php php-cli php-fpm php-mysql php-imap php-json php-intl php-gd
 
-# Roundcube安装
-echo -e "${yellow}📬 下载并准备 Roundcube...${reset}"
+# Roundcube安装分类
+success_roundcube=0
+fail_roundcube=0
+
+echo -e "${yellow}📬 安装Roundcube...${reset}"
 cd /root/VPN/MAIL
 
+# 下载Roundcube
+echo -n "🔍 下载 Roundcube源码..."
 if wget -qO roundcube.tar.gz https://github.com/roundcube/roundcubemail/releases/download/1.6.6/roundcubemail-1.6.6-complete.tar.gz; then
-  if tar -xzf roundcube.tar.gz > /dev/null 2>&1; then
-    rm -f roundcube.tar.gz
-    if [ ! -d "roundcube" ]; then
-      mkdir roundcube
-    fi
-    if mv roundcubemail-1.6.6/* roundcube/ 2>/dev/null; then
-      echo -e "${green}✅ Roundcube下载解压完成${reset}\n"
-    else
-      echo -e "${red}❌ Roundcube目录移动失败${reset}\n"
-      fail_all=$((fail_all+1))
-    fi
-  else
-    echo -e "${red}❌ Roundcube解压失败${reset}\n"
-    fail_all=$((fail_all+1))
-  fi
+  echo -e "${green} ✓ 成功${reset}"
+  success_roundcube=$((success_roundcube+1))
 else
-  echo -e "${red}❌ Roundcube下载失败${reset}\n"
-  fail_all=$((fail_all+1))
+  echo -e "${red} ✗ 失败${reset}"
+  fail_roundcube=$((fail_roundcube+1))
 fi
+
+# 解压Roundcube
+echo -n "🔍 解压 Roundcube源码..."
+if tar -xzf roundcube.tar.gz > /dev/null 2>&1; then
+  rm -f roundcube.tar.gz
+  echo -e "${green} ✓ 成功${reset}"
+  success_roundcube=$((success_roundcube+1))
+else
+  echo -e "${red} ✗ 失败${reset}"
+  fail_roundcube=$((fail_roundcube+1))
+fi
+
+# 安装Roundcube
+echo -n "🔍 安装 Roundcube..."
+if mv roundcubemail-1.6.6/* roundcube/ 2>/dev/null; then
+  echo -e "${green} ✓ 成功${reset}"
+  success_roundcube=$((success_roundcube+1))
+else
+  echo -e "${red} ✗ 失败${reset}"
+  fail_roundcube=$((fail_roundcube+1))
+fi
+
+# 修复Roundcube权限
+echo -n "▶ 修复 Roundcube目录权限..."
+if chown -R www-data:www-data /root/VPN/MAIL/roundcube > /dev/null 2>&1; then
+  echo -e "${green} ✓ 成功${reset}"
+else
+  echo -e "${red} ✗ 失败${reset}"
+  fail_roundcube=$((fail_roundcube+1))
+fi
+
+# 统计Roundcube结果
+success_all=$((success_all+success_roundcube))
+fail_all=$((fail_all+fail_roundcube))
+
+if [ $fail_roundcube -eq 0 ]; then
+  echo -e "${green}✅ 📬 安装Roundcube全部完成${reset}\n"
+else
+  echo -e "${red}⚠ 📬 安装Roundcube部分失败（成功${success_roundcube}个，失败${fail_roundcube}个）${reset}\n"
+fi
+
 sleep 1
 
 # 安装OpenDKIM和Certbot
