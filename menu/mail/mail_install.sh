@@ -29,7 +29,6 @@ if [ "$user_pass" != "88" ]; then
 else
   echo -e "${green}✅ 密码正确，开始安装！${reset}"
   sleep 0.5
-  clear
 fi
 
 success_all=0
