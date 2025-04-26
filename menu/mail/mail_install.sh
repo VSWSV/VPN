@@ -30,7 +30,6 @@ else
   echo -e "${green}✅ 密码正确，开始安装！${reset}"
   sleep 0.5
   clear
-  draw_header
 fi
 
 success_all=0
