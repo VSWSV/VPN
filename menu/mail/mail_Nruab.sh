@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# ==============================================
-# 邮件系统智能安装脚本
-# 版本：8.0
-# 特点：防重复安装、自动数据库配置、无垃圾文件
-# ==============================================
-
 INSTALL_DIR="/root/VPN/MAIL"
 LOG_FILE="$INSTALL_DIR/install.log"
 mkdir -p "$INSTALL_DIR" && chmod 700 "$INSTALL_DIR"
