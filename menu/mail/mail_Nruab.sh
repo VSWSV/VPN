@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# ==============================================
+# 邮件系统智能安装脚本
+# 版本：8.0
+# 特点：防重复安装、自动数据库配置、无垃圾文件
+# ==============================================
+
 INSTALL_DIR="/root/VPN/MAIL"
 LOG_FILE="$INSTALL_DIR/install.log"
 mkdir -p "$INSTALL_DIR" && chmod 700 "$INSTALL_DIR"
@@ -25,20 +31,78 @@ draw_bottom() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 安装组件函数
-install_pkg() {
-  local pkg="$1"
-  local step="$2"
-  local desc="$3"
+# 安全安装函数
+safe_install() {
+  local pkg=$1
+  local step=$2
+  local desc=$3
   
   echo -e "${orange}${step} ${desc}...${reset}"
   if dpkg -l | grep -q "^ii  $pkg "; then
-    echo -e "${yellow}⚠ 已安装: ${green}$pkg${yellow} 版本: ${green}$(dpkg -s $pkg | grep Version | cut -d' ' -f2)${reset}"
-    echo -e "${blue}✓ 跳过安装${reset}"
+    echo -e "${yellow}⚠ 已安装: ${green}$pkg${reset}"
+    return 0
+  fi
+  
+  apt-get install -y "$pkg" >> "$LOG_FILE" 2>&1
+  if [ $? -eq 0 ]; then
+    echo -e "${green}✓ 安装成功${reset}"
     return 0
   else
-    apt-get install -y "$pkg" >> "$LOG_FILE" 2>&1
-    [ $? -eq 0 ] && echo -e "${green}✓ 安装成功${reset}" || { echo -e "${red}✗ 安装失败${reset}"; tail -n 3 "$LOG_FILE"; exit 1; }
+    echo -e "${red}✗ 安装失败${reset}"
+    tail -n 3 "$LOG_FILE"
+    return 1
+  fi
+}
+
+# 安全部署Roundcube
+install_roundcube() {
+  echo -e "${orange}⑦ 部署Roundcube...${reset}"
+  
+  # 清理旧版本（不提示）
+  [ -d "/var/www/roundcube" ] && rm -rf /var/www/roundcube
+  
+  # 下载解压新版本
+  if wget -q https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O /tmp/roundcube.tar.gz && \
+     tar -xzf /tmp/roundcube.tar.gz -C /var/www && \
+     mv /var/www/roundcubemail-1.6.3 /var/www/roundcube && \
+     chown -R www-data:www-data /var/www/roundcube
+  then
+    rm -f /tmp/roundcube.tar.gz
+    echo -e "${green}✓ 部署成功${reset}"
+    return 0
+  else
+    echo -e "${red}✗ 部署失败${reset}"
+    return 1
+  fi
+}
+
+# 安全初始化数据库
+init_database() {
+  echo -e "${orange}⑧ 初始化邮件数据库...${reset}"
+  
+  # 检查表是否已存在
+  if mysql -uroot roundcubedb -e "SHOW TABLES LIKE 'session'" 2>/dev/null | grep -q "session"; then
+    echo -e "${yellow}⚠ 数据库已初始化，跳过此步骤${reset}"
+    return 0
+  fi
+  
+  # 创建数据库和用户
+  mysql -uroot <<MYSQL_SCRIPT
+CREATE DATABASE IF NOT EXISTS roundcubedb DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER IF NOT EXISTS 'roundcube'@'localhost' IDENTIFIED BY 'roundcube_password';
+GRANT ALL PRIVILEGES ON roundcubedb.* TO 'roundcube'@'localhost';
+FLUSH PRIVILEGES;
+MYSQL_SCRIPT
+
+  # 导入表结构（忽略已存在错误）
+  mysql -uroot roundcubedb < /var/www/roundcube/SQL/mysql.initial.sql 2>&1 | grep -v "already exists"
+  
+  if [ ${PIPESTATUS[0]} -eq 0 ]; then
+    echo -e "${green}✓ 数据库初始化完成${reset}"
+    return 0
+  else
+    echo -e "${red}✗ 数据库初始化失败${reset}"
+    return 1
   fi
 }
 
@@ -47,94 +111,61 @@ draw_top
 echo -e "${orange}                  📮 邮局系统安装                 ${reset}"
 draw_mid
 
-# 1. 更新系统
+# 1. 系统更新
 echo -e "${orange}① 更新软件包列表...${reset}"
 apt-get update >> "$LOG_FILE" 2>&1
 [ $? -eq 0 ] && echo -e "${green}✓ 更新完成${reset}" || { echo -e "${red}✗ 更新失败${reset}"; exit 1; }
 
 # 2. 安装必要工具
-install_pkg "tree" "②" "安装依赖工具"
-install_pkg "curl" "" ""
-install_pkg "wget" "" ""
+safe_install "tree" "②" "安装系统工具"
+safe_install "curl" "" ""
+safe_install "wget" "" ""
 
 # 3. 安装MySQL
 echo -e "${orange}③ 安装MySQL数据库...${reset}"
 if ! dpkg -l | grep -q mysql-server; then
-  debconf-set-selections <<< "mysql-server mysql-server/root_password password temp_p@ssw0rd"
-  debconf-set-selections <<< "mysql-server mysql-server/root_password_again password temp_p@ssw0rd"
+  debconf-set-selections <<< "mysql-server mysql-server/root_password password ''"
+  debconf-set-selections <<< "mysql-server mysql-server/root_password_again password ''"
   apt-get install -y mysql-server >> "$LOG_FILE" 2>&1
-  
-  # 安全设置
-  mysql -uroot -ptemp_p@ssw0rd <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';
-FLUSH PRIVILEGES;
-EOF
-  
-  echo -e "${green}✓ MySQL安装完成${reset}"
+  [ $? -eq 0 ] && echo -e "${green}✓ 安装成功${reset}" || { echo -e "${red}✗ 安装失败${reset}"; exit 1; }
 else
   echo -e "${yellow}⚠ MySQL已安装${reset}"
 fi
 
 # 4. 安装邮件服务
-install_pkg "postfix" "④" "安装Postfix"
-install_pkg "postfix-mysql" "" ""
-install_pkg "dovecot-core" "⑤" "安装Dovecot"
-install_pkg "dovecot-imapd" "" ""
-install_pkg "dovecot-pop3d" "" ""
-install_pkg "dovecot-mysql" "" ""
+safe_install "postfix" "④" "安装Postfix"
+safe_install "postfix-mysql" "" ""
+safe_install "dovecot-core" "⑤" "安装Dovecot"
+safe_install "dovecot-imapd" "" ""
+safe_install "dovecot-pop3d" "" ""
+safe_install "dovecot-mysql" "" ""
 
 # 5. 安装Web服务
-install_pkg "apache2" "⑥" "安装Apache"
-install_pkg "libapache2-mod-php" "" ""
-install_pkg "php" "⑦" "安装PHP组件"
-install_pkg "php-mysql" "" ""
-install_pkg "php-intl" "" ""
-install_pkg "php-curl" "" ""
-install_pkg "php-gd" "" ""
-install_pkg "php-mbstring" "" ""
-install_pkg "php-xml" "" ""
-install_pkg "php-zip" "" ""
+safe_install "apache2" "⑥" "安装Apache"
+safe_install "libapache2-mod-php" "" ""
+safe_install "php" "" "安装PHP"
+safe_install "php-mysql" "" ""
+safe_install "php-intl" "" ""
+safe_install "php-curl" "" ""
+safe_install "php-gd" "" ""
+safe_install "php-mbstring" "" ""
+safe_install "php-xml" "" ""
+safe_install "php-zip" "" ""
 
-# 6. 安装Roundcube
-echo -e "${orange}⑧ 部署Roundcube...${reset}"
-if [ -d "/var/www/roundcube" ]; then
-  echo -e "${yellow}⚠ 删除旧版Roundcube...${reset}"
-  rm -rf /var/www/roundcube
-fi
-
-wget -q https://github.com/roundcube/roundcubemail/releases/download/1.6.3/roundcubemail-1.6.3-complete.tar.gz -O /tmp/roundcube.tar.gz
-tar -xzf /tmp/roundcube.tar.gz -C /var/www
-mv /var/www/roundcubemail-1.6.3 /var/www/roundcube
-chown -R www-data:www-data /var/www/roundcube
-rm -f /tmp/roundcube.tar.gz
-[ $? -eq 0 ] && echo -e "${green}✓ 部署完成${reset}" || { echo -e "${red}✗ 部署失败${reset}"; exit 1; }
+# 6. 部署Roundcube
+install_roundcube || exit 1
 
 # 7. 初始化数据库
-echo -e "${orange}⑨ 初始化邮件数据库...${reset}"
-mysql -uroot <<MYSQL_SCRIPT
-CREATE DATABASE IF NOT EXISTS roundcubedb DEFAULT CHARACTER SET utf8mb4;
-CREATE USER IF NOT EXISTS 'roundcube'@'localhost' IDENTIFIED BY 'roundcube_password';
-GRANT ALL PRIVILEGES ON roundcubedb.* TO 'roundcube'@'localhost';
-FLUSH PRIVILEGES;
-USE roundcubedb;
-SOURCE /var/www/roundcube/SQL/mysql.initial.sql;
-MYSQL_SCRIPT
-[ $? -eq 0 ] && echo -e "${green}✓ 数据库初始化完成${reset}" || { echo -e "${red}✗ 数据库初始化失败${reset}"; exit 1; }
+init_database || exit 1
 
-# 完成提示
-draw_mid
-echo -e "${orange}🔍 服务状态检查:${reset}"
-systemctl is-active postfix &>/dev/null && echo -e "${green}✓ Postfix运行正常${reset}" || echo -e "${red}✗ Postfix未运行${reset}"
-systemctl is-active dovecot &>/dev/null && echo -e "${green}✓ Dovecot运行正常${reset}" || echo -e "${red}✗ Dovecot未运行${reset}"
-systemctl is-active apache2 &>/dev/null && echo -e "${green}✓ Apache运行正常${reset}" || echo -e "${red}✗ Apache未运行${reset}"
-systemctl is-active mysql &>/dev/null && echo -e "${green}✓ MySQL运行正常${reset}" || echo -e "${red}✗ MySQL未运行${reset}"
-
+# 完成信息
 draw_mid
 echo -e "${green}✅ 安装全部完成！"
-echo -e "${blue}🔑 MySQL root密码已设置为空"
-echo -e "${blue}📧 Roundcube数据库用户: roundcube"
-echo -e "${blue}🔐 Roundcube数据库密码: roundcube_password"
-echo -e "${blue}🌍 访问地址: https://您的服务器IP/roundcube${reset}"
+echo -e "${blue}🔑 MySQL root密码: 空密码（建议安装后修改）"
+echo -e "${blue}📧 Roundcube数据库: roundcubedb"
+echo -e "${blue}👤 数据库用户: roundcube"
+echo -e "${blue}🔐 数据库密码: roundcube_password"
+echo -e "${blue}🌍 访问地址: https://$(hostname -I | awk '{print $1}')/roundcube${reset}"
 draw_bottom
 
 read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
