@@ -15,9 +15,9 @@ show_menu() {
     echo -e "${pink}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
     echo -e "                                  ${orange}✉️ 邮局-系统${reset}"
     echo -e "${pink}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-    echo -e "  ${yellow}❶${reset} ${green}邮局系统安装${reset}                   ${yellow}❷${reset} ${green}邮局系统升级${reset}                  ${yellow}❸${reset} ${green}邮局域名配置${reset}"
-    echo -e "  ${yellow}❹${reset} ${green}服务启停状态${reset}                   ${yellow}❺${reset} ${green}服务控制菜单${reset}                  ${yellow}❻${reset} ${green}返回主菜单${reset}"
-    echo -e "  ${yellow}❼${reset} ${green}清理所有日志${reset}                   ${yellow}❽${reset} ${green}查看磁盘空间${reset}                  ${yellow}⓿${reset} ${red}返回主菜单${reset}"
+    echo -e "  ${yellow}❶${reset} ${green}邮局系统安装${reset}                   ${yellow}❷${reset} ${green}邮局系统升级${reset}                  ${yellow}❸${reset} ${green}服务启停状态${reset}"
+    echo -e "  ${yellow}❹${reset} ${green}邮局域名配置${reset}                   ${yellow}❺${reset} ${green}邮局账户管理${reset}                  ${yellow}❻${reset} ${green}邮局系统测试${reset}"
+    echo -e "  ${yellow}⓿${reset} ${red}返回主菜单${reset}"
     echo -e "${pink}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
@@ -25,21 +25,17 @@ while true; do
     show_menu
     read -p "请输入选项编号： " opt
     case $opt in
-        1) bash /root/VPN/menu/mail/install_mail.sh
+        1) bash /root/VPN/menu/mail/mail_Nruab.sh
             break ;;
-        2) bash /root/VPN/menu/mail/upgrade_mail.sh
+        2) bash /root/VPN/menu/mail/mail_upgrade.sh
             break ;;
-        3) bash /root/VPN/menu/mail/configure_mail.sh
+        3) bash /root/VPN/menu/mail/mail_khiav.sh
            break ;;
-        4) bash /root/VPN/menu/mail/mail_control.sh
+        4) bash /root/VPN/menu/mail/mail_configure.sh
             break ;;
-        5) bash /root/VPN/menu/mail/test_mail.sh
+        5) bash /root/VPN/menu/mail/mail_account.sh
             break ;;
-        6) bash /root/VPN/menu/mail/install_mail.sh
-            break ;;
-        7) bash /root/VPN/menu/maintain/clean_all_logs.sh
-            break ;;
-        8) bash /root/VPN/menu/maintain/disk_check.sh
+        6) bash /root/VPN/menu/mail/mail_xeem.sh
             break ;;
         0) bash /root/VPN/menu.sh
             break ;;
