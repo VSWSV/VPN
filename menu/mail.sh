@@ -35,7 +35,7 @@ while true; do
             break ;;
         5) bash /root/VPN/menu/mail/mail_account.sh
             break ;;
-        6) bash /root/VPN/menu/mail/mail_xeem.sh
+        6) bash /root/VPN/menu/mail/mail_test.sh
             break ;;
         0) bash /root/VPN/menu.sh
             break ;;
