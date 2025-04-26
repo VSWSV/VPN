@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 INSTALL_DIR="/root/VPN/MAIL"
 LOG_FILE="$INSTALL_DIR/upgrade.log"
 > "$LOG_FILE"
