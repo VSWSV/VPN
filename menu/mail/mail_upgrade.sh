@@ -28,8 +28,6 @@ if [ "$user_pass" != "88" ]; then
 else
   echo -e "${green}✅ 密码正确，开始卸载！${reset}"
   sleep 0.5
-  clear
-  draw_header
 fi
 
 success_uninstall=0
