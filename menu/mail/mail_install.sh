@@ -23,13 +23,14 @@ if [ "$user_pass" != "88" ]; then
 else
   echo -e "${green}✅ 密码正确，开始安装！${reset}"
   sleep 0.5
+  clear
+  draw_header  # ✅ 密码正确后清屏并画大边框
 fi
-
 
 success_all=0
 fail_all=0
 
-
+# 边框函数
 function draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
   echo -e "                               ${orange}📬 邮局系统安装${reset}"
@@ -138,7 +139,8 @@ echo -n "🔍 安装 Roundcube..."
 if [ -d "roundcubemail-1.6.6" ]; then
   mkdir -p roundcube
   mv roundcubemail-1.6.6/* roundcube/ 2>/dev/null && echo -e "${green} ✓ 成功${reset}" || {
-    echo -e "${red} ✗ 失败${reset}"; fail_roundcube=$((fail_roundcube+1));
+    echo -e "${red} ✗ 失败${reset}"
+    fail_roundcube=$((fail_roundcube+1))
   }
 else
   echo -e "${red} ✗ 失败${reset}"
@@ -149,7 +151,8 @@ fi
 echo -n "▶ 修复 Roundcube目录权限..."
 if [ -d "/root/VPN/MAIL/roundcube" ]; then
   chown -R www-data:www-data /root/VPN/MAIL/roundcube > /dev/null 2>&1 && echo -e "${green} ✓ 成功${reset}" || {
-    echo -e "${red} ✗ 失败${reset}"; fail_roundcube=$((fail_roundcube+1));
+    echo -e "${red} ✗ 失败${reset}"
+    fail_roundcube=$((fail_roundcube+1))
   }
 else
   echo -e "${red} ✗ 失败${reset}"
