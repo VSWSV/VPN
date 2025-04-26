@@ -11,14 +11,32 @@ reset="\033[0m"
 
 # 边框函数
 draw_top() {
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+  echo -e "${cyan}╔$(printf '═%.0s' {1..78})╗${reset}"
 }
 draw_mid() {
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+  echo -e "${cyan}╠$(printf '═%.0s' {1..78})╣${reset}"
 }
 draw_bottom() {
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+  echo -e "${cyan}╚$(printf '═%.0s' {1..78})╝${reset}"
 }
+
+draw_top
+echo -e "${orange}                 ⚙️ 邮局配置菜单                ${reset}"
+draw_mid
+echo -e "${green}① DNS配置指南${reset}"
+echo -e "${green}② 配置邮件域名${reset}"
+echo -e "${green}③ 配置数据库${reset}"
+echo -e "${green}⓪ 返回主菜单${reset}"
+draw_mid
+
+read -p "$(echo -e "${yellow}✨ 请选择操作: ${reset}")" choice
+case $choice in
+  1) show_dns_guide ;;
+  2) setup_domain ;;
+  3) setup_database ;;
+  0) exit ;;
+  *) echo -e "${red}✗ 无效选择!${reset}"; sleep 1 ;;
+esac
 
 # DNS 配置指南函数
 show_dns_guide() {
@@ -27,9 +45,14 @@ show_dns_guide() {
   draw_mid
   read -p "$(echo -e "${yellow}✨ 请输入您的邮件域名 (例如: example.com): ${reset}")" domain
   echo -e "${blue}📝 输入为: ${green}$domain${reset}"
+  # 获取公网IP
+  public_ip=$(curl -s --connect-timeout 5 ifconfig.me)
+  if [ -z "$public_ip" ]; then
+    public_ip=$(hostname -I | awk '{print $1}')
+  fi
   echo -e "${yellow}请为域名 ${green}$domain${yellow} 添加以下 DNS 记录：${reset}"
-  echo -e "${green}① A记录：@ → 服务器公网 IP${reset}"
-  echo -e "${green}② A记录：mail → 服务器公网 IP${reset}"
+  echo -e "${green}① A记录：@ → ${public_ip} （服务器公网 IP）${reset}"
+  echo -e "${green}② A记录：mail → ${public_ip} （服务器公网 IP）${reset}"
   echo -e "${green}③ MX记录：@ → mail.$domain （优先级 10）${reset}"
   echo -e "${green}④ TXT记录：@ → v=spf1 mx ~all${reset}"
   echo -e "${green}⑤ TXT记录：_dmarc → v=DMARC1; p=none; rua=mailto:postmaster@$domain${reset}"
@@ -60,7 +83,7 @@ setup_domain() {
   echo "ssl_key = </etc/letsencrypt/live/$hostname/privkey.pem" >> $DOVECOT_CONF
   draw_mid
   echo -e "${green}✅ 域名配置完成!${reset}"
-  echo -e "${blue}🌍 Roundcube 访问: ${green}https://$hostname/roundcube${reset}"
+  echo -e "${blue}🌍 Roundcube访问: ${green}https://$hostname/roundcube${reset}"
   draw_bottom
   read -p "$(echo -e "💬 ${cyan}按回车键继续...${reset}")" dummy
 }
@@ -113,6 +136,7 @@ EOF
   read -p "$(echo -e "💬 ${cyan}按回车键继续...${reset}")" dummy
 }
 
+# 配置菜单循环
 main_menu() {
   while true; do
     draw_top
@@ -121,7 +145,7 @@ main_menu() {
     echo -e "${green}① DNS配置指南${reset}"
     echo -e "${green}② 配置邮件域名${reset}"
     echo -e "${green}③ 配置数据库${reset}"
-    echo -e "${green}0 返回主菜单${reset}"
+    echo -e "${green}⓪ 返回主菜单${reset}"
     draw_mid
     read -p "$(echo -e "${yellow}✨ 请选择操作: ${reset}")" choice
     case $choice in
