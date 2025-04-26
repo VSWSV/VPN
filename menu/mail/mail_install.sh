@@ -26,7 +26,7 @@ echo -e "${cyan}╔════════════════════�
 echo -e "                               ${orange}📬 邮局系统安装${reset}"
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 
-# 单个包安装函数，返回成功失败
+# 单个包安装函数
 install_single() {
   local pkg=$1
   echo -n "🔍 安装 ${pkg}..."
@@ -90,6 +90,7 @@ install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot
 install_category "🛢️ 安装数据库服务..." mariadb-server
 install_category "🌐 安装Web服务器..." apache2
 install_category "🧩 安装PHP及扩展..." php php-cli php-fpm php-mysql php-imap php-json php-intl php-gd
+install_category "🔒 安装邮件认证和HTTPS工具..." opendkim opendkim-tools certbot
 
 # Roundcube安装分类
 success_roundcube=0
@@ -121,9 +122,11 @@ fi
 
 # 安装Roundcube
 echo -n "🔍 安装 Roundcube..."
-if mv roundcubemail-1.6.6/* roundcube/ 2>/dev/null; then
-  echo -e "${green} ✓ 成功${reset}"
-  success_roundcube=$((success_roundcube+1))
+if [ -d "roundcubemail-1.6.6" ]; then
+  mkdir -p roundcube
+  mv roundcubemail-1.6.6/* roundcube/ 2>/dev/null && echo -e "${green} ✓ 成功${reset}" || {
+    echo -e "${red} ✗ 失败${reset}"; fail_roundcube=$((fail_roundcube+1));
+  }
 else
   echo -e "${red} ✗ 失败${reset}"
   fail_roundcube=$((fail_roundcube+1))
@@ -131,8 +134,10 @@ fi
 
 # 修复Roundcube权限
 echo -n "▶ 修复 Roundcube目录权限..."
-if chown -R www-data:www-data /root/VPN/MAIL/roundcube > /dev/null 2>&1; then
-  echo -e "${green} ✓ 成功${reset}"
+if [ -d "/root/VPN/MAIL/roundcube" ]; then
+  chown -R www-data:www-data /root/VPN/MAIL/roundcube > /dev/null 2>&1 && echo -e "${green} ✓ 成功${reset}" || {
+    echo -e "${red} ✗ 失败${reset}"; fail_roundcube=$((fail_roundcube+1));
+  }
 else
   echo -e "${red} ✗ 失败${reset}"
   fail_roundcube=$((fail_roundcube+1))
@@ -149,9 +154,6 @@ else
 fi
 
 sleep 1
-
-# 安装OpenDKIM和Certbot
-install_category "🔒 安装邮件认证和HTTPS工具..." opendkim opendkim-tools certbot
 
 # 收尾边框输出
 echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
