@@ -1,16 +1,10 @@
 #!/bin/bash
 
-# ==============================================
-# 邮件系统安装脚本
-# 完整功能版 | 保留所有原始设计元素
-# ==============================================
-
 INSTALL_DIR="/root/VPN/MAIL"
 LOG_FILE="$INSTALL_DIR/install.log"
 mkdir -p "$INSTALL_DIR" && chmod 700 "$INSTALL_DIR"
 > "$LOG_FILE"
 
-# 颜色定义
 blue="\033[1;34m"
 green="\033[1;32m"
 yellow="\033[1;33m"
@@ -19,7 +13,6 @@ orange="\033[38;5;214m"
 cyan="\033[1;36m"
 reset="\033[0m"
 
-# 边框函数
 draw_top() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
 }
@@ -30,29 +23,21 @@ draw_bottom() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 显示目录结构
 show_dir_structure() {
   echo -e "${orange}📦 安装目录结构:${reset}"
   if command -v tree &>/dev/null; then
     echo -e "${blue}"
     tree -L 2 --noreport "$INSTALL_DIR"
     echo -e "${reset}"
-    local dir_count=$(find "$INSTALL_DIR" -type d | wc -l)
-    local file_count=$(find "$INSTALL_DIR" -type f | wc -l)
-    echo -ne "${blue}${dir_count} 个目录${reset}  "
-    echo -e "${green}${file_count} 个文件${reset}"
+    echo -e "${blue}$(find "$INSTALL_DIR" -type d | wc -l) 个目录${reset} ${green}$(find "$INSTALL_DIR" -type f | wc -l) 个文件${reset}"
   else
     echo -e "${blue}"
     ls -lhp "$INSTALL_DIR" | grep -v "^total"
     echo -e "${reset}"
-    local dir_count=$(find "$INSTALL_DIR" -type d | wc -l)
-    local file_count=$(find "$INSTALL_DIR" -type f | wc -l)
-    echo -ne "${blue}${dir_count} 个目录${reset}  "
-    echo -e "${green}${file_count} 个文件${reset}"
+    echo -e "${blue}$(find "$INSTALL_DIR" -type d | wc -l) 个目录${reset} ${green}$(find "$INSTALL_DIR" -type f | wc -l) 个文件${reset}"
   fi
 }
 
-# 安装步骤
 install_step() {
   local step_num=$1
   local step_name=$2
@@ -79,7 +64,6 @@ install_step() {
   fi
 }
 
-# 主安装流程
 draw_top
 echo -e "${orange}                  📮 邮局系统安装                 ${reset}"
 draw_mid
