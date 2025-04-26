@@ -33,7 +33,6 @@ install_single() {
 }
 
 # 创建目录
-clear
 draw_header
 echo -e "${green}▶ 正在创建 /root/VPN/MAIL 目录...${reset}"
 mkdir -p /root/VPN/MAIL
@@ -51,7 +50,6 @@ sleep 1
 
 # 分类安装开始
 # 邮件服务
-clear
 draw_header
 echo -e "${yellow}📦 安装邮件服务组件...${reset}"
 install_single postfix
@@ -63,7 +61,6 @@ draw_footer
 sleep 1
 
 # 数据库
-clear
 draw_header
 echo -e "${yellow}🛢️ 安装数据库服务...${reset}"
 install_single mariadb-server
@@ -72,7 +69,6 @@ draw_footer
 sleep 1
 
 # Web服务器
-clear
 draw_header
 echo -e "${yellow}🌐 安装Web服务器...${reset}"
 install_single apache2
@@ -81,7 +77,6 @@ draw_footer
 sleep 1
 
 # PHP及扩展
-clear
 draw_header
 echo -e "${yellow}🧩 安装PHP及扩展...${reset}"
 install_single php
@@ -97,7 +92,6 @@ draw_footer
 sleep 1
 
 # Roundcube安装（下载到 /root/VPN/MAIL）
-clear
 draw_header
 echo -e "${yellow}📬 下载并准备 Roundcube...${reset}"
 cd /root/VPN/MAIL
@@ -113,7 +107,6 @@ draw_footer
 sleep 1
 
 # 安装OpenDKIM和Certbot
-clear
 draw_header
 echo -e "${yellow}🔒 安装邮件认证和HTTPS工具...${reset}"
 install_single opendkim
@@ -124,7 +117,6 @@ draw_footer
 sleep 1
 
 # 安装完成
-clear
 draw_header
 echo -e "${green}✅ 邮局系统所有组件安装完成！${reset}"
 draw_footer
