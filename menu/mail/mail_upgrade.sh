@@ -16,10 +16,11 @@ read -p "请输入密码以继续（默认密码: 888）: " user_pass
 
 if [ "$user_pass" != "888" ]; then
   echo -e "${red}❌ 密码错误，卸载已取消！${reset}"
+  leep 0.5
   bash /root/VPN/menu/mail.sh
 else
   echo -e "${green}✅ 密码正确，开始卸载！${reset}"
-  sleep 2
+  sleep 0.5
 fi
 
 # 卸载统计
