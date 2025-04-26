@@ -10,6 +10,13 @@ red="\033[1;31m"
 orange="\033[38;5;214m"
 reset="\033[0m"
 
+# 倒计时开始
+echo -e "${yellow}⚡ 即将清理并重新安装，5秒后开始...${reset}"
+for i in {5..1}; do
+  echo -ne "${cyan}倒计时：$i 秒\r${reset}"
+  sleep 1
+done
+
 # 安装总结果统计
 success_all=0
 fail_all=0
