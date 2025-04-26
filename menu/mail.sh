@@ -25,7 +25,7 @@ while true; do
     show_menu
     read -p "请输入选项编号： " opt
     case $opt in
-        1) bash /root/VPN/menu/mail/mail_Nruab.sh
+        1) bash /root/VPN/menu/mail/mail_install.sh
             break ;;
         2) bash /root/VPN/menu/mail/mail_upgrade.sh
             break ;;
