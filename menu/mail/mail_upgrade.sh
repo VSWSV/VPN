@@ -2,7 +2,6 @@
 
 clear
 
-# 颜色定义
 cyan="\033[1;36m"
 green="\033[1;32m"
 yellow="\033[1;33m"
@@ -10,7 +9,15 @@ red="\033[1;31m"
 orange="\033[38;5;214m"
 reset="\033[0m"
 
-# 密码确认
+function draw_header() {
+  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+  echo -e "                               ${orange}📦 邮局系统卸载${reset}"
+  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+}
+function draw_footer() {
+  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+}
+
 echo -e "${yellow}⚡ 卸载操作非常危险，需要输入密码确认${reset}"
 read -p "请输入密码以继续（默认密码: 88）: " user_pass
 
@@ -23,21 +30,9 @@ else
   sleep 0.5
 fi
 
-# 卸载统计
 success_uninstall=0
 fail_uninstall=0
 
-# 边框输出
-function draw_header() {
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                               ${orange}📦 邮局系统卸载${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-}
-function draw_footer() {
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-}
-
-# 停止并卸载服务（智能检测）
 function stop_and_remove_service() {
   local service_name=$1
   echo -n "🔍 处理 ${service_name}..."
@@ -56,7 +51,6 @@ function stop_and_remove_service() {
   fi
 }
 
-# 删除目录（智能检测）
 function remove_directory() {
   local dir_path=$1
   echo -n "🔍 删除 ${dir_path}..."
@@ -74,10 +68,8 @@ function remove_directory() {
   fi
 }
 
-# 开始卸载
 draw_header
 
-# 停止并卸载主要服务
 stop_and_remove_service postfix
 stop_and_remove_service dovecot-core
 stop_and_remove_service dovecot-imapd
@@ -96,17 +88,14 @@ stop_and_remove_service opendkim
 stop_and_remove_service opendkim-tools
 stop_and_remove_service certbot
 
-# 删除应用文件目录
 remove_directory /root/VPN/MAIL
 remove_directory /var/www/html/roundcube
 
-# 删除配置文件目录
 remove_directory /etc/postfix
 remove_directory /etc/dovecot
 remove_directory /etc/apache2
 remove_directory /etc/roundcube
 
-# 清理残余
 echo -n "🔍 清理残余缓存..."
 apt autoremove -y > /dev/null 2>&1 && apt clean > /dev/null 2>&1
 if [ $? -eq 0 ]; then
@@ -115,16 +104,13 @@ else
   echo -e "${red} ✗ 失败${reset}"
 fi
 
-# 收尾
 draw_footer
 
-# 总结结果
 if [ $fail_uninstall -eq 0 ]; then
   echo -e "${green}✅ 邮局系统所有组件卸载完成！${reset}"
 else
   echo -e "${red}⚠ 邮局系统卸载部分失败，请检查上方日志${reset}"
 fi
 
-# 返回主菜单提示
 read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/mail.sh
