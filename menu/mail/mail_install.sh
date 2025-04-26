@@ -10,6 +10,17 @@ red="\033[1;31m"
 orange="\033[38;5;214m"
 reset="\033[0m"
 
+# 密码确认
+echo -e "${yellow}⚡ 卸载操作非常危险，需要输入密码确认${reset}"
+read -p "请输入密码以继续（默认密码: 888）: " user_pass
+
+if [ "$user_pass" != "888" ]; then
+  echo -e "${red}❌ 密码错误，卸载已取消！${reset}"
+  exit 1
+else
+  echo -e "${green}✅ 密码正确，开始卸载！${reset}"
+  sleep 2
+fi
 # 安装总结果统计
 success_all=0
 fail_all=0
