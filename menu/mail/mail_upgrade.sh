@@ -12,9 +12,9 @@ reset="\033[0m"
 
 # 密码确认
 echo -e "${yellow}⚡ 卸载操作非常危险，需要输入密码确认${reset}"
-read -p "请输入密码以继续（默认密码: 888）: " user_pass
+read -p "请输入密码以继续（默认密码: 88）: " user_pass
 
-if [ "$user_pass" != "888" ]; then
+if [ "$user_pass" != "88" ]; then
   echo -e "${red}❌ 密码错误，卸载已取消！${reset}"
   sleep 0.5
   bash /root/VPN/menu/mail.sh
