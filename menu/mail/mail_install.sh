@@ -13,15 +13,16 @@ reset="\033[0m"
 
 # 密码确认
 echo -e "${yellow}⚡ 安装操作需要输入密码确认${reset}"
-read -p "请输入密码以继续（默认密码: 88）: " user_pass
+read -p "请输入密码以继续（默认密码: 888）: " user_pass
 
-if [ "$user_pass" != "88" ]; then
-  echo -e "${red}❌ 密码错误，安装已取消！${reset}"
-  sleep 0.5
+if [ "$user_pass" != "888" ]; then
+  echo -e "${red}❌ 密码错误，安装已取消，返回菜单！${reset}"
+  read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
   bash /root/VPN/menu/mail.sh
+  exit 1
 else
   echo -e "${green}✅ 密码正确，开始安装！${reset}"
-  sleep 0.5
+  sleep 2
 fi
 
 # 安装总结果统计
