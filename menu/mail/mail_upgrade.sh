@@ -1,5 +1,5 @@
 #!/bin/bash
-export DEBIAN_FRONTEND=noninteractive
+
 clear
 
 # 颜色定义
