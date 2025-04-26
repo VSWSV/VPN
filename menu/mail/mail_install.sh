@@ -61,6 +61,12 @@ install_category() {
   fi
 }
 
+# 强制清理 MAIL 目录
+if [ -d "/root/VPN/MAIL" ]; then
+  echo -e "${yellow}⚡ 检测到已有 /root/VPN/MAIL，正在强制清理...${reset}"
+  rm -rf /root/VPN/MAIL
+fi
+
 # 创建目录
 echo -e "${green}▶ 正在创建 /root/VPN/MAIL 目录...${reset}"
 mkdir -p /root/VPN/MAIL
@@ -85,6 +91,9 @@ cd /root/VPN/MAIL
 if wget -qO roundcube.tar.gz https://github.com/roundcube/roundcubemail/releases/download/1.6.6/roundcubemail-1.6.6-complete.tar.gz; then
   if tar -xzf roundcube.tar.gz > /dev/null 2>&1; then
     rm -f roundcube.tar.gz
+    if [ ! -d "roundcube" ]; then
+      mkdir roundcube
+    fi
     if mv roundcubemail-1.6.6/* roundcube/ 2>/dev/null; then
       echo -e "${green}✅ Roundcube下载解压完成${reset}\n"
     else
