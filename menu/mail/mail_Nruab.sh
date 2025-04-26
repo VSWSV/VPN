@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# ==============================================
-# 邮件系统完整安装脚本
-# 包含：Postfix/Dovecot/Apache/Roundcube/MySQL
-# 版本：7.0
-# 特点：无备份文件、无垃圾文件、全自动安装
-# ==============================================
-
 INSTALL_DIR="/root/VPN/MAIL"
 LOG_FILE="$INSTALL_DIR/install.log"
 mkdir -p "$INSTALL_DIR" && chmod 700 "$INSTALL_DIR"
