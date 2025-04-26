@@ -1,23 +1,24 @@
 #!/bin/bash
 
-draw_top
-echo -e "${orange}                 ⚙️ 邮局配置菜单                ${reset}"
-draw_mid
+# 颜色定义
+blue="\033[1;34m"
+green="\033[1;32m"
+yellow="\033[1;33m"
+red="\033[1;31m"
+orange="\033[38;5;214m"
+cyan="\033[1;36m"
+reset="\033[0m"
 
-echo -e "${green}① DNS配置指南${reset}"
-echo -e "${green}② 配置邮件域名${reset}"
-echo -e "${green}③ 配置数据库${reset}"
-echo -e "${green}④ 返回主菜单${reset}"
-draw_mid
-
-read -p "$(echo -e "${yellow}✨ 请选择操作: ${reset}")" choice
-case $choice in
-  1) show_dns_guide ;;
-  2) setup_domain ;;
-  3) setup_database ;;
-  4) exit ;;
-  *) echo -e "${red}✗ 无效选择!${reset}"; sleep 1 ;;
-esac
+# 边框函数
+draw_top() {
+  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+}
+draw_mid() {
+  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+}
+draw_bottom() {
+  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+}
 
 # DNS 配置指南函数
 show_dns_guide() {
@@ -120,14 +121,14 @@ main_menu() {
     echo -e "${green}① DNS配置指南${reset}"
     echo -e "${green}② 配置邮件域名${reset}"
     echo -e "${green}③ 配置数据库${reset}"
-    echo -e "${green}④ 返回主菜单${reset}"
+    echo -e "${green}0 返回主菜单${reset}"
     draw_mid
     read -p "$(echo -e "${yellow}✨ 请选择操作: ${reset}")" choice
     case $choice in
       1) show_dns_guide ;;
       2) setup_domain ;;
       3) setup_database ;;
-      4) break ;;
+      0) break ;;
       *) echo -e "${red}✗ 无效选择!${reset}"; sleep 1 ;;
     esac
   done
