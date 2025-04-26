@@ -24,32 +24,40 @@ function draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 停止并卸载服务
+# 停止并卸载服务（智能检测）
 function stop_and_remove_service() {
   local service_name=$1
   echo -n "🔍 处理 ${service_name}..."
-  systemctl stop $service_name > /dev/null 2>&1
-  apt purge -y $service_name > /dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    echo -e "${green} ✓ 已卸载${reset}"
-    success_uninstall=$((success_uninstall+1))
+  if dpkg -s "$service_name" > /dev/null 2>&1; then
+    systemctl stop $service_name > /dev/null 2>&1
+    apt purge -y $service_name > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+      echo -e "${green} ✓ 已卸载${reset}"
+      success_uninstall=$((success_uninstall+1))
+    else
+      echo -e "${red} ✗ 卸载失败${reset}"
+      fail_uninstall=$((fail_uninstall+1))
+    fi
   else
-    echo -e "${red} ✗ 卸载失败${reset}"
-    fail_uninstall=$((fail_uninstall+1))
+    echo -e "${yellow} ⚠ 已不存在，跳过${reset}"
   fi
 }
 
-# 删除目录
+# 删除目录（智能检测）
 function remove_directory() {
   local dir_path=$1
   echo -n "🔍 删除 ${dir_path}..."
-  rm -rf $dir_path
-  if [ ! -d "$dir_path" ]; then
-    echo -e "${green} ✓ 已删除${reset}"
-    success_uninstall=$((success_uninstall+1))
+  if [ -d "$dir_path" ]; then
+    rm -rf "$dir_path"
+    if [ ! -d "$dir_path" ]; then
+      echo -e "${green} ✓ 已删除${reset}"
+      success_uninstall=$((success_uninstall+1))
+    else
+      echo -e "${red} ✗ 删除失败${reset}"
+      fail_uninstall=$((fail_uninstall+1))
+    fi
   else
-    echo -e "${red} ✗ 删除失败${reset}"
-    fail_uninstall=$((fail_uninstall+1))
+    echo -e "${yellow} ⚠ 不存在，跳过${reset}"
   fi
 }
 
