@@ -81,11 +81,20 @@ install_category "🧩 安装PHP及扩展..." php php-cli php-fpm php-mysql php-
 # Roundcube安装
 echo -e "${yellow}📬 下载并准备 Roundcube...${reset}"
 cd /root/VPN/MAIL
+
 if wget -qO roundcube.tar.gz https://github.com/roundcube/roundcubemail/releases/download/1.6.6/roundcubemail-1.6.6-complete.tar.gz; then
-  tar -xzf roundcube.tar.gz
-  rm -rf roundcube.tar.gz
-  mv roundcubemail-1.6.6 roundcube
-  echo -e "${green}✅ Roundcube下载解压完成${reset}\n"
+  if tar -xzf roundcube.tar.gz > /dev/null 2>&1; then
+    rm -f roundcube.tar.gz
+    if mv roundcubemail-1.6.6/* roundcube/ 2>/dev/null; then
+      echo -e "${green}✅ Roundcube下载解压完成${reset}\n"
+    else
+      echo -e "${red}❌ Roundcube目录移动失败${reset}\n"
+      fail_all=$((fail_all+1))
+    fi
+  else
+    echo -e "${red}❌ Roundcube解压失败${reset}\n"
+    fail_all=$((fail_all+1))
+  fi
 else
   echo -e "${red}❌ Roundcube下载失败${reset}\n"
   fail_all=$((fail_all+1))
