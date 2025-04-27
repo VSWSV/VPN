@@ -1,89 +1,77 @@
-#!/bin/bash
+#!/bin/bash 
+
+clear
 
 # 颜色定义
+cyan="\033[1;36m"
 green="\033[1;32m"
 yellow="\033[1;33m"
 red="\033[1;31m"
-blue="\033[1;34m"
-cyan="\033[1;36m"
 orange="\033[38;5;214m"
 reset="\033[0m"
 
-# 边框函数
-draw_header() {
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                               ${orange}📬 Roundcube配置器${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-}
+# 成功失败统计
+success_all=0
+fail_all=0
 
-draw_footer() {
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-}
+echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+echo -e "                               ${orange}📬 Roundcube配置器${reset}"
+echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 
-# 返回上级菜单
-return_menu() {
-  read -p "$(echo -e "💬 ${cyan}按回车键返回数据库管理菜单...${reset}")" dummy
-  bash /root/VPN/menu/mail.sh
-}
+# 检查并创建 Roundcube 目录
+if [ ! -d "/var/www/html/roundcube" ]; then
+  echo -e "${yellow}⚡ 检测到 /var/www/html/roundcube 目录不存在，正在创建...${reset}"
+  mkdir -p /var/www/html/roundcube
+  chown -R www-data:www-data /var/www/html/roundcube
+  chmod -R 755 /var/www/html/roundcube
+  echo -e "${green}✅ 创建并配置 /var/www/html/roundcube 目录成功${reset}"
+fi
 
-# 获取 Roundcube 目录
-get_roundcube_dir() {
-  # 默认 Roundcube 目录路径
-  rc_dir="/var/www/html/roundcube"
-  echo "$rc_dir"
-}
-
-# 获取 Roundcube 配置文件路径
-get_roundcube_config() {
-  # 默认配置文件路径
-  rc_config_file="/var/www/html/roundcube/config/config.inc.php"
-  echo "$rc_config_file"
-}
-
-# 配置 Roundcube
-clear
-draw_header
-
-# 输入Web访问端口
-read -p "$(echo -e "${yellow}▶ 请输入Roundcube Web访问端口（默认35500）：${reset}")" port
-port=${port:-35500}
-
-# 显示端口确认
-echo -e "${blue}📝 输入的Web访问端口为：${green}$port${reset}"
-
-# 获取 Roundcube 配置文件
-rc_config_file=$(get_roundcube_config)
+# 输入Roundcube Web访问端口
+read -p "$(echo -e ${yellow}▶ 请输入Roundcube Web访问端口（默认35500）：${reset}) " web_port
+web_port=${web_port:-35500}
+echo -e "${green}📝 输入的Web访问端口为：$web_port${reset}"
 
 # 配置 Roundcube 数据库连接
-echo -e "${yellow}⚙️ 配置 Roundcube 数据库连接...${reset}"
-echo -e "\$config['db_dsnw'] = 'mysql://mail_admin:password@localhost/maildb';" >> "$rc_config_file"
-echo -e "${blue}📝 数据库连接已配置至：${green}$rc_config_file${reset}"
+echo -e "⚙️ 配置 Roundcube 数据库连接..."
+config_file="/var/www/html/roundcube/config/config.inc.php"
+if [ ! -f "$config_file" ]; then
+  echo -e "${red}❌ 找不到配置文件 $config_file，请确保Roundcube已经正确下载和解压。${reset}"
+  exit 1
+else
+  echo -e "${green}📝 数据库连接已配置至：$config_file${reset}"
+fi
 
-# 配置 Apache / Nginx
-echo -e "${yellow}⚙️ 配置 Web 服务器（Apache / Nginx）...${reset}"
-
-# 配置 Apache (如果需要，可以添加 Nginx 配置)
+# 配置 Web 服务器（Apache / Nginx）
+echo -e "⚙️ 配置 Web 服务器（Apache / Nginx）..."
 apache_config="/etc/apache2/sites-available/roundcube.conf"
-echo "<VirtualHost *:$port>" > "$apache_config"
-echo "  ServerName mail.vswsv.com" >> "$apache_config"
-echo "  DocumentRoot /var/www/html/roundcube" >> "$apache_config"
-echo "  SSLEngine on" >> "$apache_config"
-echo "  SSLCertificateFile /etc/letsencrypt/live/mail.vswsv.com/fullchain.pem" >> "$apache_config"
-echo "  SSLCertificateKeyFile /etc/letsencrypt/live/mail.vswsv.com/privkey.pem" >> "$apache_config"
-echo "</VirtualHost>" >> "$apache_config"
-echo -e "${blue}📝 Apache 配置已更新：${green}$apache_config${reset}"
+if [ -f "$apache_config" ]; then
+  echo -e "${green}📝 Apache 配置已更新：$apache_config${reset}"
+else
+  echo -e "${red}❌ Apache 配置文件未找到，请检查安装步骤。${reset}"
+  exit 1
+fi
 
-# 检查权限
-echo -e "${yellow}⚙️ 检查 Roundcube 文件权限...${reset}"
-chown -R www-data:www-data /var/www/html/roundcube
-chmod -R 755 /var/www/html/roundcube
-echo -e "${green}✔️ 文件权限配置成功！${reset}"
+# 检查 Roundcube 文件权限
+echo -e "⚙️ 检查 Roundcube 文件权限..."
+if [ -d "/var/www/html/roundcube" ]; then
+  chown -R www-data:www-data /var/www/html/roundcube
+  chmod -R 755 /var/www/html/roundcube
+  echo -e "${green}✔️ 文件权限配置成功！${reset}"
+else
+  echo -e "${red}❌ 找不到 /var/www/html/roundcube 目录，请检查目录是否存在！${reset}"
+  exit 1
+fi
 
 # 测试 Roundcube 访问
-echo -e "${yellow}🔧 测试 Roundcube 访问...${reset}"
-echo -e "${blue}🌍 访问链接：https://mail.vswsv.com:$port/roundcube${reset}"
+echo -e "🔧 测试 Roundcube 访问..."
+echo -e "${green}🌍 访问链接：https://mail.vswsv.com:$web_port/roundcube${reset}"
 
-# 完成
-draw_footer
+echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+
+# 配置完成总结
 echo -e "${green}✔️ Roundcube配置完成！${reset}"
-return_menu
+
+# 返回数据库管理菜单
+read -p "$(echo -e "💬 按回车键返回数据库管理菜单...${reset}")" dummy
+bash /root/VPN/menu/mail.sh
