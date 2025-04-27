@@ -48,7 +48,7 @@ install_single() {
     echo -e "${red} ✗ 安装失败${reset}"
     return 1
   fi
-  draw_header
+  
 }
 
 # 分类批量安装函数
@@ -79,6 +79,8 @@ install_category() {
     echo -e "${red}⚠ ${title}安装部分失败（成功${success_count}个，失败${fail_count}个）${reset}\n"
   fi
 }
+
+draw_header
 
 if [ -d "/root/VPN/MAIL" ]; then
   echo -e "${yellow}⚡ 检测到已有 /root/VPN/MAIL，正在强制清理...${reset}"
