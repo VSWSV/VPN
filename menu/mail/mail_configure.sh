@@ -12,7 +12,7 @@ reset="\033[0m"
 # 边框函数
 draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                               ${orange}📬 邮局域名与主机名配置器${reset}"
+  echo -e "                               ${orange}📬 邮局SSL证书申请器${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -26,53 +26,42 @@ return_menu() {
   bash /root/VPN/menu/mail.sh
 }
 
-# 开始配置
+# 开始执行
 clear
 draw_header
 
-# 输入主域名
-read -p "$(echo -e "${yellow}▶ 请输入主域名（例如 vswsv.com）：${reset}")" domain
-# 输入主机名
-read -p "$(echo -e "${yellow}▶ 请输入主机名（例如 mail.vswsv.com）：${reset}")" hostname
+# 检测Certbot是否存在
+if ! command -v certbot &> /dev/null; then
+  echo -e "${red}❌ 未检测到 Certbot！请先安装 Certbot。${reset}"
+  echo -e "${yellow}可使用命令安装：apt install -y certbot${reset}"
+  draw_footer
+  exit 1
+fi
+
+# 输入要申请证书的主机名
+read -p "$(echo -e "${yellow}▶ 请输入要申请SSL证书的主机名（如 mail.vswsv.com）：${reset}")" hostname
 
 # 显示输入确认
-echo -e "${blue}📝 输入的主域名为：${green}$domain${reset}"
 echo -e "${blue}📝 输入的主机名为：${green}$hostname${reset}"
 
-# 开始配置系统主机名
-echo -e "${yellow}⚙️ 配置系统主机名...${reset}"
-hostnamectl set-hostname "$hostname"
+# 申请证书
+echo -e "${yellow}⚙️ 正在为 ${hostname} 申请 SSL证书...${reset}"
+systemctl stop apache2 nginx 2>/dev/null
 
-# 更新/etc/hostname
-echo "$hostname" > /etc/hostname
+certbot certonly --standalone -d "$hostname" --agree-tos --register-unsafely-without-email
 
-# 更新/etc/hosts（确保 localhost 和 新域名都映射）
-sed -i '/127.0.1.1/d' /etc/hosts
-echo "127.0.0.1   localhost" > /etc/hosts
-echo "127.0.1.1   $hostname $domain" >> /etc/hosts
+systemctl start apache2 nginx 2>/dev/null
 
-# 配置 Postfix
-echo -e "${yellow}⚙️ 配置Postfix服务...${reset}"
-postconf -e "myhostname = $hostname"
-postconf -e "mydomain = $domain"
-postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain"
-
-# 配置 Dovecot证书路径
-echo -e "${yellow}⚙️ 配置Dovecot服务...${reset}"
-dovecot_ssl_conf="/etc/dovecot/conf.d/10-ssl.conf"
-
-# 清理旧证书设置
-sed -i '/ssl_cert =/d' "$dovecot_ssl_conf"
-sed -i '/ssl_key =/d' "$dovecot_ssl_conf"
-
-# 添加新证书路径（默认 Let's Encrypt 路径）
-echo "ssl_cert = </etc/letsencrypt/live/$hostname/fullchain.pem" >> "$dovecot_ssl_conf"
-echo "ssl_key = </etc/letsencrypt/live/$hostname/privkey.pem" >> "$dovecot_ssl_conf"
-
-# 完成
-draw_footer
-echo -e "${green}✔️ 域名与主机名配置成功！${reset}"
-echo -e "${blue}🌍 主机名：${green}$hostname${reset}"
-echo -e "${blue}🌍 邮局访问入口示例：https://${green}$hostname/roundcube${reset}"
+# 检查证书是否申请成功
+if [ -f "/etc/letsencrypt/live/${hostname}/fullchain.pem" ]; then
+  draw_footer
+  echo -e "${green}✔️ 证书申请成功！${reset}"
+  echo -e "${blue}📜 证书文件路径：${green}/etc/letsencrypt/live/${hostname}/fullchain.pem${reset}"
+  echo -e "${blue}🔑 私钥文件路径：${green}/etc/letsencrypt/live/${hostname}/privkey.pem${reset}"
+  echo -e "${blue}🌍 访问示例：${green}https://${hostname}/roundcube${reset}"
+else
+  draw_footer
+  echo -e "${red}❌ 证书申请失败，请检查域名解析是否正确指向本机！${reset}"
+fi
 
 return_menu
