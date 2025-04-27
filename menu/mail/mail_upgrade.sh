@@ -1,8 +1,8 @@
 #!/bin/bash
+
 export DEBIAN_FRONTEND=noninteractive
 clear
 
-# 颜色定义
 cyan="\033[1;36m"
 green="\033[1;32m"
 yellow="\033[1;33m"
@@ -10,100 +10,94 @@ red="\033[1;31m"
 orange="\033[38;5;214m"
 reset="\033[0m"
 
-# 边框函数
-function draw_header() {
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                               ${orange}📦 邮局系统卸载${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-}
-function draw_footer() {
-  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-}
+success_uninstall=0
+fail_uninstall=0
 
-# 密码确认
-echo -e "${yellow}⚡ 卸载操作非常危险，需要输入密码确认${reset}"
+echo -e "${yellow}⚡ 卸载操作需要输入密码确认${reset}"
 read -p "请输入密码以继续（默认密码: 88）: " user_pass
 
 if [ "$user_pass" != "88" ]; then
   echo -e "${red}❌ 密码错误，卸载已取消！${reset}"
-  read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
   sleep 0.5
   bash /root/VPN/menu/mail.sh
+  exit 1
 else
   echo -e "${green}✅ 密码正确，开始卸载！${reset}"
   sleep 0.5
 fi
 
-success_uninstall=0
-fail_uninstall=0
+echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+echo -e "                               ${orange}📦 邮局系统卸载${reset}"
+echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 
-draw_header
-
-# 卸载的软件列表（完全根据你的安装版整理）
-packages=(
-postfix dovecot-core dovecot-imapd dovecot-mysql
-mariadb-server
-apache2
-php php-cli php-fpm php-mysql php-imap php-json php-intl php-gd
-opendkim opendkim-tools certbot
-)
-
-# 要删除的目录列表（也根据你的安装流程整理）
-directories=(
-/root/VPN/MAIL
-/var/www/html/roundcube
-/etc/postfix
-/etc/dovecot
-/etc/apache2
-/etc/roundcube
-)
-
-# 卸载软件
-for pkg in "${packages[@]}"; do
+uninstall_package() {
+  local pkg=$1
   echo -n "🔍 处理 ${pkg}..."
   if dpkg -s "$pkg" > /dev/null 2>&1; then
     apt purge -y "$pkg" > /dev/null 2>&1
     if [ $? -eq 0 ]; then
-      echo -e "${green} ✓ 已卸载${reset}"
+      echo -e "${green} ✔ 已卸载${reset}"
       success_uninstall=$((success_uninstall+1))
     else
-      echo -e "${red} ✗ 卸载失败${reset}"
+      echo -e "${red} ✘ 卸载失败${reset}"
       fail_uninstall=$((fail_uninstall+1))
     fi
   else
     echo -e "${yellow} ⚠ 已不存在，跳过${reset}"
   fi
-done
+}
 
-# 删除目录
-for dir in "${directories[@]}"; do
+remove_directory() {
+  local dir=$1
   echo -n "🔍 删除 ${dir}..."
   if [ -d "$dir" ]; then
     rm -rf "$dir"
     if [ ! -d "$dir" ]; then
-      echo -e "${green} ✓ 已删除${reset}"
+      echo -e "${green} ✔ 已删除${reset}"
       success_uninstall=$((success_uninstall+1))
     else
-      echo -e "${red} ✗ 删除失败${reset}"
+      echo -e "${red} ✘ 删除失败${reset}"
       fail_uninstall=$((fail_uninstall+1))
     fi
   else
     echo -e "${yellow} ⚠ 不存在，跳过${reset}"
   fi
-done
+}
 
-# 清理残余
+uninstall_package postfix
+uninstall_package dovecot-coreuninstall_package dovecot-core\uninstall_package dovecot-imapd
+uninstall_package dovecot-mysql
+uninstall_package mariadb-server
+uninstall_package apache2
+uninstall_package php
+uninstall_package php-cli
+uninstall_package php-fpm
+uninstall_package php-mysql
+uninstall_package php-imap
+uninstall_package php-json
+uninstall_package php-intl
+uninstall_package php-gd
+uninstall_package opendkim
+uninstall_package opendkim-tools
+uninstall_package certbot
+
+remove_directory /root/VPN/MAIL
+remove_directory /var/www/html/roundcube
+remove_directory /etc/postfix
+remove_directory /etc/dovecot
+remove_directory /etc/apache2
+remove_directory /etc/roundcube
+
 echo -n "🔍 清理残余缓存..."
 apt autoremove -y > /dev/null 2>&1 && apt clean > /dev/null 2>&1
 if [ $? -eq 0 ]; then
-  echo -e "${green} ✓ 完成${reset}"
+  echo -e "${green} ✔ 完成${reset}"
 else
-  echo -e "${red} ✗ 失败${reset}"
+  echo -e "${red} ✘ 失败${reset}"
 fi
 
-draw_footer
+echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
-# 总结提示
 if [ $fail_uninstall -eq 0 ]; then
   echo -e "${green}✅ 邮局系统所有组件卸载完成！${reset}"
 else
