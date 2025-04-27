@@ -1,6 +1,5 @@
 #!/bin/bash
 
-export DEBIAN_FRONTEND=noninteractive
 clear
 
 # 颜色定义
@@ -27,8 +26,8 @@ function draw_footer() {
 function uninstall_package() {
   local pkg=$1
   echo -n "🔍 处理 ${pkg}..."
-  if dpkg -s "$pkg" > /dev/null 2>&1; then
-    apt purge -y "$pkg" > /dev/null 2>&1
+  if dpkg -s "$pkg"; then
+    apt purge -y "$pkg"
     if [ $? -eq 0 ]; then
       echo -e "${green} ✔ 已卸载${reset}"
       success_all=$((success_all+1))
@@ -100,7 +99,7 @@ remove_directory /var/www/html/roundcube
 
 # 清理缓存
 echo -n "🔍 清理系统残余..."
-apt autoremove -y > /dev/null 2>&1 && apt clean > /dev/null 2>&1
+apt autoremove -y && apt clean
 if [ $? -eq 0 ]; then
   echo -e "${green} ✔ 完成${reset}"
 else
