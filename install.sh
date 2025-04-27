@@ -1,14 +1,5 @@
 #!/bin/bash
-if ! command -v curl >/dev/null 2>&1; then
-  echo -e "\033[1;33m⚡ 未检测到 curl，正在自动安装...\033[0m"
-  apt update && apt install -y curl
-  if [ $? -eq 0 ]; then
-    echo -e "\033[1;32m✅ curl 安装完成\033[0m"
-  else
-    echo -e "\033[1;31m❌ curl 安装失败，请检查网络！\033[0m"
-    exit 1
-  fi
-fi
+
 clear
 
 green="\033[1;32m"
