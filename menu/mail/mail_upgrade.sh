@@ -29,10 +29,10 @@ function uninstall_package() {
   if dpkg -s "$pkg"; then
     apt purge -y "$pkg"
     if [ $? -eq 0 ]; then
-      echo -e "${green} ✔ 已卸载${reset}"
+      echo -e "${green} ✓ 已卸载${reset}"
       success_all=$((success_all+1))
     else
-      echo -e "${red} ✘ 卸载失败${reset}"
+      echo -e "${red} ✗ 卸载失败${reset}"
       fail_all=$((fail_all+1))
     fi
   else
@@ -46,10 +46,10 @@ function remove_directory() {
   if [ -d "$dir" ]; then
     rm -rf "$dir"
     if [ ! -d "$dir" ]; then
-      echo -e "${green} ✔ 已删除${reset}"
+      echo -e "${green} ✓ 已删除${reset}"
       success_all=$((success_all+1))
     else
-      echo -e "${red} ✘ 删除失败${reset}"
+      echo -e "${red} ✗ 删除失败${reset}"
       fail_all=$((fail_all+1))
     fi
   else
@@ -101,9 +101,9 @@ remove_directory /var/www/html/roundcube
 echo -n "🔍 清理系统残余..."
 apt autoremove -y && apt clean
 if [ $? -eq 0 ]; then
-  echo -e "${green} ✔ 完成${reset}"
+  echo -e "${green} ✓ 完成${reset}"
 else
-  echo -e "${red} ✘ 清理失败${reset}"
+  echo -e "${red} ✗ 清理失败${reset}"
 fi
 
 # 收尾输出
