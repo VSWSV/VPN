@@ -1,7 +1,8 @@
 #!/bin/bash
-
+export DEBIAN_FRONTEND=noninteractive
 clear
 
+# 颜色定义
 cyan="\033[1;36m"
 green="\033[1;32m"
 yellow="\033[1;33m"
@@ -9,6 +10,7 @@ red="\033[1;31m"
 orange="\033[38;5;214m"
 reset="\033[0m"
 
+# 边框函数
 function draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
   echo -e "                               ${orange}📦 邮局系统卸载${reset}"
@@ -18,11 +20,13 @@ function draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
+# 密码确认
 echo -e "${yellow}⚡ 卸载操作非常危险，需要输入密码确认${reset}"
 read -p "请输入密码以继续（默认密码: 88）: " user_pass
 
 if [ "$user_pass" != "88" ]; then
   echo -e "${red}❌ 密码错误，卸载已取消！${reset}"
+  read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
   sleep 0.5
   bash /root/VPN/menu/mail.sh
 else
@@ -33,12 +37,32 @@ fi
 success_uninstall=0
 fail_uninstall=0
 
-function stop_and_remove_service() {
-  local service_name=$1
-  echo -n "🔍 处理 ${service_name}..."
-  if dpkg -s "$service_name" > /dev/null 2>&1; then
-    systemctl stop $service_name > /dev/null 2>&1
-    apt purge -y $service_name > /dev/null 2>&1
+draw_header
+
+# 卸载的软件列表（完全根据你的安装版整理）
+packages=(
+postfix dovecot-core dovecot-imapd dovecot-mysql
+mariadb-server
+apache2
+php php-cli php-fpm php-mysql php-imap php-json php-intl php-gd
+opendkim opendkim-tools certbot
+)
+
+# 要删除的目录列表（也根据你的安装流程整理）
+directories=(
+/root/VPN/MAIL
+/var/www/html/roundcube
+/etc/postfix
+/etc/dovecot
+/etc/apache2
+/etc/roundcube
+)
+
+# 卸载软件
+for pkg in "${packages[@]}"; do
+  echo -n "🔍 处理 ${pkg}..."
+  if dpkg -s "$pkg" > /dev/null 2>&1; then
+    apt purge -y "$pkg" > /dev/null 2>&1
     if [ $? -eq 0 ]; then
       echo -e "${green} ✓ 已卸载${reset}"
       success_uninstall=$((success_uninstall+1))
@@ -49,14 +73,14 @@ function stop_and_remove_service() {
   else
     echo -e "${yellow} ⚠ 已不存在，跳过${reset}"
   fi
-}
+done
 
-function remove_directory() {
-  local dir_path=$1
-  echo -n "🔍 删除 ${dir_path}..."
-  if [ -d "$dir_path" ]; then
-    rm -rf "$dir_path"
-    if [ ! -d "$dir_path" ]; then
+# 删除目录
+for dir in "${directories[@]}"; do
+  echo -n "🔍 删除 ${dir}..."
+  if [ -d "$dir" ]; then
+    rm -rf "$dir"
+    if [ ! -d "$dir" ]; then
       echo -e "${green} ✓ 已删除${reset}"
       success_uninstall=$((success_uninstall+1))
     else
@@ -66,36 +90,9 @@ function remove_directory() {
   else
     echo -e "${yellow} ⚠ 不存在，跳过${reset}"
   fi
-}
+done
 
-draw_header
-
-stop_and_remove_service postfix
-stop_and_remove_service dovecot-core
-stop_and_remove_service dovecot-imapd
-stop_and_remove_service dovecot-mysql
-stop_and_remove_service mariadb-server
-stop_and_remove_service apache2
-stop_and_remove_service php
-stop_and_remove_service php-cli
-stop_and_remove_service php-fpm
-stop_and_remove_service php-mysql
-stop_and_remove_service php-imap
-stop_and_remove_service php-json
-stop_and_remove_service php-intl
-stop_and_remove_service php-gd
-stop_and_remove_service opendkim
-stop_and_remove_service opendkim-tools
-stop_and_remove_service certbot
-
-remove_directory /root/VPN/MAIL
-remove_directory /var/www/html/roundcube
-
-remove_directory /etc/postfix
-remove_directory /etc/dovecot
-remove_directory /etc/apache2
-remove_directory /etc/roundcube
-
+# 清理残余
 echo -n "🔍 清理残余缓存..."
 apt autoremove -y > /dev/null 2>&1 && apt clean > /dev/null 2>&1
 if [ $? -eq 0 ]; then
@@ -106,6 +103,7 @@ fi
 
 draw_footer
 
+# 总结提示
 if [ $fail_uninstall -eq 0 ]; then
   echo -e "${green}✅ 邮局系统所有组件卸载完成！${reset}"
 else
