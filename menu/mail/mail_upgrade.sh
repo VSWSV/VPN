@@ -1,8 +1,7 @@
 #!/bin/bash
 
-export DEBIAN_FRONTEND=noninteractive
 clear
-
+export DEBIAN_FRONTEND=noninteractive
 cyan="\033[1;36m"
 green="\033[1;32m"
 yellow="\033[1;33m"
