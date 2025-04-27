@@ -48,6 +48,7 @@ install_single() {
     echo -e "${red} ✗ 安装失败${reset}"
     return 1
   fi
+  draw_header
 }
 
 # 分类批量安装函数
