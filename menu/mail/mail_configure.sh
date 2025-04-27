@@ -26,6 +26,13 @@ get_public_ip() {
   echo "$ipv4"
 }
 
+# 获取发信邮箱（假设在系统中已经配置）
+get_mail_address() {
+  # 这里假设邮箱格式是 mail@vswsv.com，按需求调整
+  mail_address="mail@vswsv.com"
+  echo "$mail_address"
+}
+
 # 返回上级菜单
 return_menu() {
   read -p "$(echo -e "💬 ${cyan}按回车键返回数据库管理菜单...${reset}")" dummy
@@ -44,6 +51,9 @@ echo -e "${blue}📝 当前服务器公网IPv4：${green}$ipv4${reset}"
 read -p "$(echo -e "${yellow}▶ 请输入主域名（如：vswsv.com）：${reset}")" domain
 echo -e "${blue}📝 输入的主域名为：${green}$domain${reset}"
 
+# 获取发信邮箱地址
+mail_address=$(get_mail_address)
+
 # A记录提示
 echo -e "${yellow}① ${green}A记录： mail -> $ipv4${reset}"
 # MX记录提示
@@ -51,7 +61,7 @@ echo -e "${yellow}② ${green}MX记录： @ -> mail.${domain} 优先级 10${rese
 # SPF记录提示
 echo -e "${yellow}③ ${green}TXT记录（SPF）： @ -> v=spf1 mx ~all${reset}"
 # DMARC记录提示
-echo -e "${yellow}④ ${green}TXT记录（DMARC，可选）： _dmarc -> v=DMARC1; p=none; rua=mailto:你的邮箱${reset}"
+echo -e "${yellow}④ ${green}TXT记录（DMARC，可选）： _dmarc -> v=DMARC1; p=none; rua=mailto:${mail_address}${reset}"
 # DKIM记录提示
 echo -e "${yellow}⑤ ${green}TXT记录（DKIM，后续生成）${reset}"
 
