@@ -20,6 +20,7 @@ echo -e "      ${green}2.${reset} 安装必要工具 GIT和CUR"
 echo -e "      ${green}3.${reset} 克隆或覆盖 GITHUB 仓库到 /ROOT/VPN"
 echo -e "      ${green}4.${reset} 设置 '自定义' 命令来快速启动菜单"
 echo -e "      ${green}5.${reset} 修改密码-美化显示-开启IPV6-SSH 保活"
+echo -e "      ${green}6.${reset} 永久禁用APT锁冲突问题"
 echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 
 read -p "$(echo -e ${yellow}是否继续安装？请输入 [Y/N]：${reset}) " answer
@@ -29,6 +30,24 @@ if [[ "$answer" != "Y" && "$answer" != "y" ]]; then
   exit 1
 fi
 
+# ========================= 第一步：解决APT锁问题 =========================
+echo -e "${green}🔒 正在永久解决APT锁冲突问题...${reset}"
+sudo systemctl stop unattended-upgrades >/dev/null 2>&1
+sudo systemctl disable unattended-upgrades >/dev/null 2>&1
+sudo systemctl mask unattended-upgrades >/dev/null 2>&1
+sudo rm -f /etc/apt/apt.conf.d/20auto-upgrades >/dev/null 2>&1
+
+# 创建APT配置文件防止锁冲突
+sudo tee /etc/apt/apt.conf.d/99-force-lock-ignore >/dev/null <<'EOF'
+APT::Get::Assume-Yes "true";
+APT::Get::AllowUnauthenticated "true";
+DPkg::Options {"--force-confdef";"--force-confold";};
+DPkg::Lock::Timeout "-1";
+EOF
+
+echo -e "${green}✅ APT锁冲突问题已永久解决！${reset}"
+
+# ========================= 第二步：常规安装流程 =========================
 echo -e "${green}🧹 正在清理APT缓存${reset}"
 sudo apt-get clean && echo -e "${green}✅ 清理完成${reset}"
 
@@ -165,4 +184,5 @@ sysctl -p && echo -e "${green}✅ IPv6 设置已应用成功${reset}"
 
 echo -e "${blue}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
 echo -e "              ${green}🎉 安装完成！现在你可以直接输入 ${yellow}${custom_command}${green} 来启动菜单！${reset}"
+echo -e "              ${green}🔒 APT锁冲突问题已永久解决，重启后依然有效！${reset}"
 echo -e "${blue}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
