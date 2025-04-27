@@ -1,163 +1,162 @@
 #!/bin/bash
 
 # 颜色定义
-blue="\033[1;34m"
 green="\033[1;32m"
 yellow="\033[1;33m"
 red="\033[1;31m"
-orange="\033[38;5;214m"
+blue="\033[1;34m"
 cyan="\033[1;36m"
+orange="\033[38;5;214m"
 reset="\033[0m"
 
 # 边框函数
-draw_top() {
-  echo -e "${cyan}╔$(printf '═%.0s' {1..78})╗${reset}"
-}
-draw_mid() {
-  echo -e "${cyan}╠$(printf '═%.0s' {1..78})╣${reset}"
-}
-draw_bottom() {
-  echo -e "${cyan}╚$(printf '═%.0s' {1..78})╝${reset}"
+function draw_header() {
+  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+  echo -e "                               ${orange}📬 邮局系统配置向导${reset}"
+  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-draw_top
-echo -e "${orange}                 ⚙️ 邮局配置菜单                ${reset}"
-draw_mid
-echo -e "${green}① DNS配置指南${reset}"
-echo -e "${green}② 配置邮件域名${reset}"
-echo -e "${green}③ 配置数据库${reset}"
-echo -e "${green}⓪ 返回主菜单${reset}"
-draw_mid
-
-read -p "$(echo -e "${yellow}✨ 请选择操作: ${reset}")" choice
-case $choice in
-  1) show_dns_guide ;;
-  2) setup_domain ;;
-  3) setup_database ;;
-  0) exit ;;
-  *) echo -e "${red}✗ 无效选择!${reset}"; sleep 1 ;;
-esac
-
-# DNS 配置指南函数
-show_dns_guide() {
-  draw_top
-  echo -e "${orange}                  🌐 DNS配置指南                 ${reset}"
-  draw_mid
-  read -p "$(echo -e "${yellow}✨ 请输入您的邮件域名 (例如: example.com): ${reset}")" domain
-  echo -e "${blue}📝 输入为: ${green}$domain${reset}"
-  # 获取公网IP
-  public_ip=$(curl -s --connect-timeout 5 ifconfig.me)
-  if [ -z "$public_ip" ]; then
-    public_ip=$(hostname -I | awk '{print $1}')
-  fi
-  echo -e "${yellow}请为域名 ${green}$domain${yellow} 添加以下 DNS 记录：${reset}"
-  echo -e "${green}① A记录：@ → ${public_ip} （服务器公网 IP）${reset}"
-  echo -e "${green}② A记录：mail → ${public_ip} （服务器公网 IP）${reset}"
-  echo -e "${green}③ MX记录：@ → mail.$domain （优先级 10）${reset}"
-  echo -e "${green}④ TXT记录：@ → v=spf1 mx ~all${reset}"
-  echo -e "${green}⑤ TXT记录：_dmarc → v=DMARC1; p=none; rua=mailto:postmaster@$domain${reset}"
-  draw_mid
-  echo -e "${yellow}🔔 重要提示：${reset}"
-  echo -e "${blue}• DKIM 公钥记录需要使用 opendkim 生成后手动添加${reset}"
-  echo -e "${blue}• PTR 记录需联系提供商设置${reset}"
-  draw_bottom
-  read -p "$(echo -e "💬 ${cyan}按回车键继续...${reset}")" dummy
+function draw_footer() {
+  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 域名配置函数
-setup_domain() {
-  draw_top
-  echo -e "${orange}                 📧 邮局域名配置                ${reset}"
-  draw_mid
-  read -p "$(echo -e "${yellow}✨ 请输入您的邮件域名 (例如: example.com): ${reset}")" domain
-  echo -e "${blue}📝 输入为: ${green}$domain${reset}"
-  read -p "$(echo -e "${yellow}✨ 请输入服务器主机名 (例如: mail.example.com): ${reset}")" hostname
-  echo -e "${blue}📝 输入为: ${green}$hostname${reset}"
-  echo -e "${orange}① 配置 Postfix...${reset}"
-  postconf -e "myhostname = $hostname"
-  postconf -e "mydomain = $domain"
-  postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain"
-  echo -e "${orange}② 配置 Dovecot...${reset}"
-  DOVECOT_CONF="/etc/dovecot/conf.d/10-ssl.conf"
-  echo "ssl_cert = </etc/letsencrypt/live/$hostname/fullchain.pem" >> $DOVECOT_CONF
-  echo "ssl_key = </etc/letsencrypt/live/$hostname/privkey.pem" >> $DOVECOT_CONF
-  draw_mid
-  echo -e "${green}✅ 域名配置完成!${reset}"
-  echo -e "${blue}🌍 Roundcube访问: ${green}https://$hostname/roundcube${reset}"
-  draw_bottom
-  read -p "$(echo -e "💬 ${cyan}按回车键继续...${reset}")" dummy
+function return_menu() {
+  read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
+  bash /root/VPN/menu/mail.sh
 }
 
-# 数据库配置函数
-setup_database() {
-  draw_top
-  echo -e "${orange}                 🗃️ 数据库配置                  ${reset}"
-  draw_mid
-  read -p "$(echo -e "${yellow}✨ 请输入 MySQL root 密码: ${reset}")" -s rootpass
-  echo -e "\n${blue}📝 输入为: ${green}[密码已隐藏]${reset}"
-  DB_NAME="maildb_$(date +%Y%m%d)"
-  DB_USER="mail_admin"
-  DB_PASS=$(openssl rand -hex 12)
-  echo -e "${orange}① 创建数据库...${reset}"
-  mysql -uroot -p"$rootpass" <<MYSQL_SCRIPT
-CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4;
-CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
-GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+# 自动检测IP
+ipv4=$(curl -s4 ip.sb)
+ipv6=$(curl -s6 ip.sb)
+
+while true; do
+  clear
+  draw_header
+
+  echo -e "  ${yellow}①${reset} ${green}建数据库${reset}        ${yellow}②${reset} ${green}设主机名域名${reset}     ${yellow}③${reset} ${green}DNS引导${reset}"
+  echo -e "  ${yellow}④${reset} ${green}SSL证书${reset}          ${yellow}⑤${reset} ${green}设Postfix${reset}        ${yellow}⑥${reset} ${green}设Dovecot${reset}"
+  echo -e "   ${yellow}⓪${reset} ${red}返回主菜单${reset}"
+
+  draw_footer
+
+  read -p "请输入选项编号：" opt
+  case $opt in
+    1)
+      clear
+      draw_header
+      echo -e "${cyan}▶ 请输入数据库名称：${reset}"
+      read dbname
+      echo -e "${cyan}▶ 请输入数据库用户名：${reset}"
+      read dbuser
+      echo -e "${cyan}▶ 请输入数据库用户密码：${reset}"
+      read dbpass
+      echo -e "${cyan}▶ 请再次确认数据库用户密码：${reset}"
+      read dbpass_confirm
+
+      if [ "$dbpass" != "$dbpass_confirm" ]; then
+        echo -e "${red}❌ 两次输入的密码不一致！${reset}"
+        return_menu
+      fi
+
+      mysql -u root -p <<EOF
+CREATE DATABASE IF NOT EXISTS ${dbname} DEFAULT CHARACTER SET utf8mb4;
+CREATE USER IF NOT EXISTS '${dbuser}'@'localhost' IDENTIFIED BY '${dbpass}';
+GRANT ALL PRIVILEGES ON ${dbname}.* TO '${dbuser}'@'localhost';
 FLUSH PRIVILEGES;
-MYSQL_SCRIPT
-  echo -e "${orange}② 创建表结构...${reset}"
-  mysql -uroot -p"$rootpass" $DB_NAME <<EOF
-CREATE TABLE virtual_domains (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(50) NOT NULL UNIQUE
-);
-CREATE TABLE virtual_users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  domain_id INT NOT NULL,
-  email VARCHAR(100) NOT NULL UNIQUE,
-  password VARCHAR(106) NOT NULL,
-  FOREIGN KEY (domain_id) REFERENCES virtual_domains(id) ON DELETE CASCADE
-);
-CREATE TABLE virtual_aliases (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  domain_id INT NOT NULL,
-  source VARCHAR(100) NOT NULL,
-  destination VARCHAR(100) NOT NULL,
-  FOREIGN KEY (domain_id) REFERENCES virtual_domains(id) ON DELETE CASCADE
-);
 EOF
-  draw_mid
-  echo -e "${green}✅ 数据库配置完成!${reset}"
-  echo -e "${blue}🔑 数据库信息:${reset}"
-  echo -e "名称: ${green}$DB_NAME${reset}"
-  echo -e "用户: ${green}$DB_USER${reset}"
-  echo -e "密码: ${green}$DB_PASS${reset}"
-  draw_bottom
-  read -p "$(echo -e "💬 ${cyan}按回车键继续...${reset}")" dummy
-}
 
-# 配置菜单循环
-main_menu() {
-  while true; do
-    draw_top
-    echo -e "${orange}                 ⚙️ 邮局配置菜单                ${reset}"
-    draw_mid
-    echo -e "${green}① DNS配置指南${reset}"
-    echo -e "${green}② 配置邮件域名${reset}"
-    echo -e "${green}③ 配置数据库${reset}"
-    echo -e "${green}⓪ 返回主菜单${reset}"
-    draw_mid
-    read -p "$(echo -e "${yellow}✨ 请选择操作: ${reset}")" choice
-    case $choice in
-      1) show_dns_guide ;;
-      2) setup_domain ;;
-      3) setup_database ;;
-      0) break ;;
-      *) echo -e "${red}✗ 无效选择!${reset}"; sleep 1 ;;
-    esac
-  done
-}
+      cd /root/VPN/MAIL/roundcube
+      mysql -u ${dbuser} -p${dbpass} ${dbname} < SQL/mysql.initial.sql
 
-main_menu
-read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
-bash /root/VPN/menu/mail.sh
+      echo -e "${green}✅ 数据库配置完成！${reset}"
+      return_menu
+      ;;
+    2)
+      clear
+      draw_header
+      echo -e "${cyan}▶ 请输入您的邮件域名 (如 example.com)：${reset}"
+      read domain
+      echo -e "${cyan}▶ 请输入服务器主机名 (如 mail.example.com)：${reset}"
+      read hostname
+
+      postconf -e "myhostname = $hostname"
+      postconf -e "mydomain = $domain"
+      postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost, \$mydomain"
+
+      DOVECOT_CONF="/etc/dovecot/conf.d/10-ssl.conf"
+      sed -i "/ssl_cert/s|.*|ssl_cert = </etc/letsencrypt/live/${hostname}/fullchain.pem|" $DOVECOT_CONF
+      sed -i "/ssl_key/s|.*|ssl_key = </etc/letsencrypt/live/${hostname}/privkey.pem|" $DOVECOT_CONF
+
+      echo -e "${green}✅ 域名配置完成！${reset}"
+      echo -e "${blue}🌍 Roundcube访问地址: https://${hostname}/roundcube${reset}"
+      return_menu
+      ;;
+    3)
+      clear
+      draw_header
+      echo -e "${cyan}▶ 请输入管理员接收邮箱（用于DMARC反馈）：${reset}"
+      read admin_mail
+      echo -e "${green}▶ 请在你的域名后台添加以下DNS记录（TTL建议300秒）：${reset}"
+      echo -e "${yellow}A记录： mail -> ${ipv4}${reset}"
+      if [ -n "$ipv6" ]; then
+        echo -e "${yellow}AAAA记录： mail -> ${ipv6}${reset}"
+      fi
+      echo -e "${yellow}MX记录： @ -> mail.${hostname} 优先级10${reset}"
+      echo -e "${yellow}TXT记录（SPF）：@ -> v=spf1 mx ~all${reset}"
+      echo -e "${yellow}TXT记录（DMARC）：_dmarc -> v=DMARC1; p=none; rua=mailto:${admin_mail}${reset}"
+      echo -e "${yellow}TXT记录（DKIM）：待OpenDKIM配置后添加${reset}"
+      return_menu
+      ;;
+    4)
+      clear
+      draw_header
+      echo -e "${cyan}▶ 请输入申请SSL证书的域名（如 mail.example.com）：${reset}"
+      read certdomain
+      systemctl stop apache2
+      certbot certonly --standalone -d "$certdomain"
+      systemctl start apache2
+      if [ -f "/etc/letsencrypt/live/${certdomain}/fullchain.pem" ]; then
+        echo -e "${green}✅ SSL证书申请成功，证书路径已生成！${reset}"
+      else
+        echo -e "${red}❌ SSL证书申请失败，请检查域名解析或防火墙！${reset}"
+      fi
+      return_menu
+      ;;
+    5)
+      clear
+      draw_header
+      echo -e "${cyan}▶ 正在配置Postfix参数...${reset}"
+      postconf -e "myhostname = $hostname"
+      postconf -e "mydestination = localhost"
+      postconf -e "inet_interfaces = all"
+      postconf -e "inet_protocols = all"
+      postconf -e "smtpd_tls_cert_file = /etc/letsencrypt/live/${hostname}/fullchain.pem"
+      postconf -e "smtpd_tls_key_file = /etc/letsencrypt/live/${hostname}/privkey.pem"
+      postconf -e "smtpd_use_tls = yes"
+      postconf -e "smtpd_tls_auth_only = yes"
+      postconf -e "smtpd_sasl_auth_enable = yes"
+      systemctl restart postfix
+      echo -e "${green}✅ Postfix配置完成！${reset}"
+      return_menu
+      ;;
+    6)
+      clear
+      draw_header
+      echo -e "${cyan}▶ 正在配置Dovecot参数...${reset}"
+      sed -i 's/#disable_plaintext_auth = yes/disable_plaintext_auth = yes/' /etc/dovecot/conf.d/10-auth.conf
+      sed -i 's/#ssl = yes/ssl = yes/' /etc/dovecot/conf.d/10-ssl.conf
+      sed -i "s|#ssl_cert = <.*|ssl_cert = </etc/letsencrypt/live/${hostname}/fullchain.pem|" /etc/dovecot/conf.d/10-ssl.conf
+      sed -i "s|#ssl_key = <.*|ssl_key = </etc/letsencrypt/live/${hostname}/privkey.pem|" /etc/dovecot/conf.d/10-ssl.conf
+      systemctl restart dovecot
+      echo -e "${green}✅ Dovecot配置完成！${reset}"
+      return_menu
+      ;;
+    0)
+      bash /root/VPN/menu/mail.sh
+      ;;
+    *)
+      echo -e "${red}❌ 无效输入，请重新选择！${reset}"
+      sleep 1
+      ;;
+  esac
+done
