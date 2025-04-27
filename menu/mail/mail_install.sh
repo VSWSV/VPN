@@ -25,9 +25,18 @@ function draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 输出顶部边框
-draw_header
+echo -e "${yellow}⚡ 卸载操作需要输入密码确认${reset}"
+read -p "请输入密码以继续（默认密码: 88）: " user_pass
 
+if [ "$user_pass" != "88" ]; then
+  echo -e "${red}❌ 密码错误，卸载已取消！${reset}"
+  sleep 0.5
+  bash /root/VPN/menu/mail.sh
+  exit 1
+else
+  echo -e "${green}✅ 密码正确，开始卸载！${reset}"
+  sleep 0.5
+fi
 # 单个包安装函数
 install_single() {
   local pkg=$1
