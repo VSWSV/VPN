@@ -37,29 +37,32 @@ if ! systemctl is-active --quiet mysql; then
   exit 1
 fi
 
-# 询问root密码
+# 输入root密码并验证
 draw_header
-echo -e "${cyan}▶ 请输入MySQL root账户密码（如果没有直接回车）：${reset}"
-read -s rootpass
+while true; do
+  echo -e "${cyan}▶ 请输入MySQL root账户密码（如果没密码直接回车）：${reset}"
+  read -s rootpass
+
+  mysql -u root -p"${rootpass}" -e "SELECT 1;" 2>/dev/null
+  if [ $? -eq 0 ]; then
+    echo -e "${green}✅ 成功连接MySQL！${reset}"
+    break
+  else
+    echo -e "${red}❌ root密码错误或连接失败，请重新输入！${reset}"
+  fi
+done
 draw_footer
 
-# 验证root密码是否正确
-mysql -u root -p"${rootpass}" -e "quit" 2>/dev/null
-if [ $? -ne 0 ]; then
-  echo -e "${red}❌ root密码错误或无权限，无法继续！${reset}"
-  exit 1
-fi
-
-# 输入数据库相关信息
+# 输入数据库信息
 draw_header
 echo -e "${cyan}▶ 请输入要创建的数据库名称（如 maildb）：${reset}"
 read dbname
 if [[ "$dbname" =~ [^a-zA-Z0-9_] ]]; then
-  echo -e "${red}❌ 数据库名只能包含字母、数字和下划线！${reset}"
+  echo -e "${red}❌ 数据库名只能包含字母、数字、下划线！${reset}"
   exit 1
 fi
 
-echo -e "${cyan}▶ 请输入新建的数据库用户名（如 mailuser，不允许root）：${reset}"
+echo -e "${cyan}▶ 请输入新建数据库用户名（如 mailuser，不允许root）：${reset}"
 read dbuser
 if [[ "$dbuser" == "root" || "$dbuser" =~ [^a-zA-Z0-9_] ]]; then
   echo -e "${red}❌ 用户名不能是root，且只能包含字母数字下划线！${reset}"
@@ -71,40 +74,41 @@ read -s dbpass
 echo -e "${cyan}▶ 请再次确认数据库用户密码：${reset}"
 read -s dbpass_confirm
 if [ "$dbpass" != "$dbpass_confirm" ]; then
-  echo -e "${red}❌ 两次密码不一致！${reset}"
+  echo -e "${red}❌ 两次输入的密码不一致！${reset}"
   exit 1
 fi
 draw_footer
 
-# 检查数据库是否存在
+# 检查是否存在
 mysql -u root -p"${rootpass}" -e "SHOW DATABASES LIKE '${dbname}';" | grep "${dbname}" >/dev/null
 if [ $? -eq 0 ]; then
-  echo -e "${yellow}⚠️ 数据库${dbname}已存在，是否继续？(y/n)${reset}"
-  read overwrite
-  if [[ "$overwrite" != "y" ]]; then
+  echo -e "${yellow}⚠️ 数据库${dbname}已存在，是否继续覆盖？(y/n)${reset}"
+  read confirm_db
+  if [[ "$confirm_db" != "y" ]]; then
     echo -e "${red}❌ 已取消操作。${reset}"
     exit 1
   fi
 fi
 
-# 检查用户是否存在
 mysql -u root -p"${rootpass}" -e "SELECT User FROM mysql.user WHERE User='${dbuser}';" | grep "${dbuser}" >/dev/null
 if [ $? -eq 0 ]; then
-  echo -e "${yellow}⚠️ 用户${dbuser}已存在，是否继续？(y/n)${reset}"
-  read overwrite_user
-  if [[ "$overwrite_user" != "y" ]]; then
+  echo -e "${yellow}⚠️ 用户${dbuser}已存在，是否继续覆盖？(y/n)${reset}"
+  read confirm_user
+  if [[ "$confirm_user" != "y" ]]; then
     echo -e "${red}❌ 已取消操作。${reset}"
     exit 1
   fi
 fi
 
-# 开始创建数据库和用户
+# 创建数据库和用户
 draw_header
 echo -e "${cyan}▶ 正在创建数据库和用户...${reset}"
 
 mysql -u root -p"${rootpass}" <<EOF
-CREATE DATABASE IF NOT EXISTS ${dbname} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-CREATE USER IF NOT EXISTS '${dbuser}'@'localhost' IDENTIFIED BY '${dbpass}';
+DROP DATABASE IF EXISTS ${dbname};
+CREATE DATABASE ${dbname} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+DROP USER IF EXISTS '${dbuser}'@'localhost';
+CREATE USER '${dbuser}'@'localhost' IDENTIFIED BY '${dbpass}';
 GRANT ALL PRIVILEGES ON ${dbname}.* TO '${dbuser}'@'localhost';
 FLUSH PRIVILEGES;
 EOF
@@ -114,20 +118,15 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo -e "${green}✅ 数据库和用户创建成功！${reset}"
-
-# 显示当前所有数据库
-echo -e "${cyan}▶ 当前数据库列表:${reset}"
-mysql -u root -p"${rootpass}" -e "SHOW DATABASES;"
-
+echo -e "${green}✅ 数据库${dbname}和用户${dbuser}创建成功！${reset}"
 draw_footer
 
-# 导入Roundcube表结构
+# 导入表结构
 draw_header
-echo -e "${cyan}▶ 正在导入Roundcube初始表结构...${reset}"
+echo -e "${cyan}▶ 正在导入Roundcube表结构...${reset}"
 
 if [ ! -f /root/VPN/MAIL/roundcube/SQL/mysql.initial.sql ]; then
-  echo -e "${red}❌ 未找到Roundcube初始化SQL文件！${reset}"
+  echo -e "${red}❌ Roundcube初始化SQL文件不存在！${reset}"
   exit 1
 fi
 
@@ -138,24 +137,23 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo -e "${green}✅ 表结构导入完成！${reset}"
+echo -e "${green}✅ 表结构导入成功！${reset}"
 
-# 显示表结构
-echo -e "${cyan}▶ 当前数据库中的表：${reset}"
+# 显示导入后的表
 mysql -u "${dbuser}" -p"${dbpass}" -e "USE ${dbname}; SHOW TABLES;"
 
 draw_footer
 
-# 保存数据库信息
+# 保存数据库连接信息
 mkdir -p /root/VPN/MAIL/
 cat >/root/VPN/MAIL/db_info.txt <<EOL
 数据库名称: ${dbname}
-数据库用户: ${dbuser}
+数据库用户名: ${dbuser}
 数据库密码: ${dbpass}
 连接命令: mysql -u ${dbuser} -p ${dbname}
 EOL
 
-echo -e "${green}✅ 数据库信息已保存到 /root/VPN/MAIL/db_info.txt${reset}"
+echo -e "${green}✅ 配置信息已保存到 /root/VPN/MAIL/db_info.txt！${reset}"
 
-# 返回主菜单
+# 返回菜单
 return_menu
