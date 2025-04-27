@@ -7,7 +7,8 @@
 ## 🛠️ 安装方法（建议一键命令）
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/VSWSV/VPN/main/install.sh)
+apt update && apt install -y curl && curl -sL https://raw.githubusercontent.com/VSWSV/VPN/main/install.sh -o install.sh && bash install.sh
+
 ```
 
 ---
