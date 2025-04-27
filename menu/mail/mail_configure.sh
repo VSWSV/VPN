@@ -25,15 +25,11 @@ return_menu() {
   read -p "$(echo -e "💬 ${cyan}按回车键返回数据库管理菜单...${reset}")" dummy
 }
 
-# 登录数据库（密码错了重新输入）
+# 登录数据库（原生Enter password版）
 function mysql_login() {
   while true; do
     clear
-    draw_header
-    echo -e "ℹ️ 请输入MySQL root账户密码："
-    draw_footer
-    read -s rootpass
-    mysql -u root -p${rootpass} -e "EXIT" 2>/dev/null
+    mysql -u root -p -e "EXIT" 2>/dev/null
     if [ $? -eq 0 ]; then
       break
     else
@@ -49,7 +45,7 @@ function show_databases() {
   draw_header
   echo -e "ℹ️ 当前用户数据库及容量：\n"
 
-  dblist=$(mysql -u root -p${rootpass} -e "SHOW DATABASES;" 2>/dev/null | grep -Ev "Database|information_schema|mysql|performance_schema|sys")
+  dblist=$(mysql -u root -p -e "SHOW DATABASES;" 2>/dev/null | grep -Ev "Database|information_schema|mysql|performance_schema|sys")
 
   for db in $dblist; do
     dbpath="/var/lib/mysql/${db}"
@@ -77,7 +73,7 @@ function change_password_menu() {
         clear
         draw_header
         echo -e "ℹ️ 当前数据库用户列表（列出数据库名）：\n"
-        dblist=$(mysql -u root -p${rootpass} -e "SHOW DATABASES;" 2>/dev/null | grep -Ev "Database|information_schema|mysql|performance_schema|sys")
+        dblist=$(mysql -u root -p -e "SHOW DATABASES;" 2>/dev/null | grep -Ev "Database|information_schema|mysql|performance_schema|sys")
         for db in $dblist; do
           echo -e "  📋 ${green}${db}${reset}"
         done
@@ -88,7 +84,7 @@ function change_password_menu() {
         read user_to_change
         echo -e "ℹ️ 请输入新密码："
         read -s newpass
-        mysql -u root -p${rootpass} -e "ALTER USER '${user_to_change}'@'localhost' IDENTIFIED BY '${newpass}'; FLUSH PRIVILEGES;"
+        mysql -u root -p -e "ALTER USER '${user_to_change}'@'localhost' IDENTIFIED BY '${newpass}'; FLUSH PRIVILEGES;"
         if [ $? -eq 0 ]; then
           echo -e "${green}✔️ 用户 ${user_to_change} 密码修改成功！${reset}"
         else
@@ -110,10 +106,9 @@ function change_password_menu() {
           return_menu
           break
         fi
-        mysql -u root -p${rootpass} -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${newrootpass}'; FLUSH PRIVILEGES;"
+        mysql -u root -p -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${newrootpass}'; FLUSH PRIVILEGES;"
         if [ $? -eq 0 ]; then
           echo -e "${green}✔️ root密码修改成功！${reset}"
-          rootpass=${newrootpass}  # 更新内存中的rootpass
         else
           echo -e "${red}❌ 修改失败！${reset}"
         fi
@@ -158,12 +153,12 @@ function main_menu() {
         read -s dbpass
         draw_footer
 
-        mysql -u root -p${rootpass} <<EOF
+        mysql -u root -p -e "
 CREATE DATABASE IF NOT EXISTS \`${dbname}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 CREATE USER IF NOT EXISTS '${dbuser}'@'localhost' IDENTIFIED BY '${dbpass}';
 GRANT ALL PRIVILEGES ON \`${dbname}\`.* TO '${dbuser}'@'localhost';
 FLUSH PRIVILEGES;
-EOF
+"
         if [ $? -eq 0 ]; then
           echo -e "${green}✔️ 数据库 ${dbname} 和用户 ${dbuser} 创建成功！${reset}"
         else
@@ -175,7 +170,7 @@ EOF
         clear
         draw_header
         echo -e "ℹ️ 当前用户数据库列表："
-        dblist=$(mysql -u root -p${rootpass} -e "SHOW DATABASES;" 2>/dev/null | grep -Ev "Database|information_schema|mysql|performance_schema|sys")
+        dblist=$(mysql -u root -p -e "SHOW DATABASES;" 2>/dev/null | grep -Ev "Database|information_schema|mysql|performance_schema|sys")
         for db in $dblist; do
           echo -e "  📋 ${green}${db}${reset}"
         done
@@ -187,7 +182,7 @@ EOF
           echo -e "⚠️ 确认要删除数据库 ${dbname_del} 吗？此操作不可逆！(y/n)"
           read confirm
           if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
-            mysql -u root -p${rootpass} -e "DROP DATABASE \`${dbname_del}\`;"
+            mysql -u root -p -e "DROP DATABASE \`${dbname_del}\`;"
             if [ $? -eq 0 ]; then
               echo -e "${green}✔️ 数据库 ${dbname_del} 删除成功！${reset}"
             else
