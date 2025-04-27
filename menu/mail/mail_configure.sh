@@ -25,21 +25,25 @@ return_menu() {
   read -p "$(echo -e "💬 ${cyan}按回车键返回数据库管理菜单...${reset}")" dummy
 }
 
-# 登录数据库，保存root密码
+# 登录数据库（密码错了重新输入）
 function mysql_login() {
-  clear
-  draw_header
-  echo -e "ℹ️ 请输入MySQL root账户密码："
-  draw_footer
-  read -s rootpass
-  mysql -u root -p${rootpass} -e "EXIT" 2>/dev/null
-  if [ $? -ne 0 ]; then
-    echo -e "${red}❌ 密码错误，退出！${reset}"
-    exit 1
-  fi
+  while true; do
+    clear
+    draw_header
+    echo -e "ℹ️ 请输入MySQL root账户密码："
+    draw_footer
+    read -s rootpass
+    mysql -u root -p${rootpass} -e "EXIT" 2>/dev/null
+    if [ $? -eq 0 ]; then
+      break
+    else
+      echo -e "${red}❌ 密码错误，请重新输入！${reset}"
+      sleep 1
+    fi
+  done
 }
 
-# 查询数据库
+# 展示数据库和容量
 function show_databases() {
   clear
   draw_header
@@ -179,7 +183,6 @@ EOF
         echo -e "ℹ️ 请输入要删除的数据库名称："
         read dbname_del
 
-        # 检查数据库是否存在
         if echo "$dblist" | grep -qw "$dbname_del"; then
           echo -e "⚠️ 确认要删除数据库 ${dbname_del} 吗？此操作不可逆！(y/n)"
           read confirm
@@ -213,6 +216,6 @@ EOF
   done
 }
 
-# 主程序
+# 主程序开始
 mysql_login
 main_menu
