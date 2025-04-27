@@ -40,10 +40,11 @@ fi
 # 开始脚本
 clear
 draw_header
-echo -e "${cyan}▶ 现在需要输入 MySQL root 账户密码（由MySQL原生弹出 Enter password: ）${reset}"
+echo -e "${cyan}▶ 现在需要连接MySQL root账户。${reset}"
+echo -e "${yellow}💬 提示：下面出现的 Enter password:，请输入root账户密码${reset}"
 draw_footer
 
-# 检查密码是否正确
+# 连接测试
 if ! mysql -u root -p -e "SELECT 1;" 2>/dev/null; then
   echo -e "${red}❌ 无法连接MySQL，请检查密码！${reset}"
   exit 1
@@ -58,7 +59,7 @@ if [[ "$dbname" =~ [^a-zA-Z0-9_] ]]; then
   exit 1
 fi
 
-echo -e "${cyan}▶ 请输入新建的数据库用户名（如 mailuser，不允许root）：${reset}"
+echo -e "${cyan}▶ 请输入新建数据库用户名（如 mailuser，不允许root）：${reset}"
 read dbuser
 if [[ "$dbuser" == "root" || "$dbuser" =~ [^a-zA-Z0-9_] ]]; then
   echo -e "${red}❌ 用户名不能是root，且只能包含字母数字下划线！${reset}"
@@ -76,7 +77,9 @@ fi
 draw_footer
 
 # 检查是否存在
-if mysql -u root -p -e "SHOW DATABASES LIKE '${dbname}';" | grep "${dbname}" >/dev/null; then
+echo -e "${yellow}💬 即将连接root账户，检查数据库/用户是否存在...${reset}"
+mysql -u root -p -e "SHOW DATABASES LIKE '${dbname}';" | grep "${dbname}" >/dev/null
+if [ $? -eq 0 ]; then
   echo -e "${yellow}⚠️ 数据库${dbname}已存在，是否覆盖？(y/n)${reset}"
   read overwrite_db
   if [[ "$overwrite_db" != "y" ]]; then
@@ -85,7 +88,8 @@ if mysql -u root -p -e "SHOW DATABASES LIKE '${dbname}';" | grep "${dbname}" >/d
   fi
 fi
 
-if mysql -u root -p -e "SELECT User FROM mysql.user WHERE User='${dbuser}';" | grep "${dbuser}" >/dev/null; then
+mysql -u root -p -e "SELECT User FROM mysql.user WHERE User='${dbuser}';" | grep "${dbuser}" >/dev/null
+if [ $? -eq 0 ]; then
   echo -e "${yellow}⚠️ 用户${dbuser}已存在，是否覆盖？(y/n)${reset}"
   read overwrite_user
   if [[ "$overwrite_user" != "y" ]]; then
@@ -94,9 +98,11 @@ if mysql -u root -p -e "SELECT User FROM mysql.user WHERE User='${dbuser}';" | g
   fi
 fi
 
-# 正式创建数据库和用户
+# 创建数据库和用户
 draw_header
-echo -e "${cyan}▶ 正在创建数据库和用户...${reset}"
+echo -e "${cyan}▶ 现在即将用root账户创建数据库和用户${reset}"
+echo -e "${yellow}💬 出现 Enter password:，请输入root账户密码${reset}"
+draw_footer
 
 mysql -u root -p <<EOF
 DROP DATABASE IF EXISTS ${dbname};
@@ -112,12 +118,13 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo -e "${green}✅ 数据库 ${dbname} 和用户 ${dbuser} 创建成功！${reset}"
-draw_footer
+echo -e "${green}✅ 数据库${dbname}和用户${dbuser}创建成功！${reset}"
 
 # 导入Roundcube表结构
 draw_header
-echo -e "${cyan}▶ 正在导入Roundcube表结构...${reset}"
+echo -e "${cyan}▶ 现在需要连接新用户【${dbuser}】，导入Roundcube表结构${reset}"
+echo -e "${yellow}💬 出现 Enter password:，请输入新建用户${dbuser}的密码${reset}"
+draw_footer
 
 if [ ! -f /root/VPN/MAIL/roundcube/SQL/mysql.initial.sql ]; then
   echo -e "${red}❌ Roundcube初始化SQL文件不存在！${reset}"
@@ -132,11 +139,12 @@ if [ $? -ne 0 ]; then
 fi
 
 echo -e "${green}✅ 表结构导入成功！${reset}"
+
+# 显示表结构
+echo -e "${cyan}▶ 导入后数据库表如下：${reset}"
 mysql -u "${dbuser}" -p -e "USE ${dbname}; SHOW TABLES;"
 
-draw_footer
-
-# 保存数据库连接信息
+# 保存数据库信息
 mkdir -p /root/VPN/MAIL/
 cat >/root/VPN/MAIL/db_info.txt <<EOL
 数据库名称: ${dbname}
