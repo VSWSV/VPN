@@ -70,7 +70,6 @@ install_category() {
   fi
 }
 
-# 强制清理 MAIL 目录
 if [ -d "/root/VPN/MAIL" ]; then
   echo -e "${yellow}⚡ 检测到已有 /root/VPN/MAIL，正在强制清理...${reset}"
   rm -rf /root/VPN/MAIL
@@ -80,18 +79,6 @@ fi
 echo -e "${green}▶ 正在创建 /root/VPN/MAIL 目录...${reset}"
 mkdir -p /root/VPN/MAIL
 chmod 755 /root/VPN/MAIL
-sleep 1
-
-# 强制清理 POSTFIX 目录
-if [ ! -d "/var/spool/postfix" ]; then
-  echo -e "${yellow}⚡ 检测到 /var/spool/postfix 不存在，正在修复...${reset}"
-  mkdir -p /var/spool/postfix
-  chown postfix:postfix /var/spool/postfix
-  chmod 700 /var/spool/postfix
-fi
-
-# 创建 POSTFIX 目录完成提示
-echo -e "${green}▶ /var/spool/postfix 目录准备完成${reset}"
 sleep 1
 
 # 更新源
