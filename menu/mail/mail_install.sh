@@ -1,5 +1,5 @@
 #!/bin/bash
-
+export DEBIAN_FRONTEND=noninteractive
 clear
 
 cyan="\033[1;36m"
