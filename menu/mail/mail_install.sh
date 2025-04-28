@@ -116,7 +116,7 @@ else
 fi
 
 # 解压Roundcube
-echo -n "${yellow}🔍 解压 Roundcube源码..."
+echo -e "${yellow}🔍 解压 Roundcube源码...${reset}"
 if tar -xzf roundcube.tar.gz; then
   echo -e "${green} ✓ 成功${reset}"
   success_roundcube=$((success_roundcube+1))
@@ -127,36 +127,46 @@ fi
 
 # 移动Roundcube目录
 if [ -d "roundcubemail-1.6.6" ]; then
+  [ -d "roundcube" ] && rm -rf roundcube
   mv roundcubemail-1.6.6 roundcube
 fi
 
 # 修复Roundcube权限
-echo -n "${yellow}🛠️ 修复 Roundcube目录权限..."
+echo -e "${yellow}🛠️ 修复 Roundcube目录权限...${reset}"
 if [ -d "/var/www/html/roundcube" ]; then
   chown -R www-data:www-data /var/www/html/roundcube && echo -e "${green} ✓ 成功${reset}" || {
-    echo -e "${red} ✗ 失败${reset}"; fail_roundcube=$((fail_roundcube+1));
+    echo -e "${red} ✗ 失败${reset}"
+    fail_roundcube=$((fail_roundcube+1))
   }
 else
   echo -e "${red} ✗ 失败${reset}"
   fail_roundcube=$((fail_roundcube+1))
 fi
 
+# 安装php-xml模块（补齐DOM和XML支持）
 apt install -y php-xml >/dev/null 2>&1
 
+# 清理下载包
 rm -f /var/www/html/roundcube.tar.gz
 
+# 更新成功失败统计
 success_all=$((success_all+success_roundcube))
 fail_all=$((fail_all+fail_roundcube))
 
+# 输出Roundcube安装器地址
 ip=$(curl -s ipv4.ip.sb)
 echo -e "${yellow}🔗 Roundcube安装器入口: ${green}http://${ip}/roundcube/installer/${reset}"
 
+# 总结安装结果
 if [ $fail_all -eq 0 ]; then
   echo -e "${green}✅ 邮局系统所有组件安装成功！${reset}"
 else
   echo -e "${red}⚠ 邮局系统安装部分失败，请检查上方安装日志${reset}"
 fi
 
+# 尾部边框
 draw_footer
+
+# 返回主菜单
 read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/mail.sh
