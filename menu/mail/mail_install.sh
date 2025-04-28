@@ -141,26 +141,22 @@ else
   fail_roundcube=$((fail_roundcube+1))
 fi
 
-# 自动安装php-xml模块（补齐DOM和XML支持）
 apt install -y php-xml >/dev/null 2>&1
 
-# 清理下载的tar包
 rm -f /var/www/html/roundcube.tar.gz
 
-# 统计Roundcube结果
 success_all=$((success_all+success_roundcube))
 fail_all=$((fail_all+fail_roundcube))
 
-# 收尾输出
-draw_footer
+ip=$(curl -s ipv4.ip.sb)
+echo -e "${green}🔗 Roundcube安装器入口: http://${ip}/roundcube/installer/ ✓ 成功${reset}"
 
-# 安装结果总结
 if [ $fail_all -eq 0 ]; then
   echo -e "${green}✅ 邮局系统所有组件安装成功！${reset}"
 else
   echo -e "${red}⚠ 邮局系统安装部分失败，请检查上方安装日志${reset}"
 fi
 
-# 返回主菜单提示
+draw_footer
 read -p "$(echo -e "💬 ${cyan}按回车键返回...${reset}")" dummy
 bash /root/VPN/menu/mail.sh
