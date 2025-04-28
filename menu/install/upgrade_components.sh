@@ -26,7 +26,7 @@ function error_exit() {
 }
 
 # 计算标题居中
-title="🔄 功能升级更新"
+title="🔄 高级组件更新检查"
 title_length=${#title}
 total_width=83
 padding=$(( (total_width - title_length) / 2 ))
@@ -45,44 +45,65 @@ fi
 
 cd /root/VPN || error_exit "无法进入 /root/VPN"
 
-# 备份配置文件
-info "📦 备份配置文件..."
-backup_dir="/root/VPN/backup_$(date +%Y%m%d%H%M%S)"
-mkdir -p "$backup_dir"
+# 函数：获取Xray最新版本
+function get_latest_xray() {
+  curl -sL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | grep '"tag_name":' | cut -d'"' -f4
+}
 
-# 备份重要配置文件
-config_files=(
-  "VLESS/config/vless.json"
-  "HY2/config/hysteria.yaml"
-  "../.cloudflared/config.yml"
-  "../.cloudflared/cert.pem"
-)
+# 函数：获取Hysteria最新版本
+function get_latest_hysteria() {
+  curl -sL "https://api.github.com/repos/apernet/hysteria/releases/latest" | grep '"tag_name":' | cut -d'"' -f4
+}
 
-backup_count=0
-for config in "${config_files[@]}"; do
-  config_path="/root/VPN/$config"
-  if [[ $config == ../* ]]; then
-    config_path="/root/${config#../}"
-  fi
-  
-  if [ -f "$config_path" ]; then
-    mkdir -p "$backup_dir/$(dirname "$config")"
-    cp "$config_path" "$backup_dir/$config"
-    info "✅ 已备份: $config_path"
-    ((backup_count++))
+# 函数：获取Cloudflared最新版本
+function get_latest_cloudflared() {
+  curl -sL "https://api.github.com/repos/cloudflare/cloudflared/releases/latest" | grep '"tag_name":' | cut -d'"' -f4
+}
+
+# 检查组件更新
+info "🔄 检查组件更新..."
+
+# Xray 更新检查
+if [ -f "/root/VPN/xray/xray" ]; then
+  current_xray=$("/root/VPN/xray/xray" version | head -n 1 | awk '{print $2}')
+  latest_xray=$(get_latest_xray)
+  if [ "$current_xray" != "$latest_xray" ]; then
+    warning "Xray 有新版本可用: $latest_xray (当前: $current_xray)"
   else
-     info "⚠️  配置文件不存在: $config_path"
+    success "Xray 已是最新版本: $current_xray"
   fi
-done
-
-if [ $backup_count -gt 0 ]; then
-  success "已备份 $backup_count 个配置文件到: $backup_dir"
 else
-  warning "未找到任何可备份的配置文件"
+  warning "Xray 未安装"
+fi
+
+# Hysteria 更新检查
+if [ -f "/root/VPN/hysteria" ]; then
+  current_hysteria=$("/root/VPN/hysteria" version | awk '{print $3}')
+  latest_hysteria=$(get_latest_hysteria)
+  if [ "$current_hysteria" != "$latest_hysteria" ]; then
+    warning "Hysteria 有新版本可用: $latest_hysteria (当前: $current_hysteria)"
+  else
+    success "Hysteria 已是最新版本: $current_hysteria"
+  fi
+else
+  warning "Hysteria 未安装"
+fi
+
+# Cloudflared 更新检查
+if [ -f "/root/VPN/cloudflared" ]; then
+  current_cloudflared=$("/root/VPN/cloudflared" version | grep -oP 'cloudflared version \K[\d.]+')
+  latest_cloudflared=$(get_latest_cloudflared | sed 's/^v//')
+  if [ "$current_cloudflared" != "$latest_cloudflared" ]; then
+    warning "Cloudflared 有新版本可用: $latest_cloudflared (当前: $current_cloudflared)"
+  else
+    success "Cloudflared 已是最新版本: $current_cloudflared"
+  fi
+else
+  warning "Cloudflared 未安装"
 fi
 
 # 从GitHub更新项目
-info "🔄 从GitHub更新项目..."
+info "🔄 从GitHub更新VPN项目..."
 if ! command -v git &> /dev/null; then
   info "安装git..."
   apt update && apt install -y git || error_exit "Git安装失败"
@@ -105,79 +126,6 @@ changed_files=$(git diff --name-only HEAD~1 HEAD)
 success "项目更新成功"
 info "📝 最后提交: ${green}$latest_commit${reset}"
 info "📄 更改的文件: ${green}$changed_files${reset}"
-
-# 恢复配置文件
-info "🔄 恢复配置文件..."
-for config in "${config_files[@]}"; do
-  backup_path="$backup_dir/$config"
-  restore_path="/root/VPN/$config"
-  if [[ $config == ../* ]]; then
-    restore_path="/root/${config#../}"
-  fi
-  
-  if [ -f "$backup_path" ]; then
-    mkdir -p "$(dirname "$restore_path")"
-    cp "$backup_path" "$restore_path"
-    info "已恢复: $restore_path"
-  fi
-done
-success "配置文件恢复完成"
-
-# 提供删除备份选项
-echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-info "🗑️ 备份管理"
-info "${green}✅ 当前备份目录: $backup_dir${reset}"
-
-# 显示备份目录大小
-backup_size=$(du -sh "$backup_dir" | cut -f1)
-info "📦 当前备份大小: $backup_size"
-
-# 查找所有备份目录
-all_backups=($(find /root/VPN -maxdepth 1 -type d -name "backup_*" | sort -r))
-if [ ${#all_backups[@]} -gt 1 ]; then
-  info "📅 现有备份列表(按时间排序):"
-  for ((i=0; i<${#all_backups[@]}; i++)); do
-    backup_date=$(basename "${all_backups[$i]}" | cut -d'_' -f2-)
-    size=$(du -sh "${all_backups[$i]}" | cut -f1)
-    if [ "$i" -eq 0 ]; then
-      echo -e "${green}  [$i] ${all_backups[$i]} (最新, $size)${reset}"
-    else
-      echo -e "${yellow}  [$i] ${all_backups[$i]} ($size)${reset}"
-    fi
-  done
-
-  echo -e "${cyan}可以选择删除多个旧备份(用空格分隔编号，最新备份[0]不会被删除)${reset}"
-  read -p "$(echo -e "${cyan}输入要删除的备份编号(如:1 2 3)，或'n'跳过: ${reset}")" choice
-  
-  if [[ "$choice" != "n" ]]; then
-    # 分割输入的选项
-    IFS=' ' read -ra choices <<< "$choice"
-    
-    # 验证每个选择
-    deleted_count=0
-    for c in "${choices[@]}"; do
-      if [[ "$c" =~ ^[0-9]+$ ]] && [ "$c" -lt "${#all_backups[@]}" ] && [ "$c" -ne 0 ]; then
-        rm -rf "${all_backups[$c]}"
-        success "已删除备份: ${all_backups[$c]}"
-        ((deleted_count++))
-      elif [ "$c" -eq 0 ]; then
-        warning "跳过最新备份[0]的保护"
-      else
-        warning "忽略无效选择: $c"
-      fi
-    done
-    
-    if [ $deleted_count -gt 0 ]; then
-      success "已成功删除 $deleted_count 个旧备份"
-    else
-      info "没有删除任何备份"
-    fi
-  else
-    info "保留所有备份"
-  fi
-else
-  info "没有其他备份可管理"
-fi
 
 # 更新组件权限
 info "🔄 更新组件权限..."
@@ -203,7 +151,7 @@ chmod -R 755 /root/VPN
 success "权限设置完成"
 
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-info "🎉 升级完成"
+info "🎉 升级检查完成"
 echo -e "${yellow}📌 可能需要重启服务使更改生效${reset}"
 echo -e "${yellow}▶ systemctl restart xray.service${reset}"
 echo -e "${yellow}▶ systemctl restart hysteria.service${reset}"
