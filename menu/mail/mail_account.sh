@@ -65,16 +65,12 @@ list_users() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
   echo -e "                                   ${orange}👥 查看用户${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-  
-    local output
-    case $db_type in
+  case $db_type in
         mysql)
-            output=$(run_mysql "SELECT user, host FROM mysql.user;")
-            [[ $? -eq 0 ]] && echo "$output"
+            run_mysql "SELECT user,host FROM mysql.user;"
             ;;
         postgres)
-            output=$(run_psql "\du")
-            [[ $? -eq 0 ]] && echo "$output"
+            run_psql "\du"
             ;;
     esac
     draw_footer
@@ -89,16 +85,12 @@ list_databases() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
   echo -e "                                   ${orange}📚 查看数据库${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-  
-    local output
-    case $db_type in
+  case $db_type in
         mysql)
-            output=$(run_mysql "SHOW DATABASES;")
-            [[ $? -eq 0 ]] && echo "$output"
+            run_mysql "SHOW DATABASES;"
             ;;
         postgres)
-            output=$(run_psql "\l")
-            [[ $? -eq 0 ]] && echo "$output"
+            run_psql "\l"
             ;;
     esac
     draw_footer
