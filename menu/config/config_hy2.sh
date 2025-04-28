@@ -163,9 +163,16 @@ done
 
 # ALPN协议
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-read -p "$(echo -e " ${lightpink}⇨ 请输入ALPN协议 [h3]: ${reset}")" alpn
-alpn=${alpn:-h3}
-show_status "ALPN协议: ${lightpink}$alpn${reset}"
+while true; do
+    read -p "$(echo -e " ${lightpink}⇨ 请输入ALPN协议 [h3]: ${reset}")" alpn
+    alpn=${alpn:-h3}
+    if validate_input "alpn" "$alpn"; then
+        show_status "ALPN协议: ${lightpink}$alpn${reset}"
+        break
+    else
+        show_error "无效协议，请输入 h2 / h3 / http/1.1 中的一种"
+    fi
+done
 
 # TLS配置
 echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
