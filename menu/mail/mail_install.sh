@@ -116,7 +116,7 @@ else
 fi
 
 # 解压Roundcube
-echo -n "${yellow}🔍 解压 Roundcube源码...
+echo -n "${yellow}🔍 解压 Roundcube源码..."
 if tar -xzf roundcube.tar.gz; then
   echo -e "${green} ✓ 成功${reset}"
   success_roundcube=$((success_roundcube+1))
