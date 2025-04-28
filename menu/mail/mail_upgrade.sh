@@ -74,7 +74,6 @@ fi
 # 开始卸载
 draw_header
 
-# 卸载安装的包
 uninstall_package postfix
 uninstall_package dovecot-core
 uninstall_package dovecot-imapd
@@ -92,9 +91,27 @@ uninstall_package php-gd
 uninstall_package opendkim
 uninstall_package opendkim-tools
 uninstall_package certbot
+uninstall_package mailutils
+uninstall_package dovecot-pop3d
+uninstall_package php-xml
 
 # 删除目录
+remove_directory /etc/roundcube
 remove_directory /var/www/html/roundcube
+remove_directory /var/lib/mysql
+remove_directory /etc/mysql
+remove_directory /var/spool/postfix
+remove_directory /var/log/mail.log
+remove_directory /var/log/mail.err
+remove_directory /var/log/dovecot.log
+remove_directory /etc/opendkim
+remove_directory /etc/letsencrypt
+
+# 删除系统用户和组
+deluser www-data
+delgroup www-data
+deluser postfix
+delgroup postfix
 
 # 清理缓存
 echo -n "🔍 清理系统残余..."
