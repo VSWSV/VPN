@@ -68,25 +68,26 @@ if [ -f "/root/VPN/xray/xray" ]; then
   current_xray=$("/root/VPN/xray/xray" version | head -n 1 | awk '{print $2}')
   latest_xray=$(get_latest_xray)
   if [ "$current_xray" != "$latest_xray" ]; then
-    warning "Xray 有新版本可用: $latest_xray (当前: $current_xray)"
+    echo -e "${yellow}║ Xray 有新版本可用: ${latest_xray} (当前: ${current_xray})${reset}"
   else
-    success "Xray 已是最新版本: $current_xray"
+    echo -e "${green}║ Xray 已是最新版本: ${current_xray}${reset}"
   fi
 else
-  warning "Xray 未安装"
+  echo -e "${yellow}║ Xray 未安装${reset}"
 fi
 
 # Hysteria 更新检查
 if [ -f "/root/VPN/hysteria" ]; then
-  current_hysteria=$("/root/VPN/hysteria" version | awk '{print $3}')
+  current_hysteria=$("/root/VPN/hysteria" version | awk 'NR==1{print $3}')
   latest_hysteria=$(get_latest_hysteria)
   if [ "$current_hysteria" != "$latest_hysteria" ]; then
-    warning "Hysteria 有新版本可用: $latest_hysteria (当前: $current_hysteria)"
+    echo -e "${yellow}║ Hysteria 有新版本可用: ${latest_hysteria}${reset}"
+    echo -e "${yellow}║ 当前版本: ${current_hysteria}${reset}"
   else
-    success "Hysteria 已是最新版本: $current_hysteria"
+    echo -e "${green}║ Hysteria 已是最新版本: ${current_hysteria}${reset}"
   fi
 else
-  warning "Hysteria 未安装"
+  echo -e "${yellow}║ Hysteria 未安装${reset}"
 fi
 
 # Cloudflared 更新检查
@@ -94,12 +95,12 @@ if [ -f "/root/VPN/cloudflared" ]; then
   current_cloudflared=$("/root/VPN/cloudflared" version | grep -oP 'cloudflared version \K[\d.]+')
   latest_cloudflared=$(get_latest_cloudflared | sed 's/^v//')
   if [ "$current_cloudflared" != "$latest_cloudflared" ]; then
-    warning "Cloudflared 有新版本可用: $latest_cloudflared (当前: $current_cloudflared)"
+    echo -e "${yellow}║ Cloudflared 有新版本可用: ${latest_cloudflared} (当前: ${current_cloudflared})${reset}"
   else
-    success "Cloudflared 已是最新版本: $current_cloudflared"
+    echo -e "${green}║ Cloudflared 已是最新版本: ${current_cloudflared}${reset}"
   fi
 else
-  warning "Cloudflared 未安装"
+  echo -e "${yellow}║ Cloudflared 未安装${reset}"
 fi
 
 # 从GitHub更新项目
