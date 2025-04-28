@@ -91,6 +91,7 @@ uninstall_package certbot
 uninstall_package mailutils
 uninstall_package dovecot-pop3d
 uninstall_package php-xml
+uninstall_package php-zip
 
 remove_directory /etc/roundcube
 remove_directory /var/www/html/roundcube
