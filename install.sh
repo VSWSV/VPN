@@ -132,6 +132,7 @@ function bar() {
   for ((i = 0; i < empty; i++)); do bar+="░"; done
   echo -e "$color$bar\033[0m"
 }
+
 load=$(uptime | awk -F'load average: ' '{print $2}' | cut -d, -f1)
 cpu_perc=$(awk -v l="$load" 'BEGIN { printf("%.0f", l*10) }')
 cpu_bar=$(bar $cpu_perc)
@@ -144,7 +145,8 @@ swap_bar=$(bar $swap_used)
 ipv4=$(hostname -I | awk '{print $1}')
 ipv6=$(ip -6 addr show scope global | awk '/inet6/ {print $2}' | cut -d/ -f1 | head -n 1)
 current_time=$(date +"%Y-%m-%d %H:%M:%S")
-echo 
+
+# 打印结果
 echo -e "CPU 使用率:        $cpu_bar  $cpu_perc%"
 echo
 echo -e "内存使用率:        $mem_bar  ${mem_used}%"
@@ -158,7 +160,6 @@ echo
 echo -e "公网 IPv6 地址:    \033[1;36m$ipv6\033[0m"
 echo
 echo -e "当前时间:          \033[1;34m$current_time\033[0m"
-echo
 EOF
 
 chmod +x /etc/profile.d/motd.sh && source /etc/profile.d/motd.sh
