@@ -88,7 +88,7 @@ if [ -f "$CONFIG_PATH" ]; then
 
     # 询问是否覆盖配置（严格 Y/y 或 N/n）
     while true; do
-        read -p "$(echo -e "${yellow}是否覆盖当前配置？(y/N): ${reset}")" -n 1 overwrite
+        read -p "$(echo -e "${yellow}是否覆盖当前配置？(Y/N): ${reset}")" -n 1 overwrite
         echo  # 换行
         
         case "$overwrite" in
