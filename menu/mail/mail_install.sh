@@ -25,6 +25,8 @@ function draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
+# 安装前验证密码
+
 echo -e "${yellow}⚡ 安装操作需要输入密码确认${reset}"
 read -p "请输入密码以继续（默认密码: 88）: " user_pass
 
@@ -37,6 +39,7 @@ else
   echo -e "${green}✅ 密码正确，开始安装！${reset}"
   sleep 0.5
 fi
+
 # 单个包安装函数
 install_single() {
   local pkg=$1
@@ -48,7 +51,6 @@ install_single() {
     echo -e "${red} ✗ 安装失败${reset}"
     return 1
   fi
-  
 }
 
 # 分类批量安装函数
@@ -80,20 +82,11 @@ install_category() {
   fi
 }
 
+# 开始安装流程
 draw_header
 
-if [ -d "/root/VPN/MAIL" ]; then
-  echo -e "${yellow}⚡ 检测到已有 /root/VPN/MAIL，正在强制清理...${reset}"
-  rm -rf /root/VPN/MAIL
-fi
-
-# 创建目录
-echo -e "${green}▶ 正在创建 /root/VPN/MAIL 目录...${reset}"
-mkdir -p /root/VPN/MAIL
-chmod 755 /root/VPN/MAIL
-sleep 1
-
 # 更新源
+
 echo -e "${green}▶ 更新系统源中...${reset}"
 apt update -y && echo -e "${green}✅ 系统更新完成${reset}" || echo -e "${red}❌ 系统更新失败${reset}"
 sleep 1
@@ -110,7 +103,7 @@ success_roundcube=0
 fail_roundcube=0
 
 echo -e "${yellow}📬 安装Roundcube...${reset}"
-cd /root/VPN/MAIL
+cd /var/www/html
 
 # 下载Roundcube
 echo -n "🔍 下载 Roundcube源码..."
@@ -125,7 +118,6 @@ fi
 # 解压Roundcube
 echo -n "🔍 解压 Roundcube源码..."
 if tar -xzf roundcube.tar.gz; then
-  rm -f roundcube.tar.gz
   echo -e "${green} ✓ 成功${reset}"
   success_roundcube=$((success_roundcube+1))
 else
@@ -133,22 +125,15 @@ else
   fail_roundcube=$((fail_roundcube+1))
 fi
 
-# 安装Roundcube
-echo -n "🔍 安装 Roundcube..."
+# 移动Roundcube目录
 if [ -d "roundcubemail-1.6.6" ]; then
-  mkdir -p roundcube
-  mv roundcubemail-1.6.6/* roundcube/ && echo -e "${green} ✓ 成功${reset}" || {
-    echo -e "${red} ✗ 失败${reset}"; fail_roundcube=$((fail_roundcube+1));
-  }
-else
-  echo -e "${red} ✗ 失败${reset}"
-  fail_roundcube=$((fail_roundcube+1))
+  mv roundcubemail-1.6.6 roundcube
 fi
 
 # 修复Roundcube权限
 echo -n "▶ 修复 Roundcube目录权限..."
-if [ -d "/root/VPN/MAIL/roundcube" ]; then
-  chown -R www-data:www-data /root/VPN/MAIL/roundcube && echo -e "${green} ✓ 成功${reset}" || {
+if [ -d "/var/www/html/roundcube" ]; then
+  chown -R www-data:www-data /var/www/html/roundcube && echo -e "${green} ✓ 成功${reset}" || {
     echo -e "${red} ✗ 失败${reset}"; fail_roundcube=$((fail_roundcube+1));
   }
 else
@@ -156,17 +141,15 @@ else
   fail_roundcube=$((fail_roundcube+1))
 fi
 
+# 自动安装php-xml模块（补齐DOM和XML支持）
+apt install -y php-xml >/dev/null 2>&1
+
+# 清理下载的tar包
+rm -f /var/www/html/roundcube.tar.gz
+
 # 统计Roundcube结果
 success_all=$((success_all+success_roundcube))
 fail_all=$((fail_all+fail_roundcube))
-
-if [ $fail_roundcube -eq 0 ]; then
-  echo -e "${green}✅ 📬 安装Roundcube全部完成${reset}\n"
-else
-  echo -e "${red}⚠ 📬 安装Roundcube部分失败（成功${success_roundcube}个，失败${fail_roundcube}个）${reset}\n"
-fi
-
-sleep 1
 
 # 收尾输出
 draw_footer
