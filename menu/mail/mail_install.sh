@@ -92,7 +92,7 @@ apt update -y && echo -e "${green}✅ 系统更新完成${reset}" || echo -e "${
 sleep 1
 
 # 分类安装
-install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql
+install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql mailutils dovecot-pop3d 
 install_category "🛢️ 安装数据库服务..." mariadb-server
 install_category "🌐 安装Web服务器..." apache2
 install_category "🧩 安装PHP及扩展..." php php-cli php-fpm php-mysql php-imap php-json php-intl php-gd
