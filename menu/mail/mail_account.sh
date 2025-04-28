@@ -32,23 +32,20 @@ safe_yn_input() {
 
 run_mysql() {
   local sql="$1"
-  mysql -u root -p -e "$sql" 2>/tmp/mysql_error.log
-  local status=$?
-  if [ $status -ne 0 ]; then
-    error_msg=$(grep -v "Using a password" /tmp/mysql_error.log)
-    echo -e "${red}${error_msg}${reset}"
-    return $status
+  local result=$(mysql -u root -p -e "$sql" 2>&1 | grep -v "Using a password")
+  if [[ $result == *"ERROR"* ]]; then
+    echo -e "${red}操作失败：${result#*ERROR}${reset}"
+    return 1
   fi
   return 0
 }
 
 run_psql() {
   local sql="$1"
-  sudo -u postgres psql -c "$sql" 2>/tmp/psql_error.log
-  local status=$?
-  if [ $status -ne 0 ]; then
-    echo -e "${red}$(cat /tmp/psql_error.log)${reset}"
-    return $status
+  local result=$(sudo -u postgres psql -c "$sql" 2>&1)
+  if [[ $result == *"ERROR"* || $result == *"错误"* ]]; then
+    echo -e "${red}操作失败：${result#*ERROR}${reset}"
+    return 1
   fi
   return 0
 }
@@ -70,12 +67,8 @@ list_users() {
     
     echo -e "${blue}=== 用户列表 ===${reset}"
     case $db_type in
-        mysql)
-            run_mysql "SELECT user,host FROM mysql.user;"
-            ;;
-        postgres)
-            run_psql "\du"
-            ;;
+        mysql) run_mysql "SELECT user,host FROM mysql.user;" ;;
+        postgres) run_psql "\du" ;;
     esac
     draw_footer
     return_to_menu
@@ -100,53 +93,15 @@ create_database() {
     case $db_type in
         mysql)
             if run_mysql "CREATE DATABASE \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"; then
-                echo -e "${green}数据库创建成功${reset}"
-            else
-                draw_footer
-                return_to_menu
-                return
+                echo -e "${green}数据库 ${db_name} 创建成功${reset}"
             fi
             ;;
         postgres)
             if run_psql "CREATE DATABASE \"$db_name\" ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8';"; then
-                echo -e "${green}数据库创建成功${reset}"
-            else
-                draw_footer
-                return_to_menu
-                return
+                echo -e "${green}数据库 ${db_name} 创建成功${reset}"
             fi
             ;;
     esac
-
-    safe_yn_input "是否创建关联用户" create_user
-    if [[ "$create_user" =~ [Yy] ]]; then
-        while true; do
-            echo -n "输入用户名: "
-            read username
-            if [ -z "$username" ]; then
-                echo -e "${red}错误：用户名不能为空！${reset}"
-            else
-                break
-            fi
-        done
-
-        echo -n "输入密码（输入不可见）: "
-        read -s password
-        echo
-
-        case $db_type in
-            mysql)
-                if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \`$db_name\`.* TO '$username'@'%'; FLUSH PRIVILEGES;"; then
-                    echo -e "${green}用户创建并授权成功${reset}"
-                fi
-                ;;
-            postgres)
-                if run_psql "CREATE USER \"$username\" WITH PASSWORD '$password'; GRANT ALL ON DATABASE \"$db_name\" TO \"$username\";"; then
-                    echo -e "${green}用户创建并授权成功${reset}"
-                fi
-                ;;
-        esac
-    fi
     draw_footer
     return_to_menu
 }
@@ -170,13 +125,17 @@ delete_database() {
     case $db_type in
         mysql)
             if run_mysql "DROP DATABASE \`$db_name\`;"; then
-                echo -e "${green}数据库删除成功${reset}"
+                echo -e "${green}数据库 ${db_name} 删除成功${reset}"
+            else
+                echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
             ;;
         postgres)
             run_psql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db_name';" >/dev/null 2>&1
             if run_psql "DROP DATABASE \"$db_name\";"; then
-                echo -e "${green}数据库删除成功${reset}"
+                echo -e "${green}数据库 ${db_name} 删除成功${reset}"
+            else
+                echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
             ;;
     esac
@@ -200,12 +159,16 @@ change_password() {
     case $db_type in
         mysql)
             if run_mysql "ALTER USER '$username'@'localhost' IDENTIFIED BY '$new_pass'; FLUSH PRIVILEGES;"; then
-                echo -e "${green}密码修改成功${reset}"
+                echo -e "${green}用户 ${username} 密码修改成功${reset}"
+            else
+                echo -e "${red}用户 ${username} 密码修改失败${reset}"
             fi
             ;;
         postgres)
             if run_psql "ALTER USER \"$username\" WITH PASSWORD '$new_pass';"; then
-                echo -e "${green}密码修改成功${reset}"
+                echo -e "${green}用户 ${username} 密码修改成功${reset}"
+            else
+                echo -e "${red}用户 ${username} 密码修改失败${reset}"
             fi
             ;;
     esac
@@ -219,12 +182,8 @@ list_databases() {
 
     echo -e "${blue}=== 数据库列表 ===${reset}"
     case $db_type in
-        mysql)
-            run_mysql "SHOW DATABASES;"
-            ;;
-        postgres)
-            run_psql "\l"
-            ;;
+        mysql) run_mysql "SHOW DATABASES;" ;;
+        postgres) run_psql "\l" ;;
     esac
     draw_footer
     return_to_menu
@@ -252,8 +211,6 @@ main() {
         echo -e "${red}错误: 此脚本需要root权限${reset}"
         exit 1
     fi
-
-    trap "rm -f /tmp/mysql_error.log /tmp/psql_error.log" EXIT
 
     while true; do
         show_menu
