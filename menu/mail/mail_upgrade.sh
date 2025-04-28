@@ -116,7 +116,7 @@ delgroup postfix
 # 完全删除残留配置文件
 echo -e "${yellow}🔍 正在完全删除残留配置文件...${reset}"
 dpkg --purge libapache2-mod-php7.4 mariadb-client-10.3 mariadb-common mariadb-server-10.3 php7.4-cli php7.4-fpm php7.4-gd php7.4-imap php7.4-intl php7.4-json php7.4-mysql php7.4-opcache php7.4-readline php7.4-xml
-
+apt purge -y php-common php-mbstring php7.4-common php7.4-mbstring
 # 清理系统残余
 echo -n "🔍 清理系统残余..."
 apt autoremove -y && apt clean
