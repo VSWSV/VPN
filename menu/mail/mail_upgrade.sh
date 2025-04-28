@@ -92,6 +92,8 @@ uninstall_package mailutils
 uninstall_package dovecot-pop3d
 uninstall_package php-xml
 uninstall_package php-zip
+uninstall_package php-ldap
+uninstall_package php-imagick
 
 remove_directory /etc/roundcube
 remove_directory /var/www/html/roundcube
