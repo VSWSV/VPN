@@ -81,11 +81,12 @@ echo -e "${green}▶ 更新系统源中...${reset}"
 apt update -y && echo -e "${green}✅ 系统更新完成${reset}" || echo -e "${red}❌ 系统更新失败${reset}"
 sleep 1
 
-install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql mailutils dovecot-pop3d 
+install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql mailutils dovecot-pop3d
 install_category "🛢️ 安装数据库服务..." mariadb-server
 install_category "🌐 安装Web服务器..." apache2
-install_category "🧩 安装PHP及扩展..." php php-cli php-fpm php-mysql php-imap php-json php-intl php-gd
+install_category "🧩 安装PHP及扩展..." php php-cli php-fpm php-mysql php-curl php-zip php-xml php-mbstring php-intl php-gd php-imap
 install_category "🔒 安装邮件认证和HTTPS工具..." opendkim opendkim-tools certbot
+
 
 success_roundcube=0
 fail_roundcube=0
