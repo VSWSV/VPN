@@ -87,7 +87,6 @@ install_category "🌐 安装Web服务器..." apache2
 install_category "🧩 安装PHP及扩展..." php php-cli php-fpm php-mysql php-curl php-zip php-xml php-mbstring php-intl php-gd php-imap
 install_category "🔒 安装邮件认证和HTTPS工具..." opendkim opendkim-tools certbot
 
-
 success_roundcube=0
 fail_roundcube=0
 
