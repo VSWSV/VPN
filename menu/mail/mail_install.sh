@@ -90,6 +90,16 @@ draw_header
 echo -e "${green}▶ 更新系统源中...${reset}"
 apt update -y && echo -e "${green}✅ 系统更新完成${reset}" || echo -e "${red}❌ 系统更新失败${reset}"
 sleep 1
+# 在安装分类前添加以下代码
+echo -e "${yellow}🛠️ 创建系统用户和组...${reset}"
+if ! getent group www-data >/dev/null; then
+    groupadd www-data
+    echo -e "${green}✓ 创建www-data组${reset}"
+fi
+if ! getent passwd www-data >/dev/null; then
+    useradd -r -g www-data -s /usr/sbin/nologin -d /var/www -c "Web Application" www-data
+    echo -e "${green}✓ 创建www-data用户${reset}"
+fi
 
 # 分类安装
 install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql mailutils dovecot-pop3d 
