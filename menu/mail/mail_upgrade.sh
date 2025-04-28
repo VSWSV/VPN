@@ -2,7 +2,6 @@
 
 clear
 
-# 颜色定义
 cyan="\033[1;36m"
 green="\033[1;32m"
 yellow="\033[1;33m"
@@ -57,7 +56,6 @@ function remove_directory() {
   fi
 }
 
-# 密码确认
 echo -e "${yellow}⚡ 卸载操作需要输入密码确认${reset}"
 read -p "请输入密码以继续（默认密码: 88）: " user_pass
 
@@ -71,7 +69,6 @@ else
   sleep 0.5
 fi
 
-# 开始卸载
 draw_header
 
 uninstall_package postfix
@@ -95,7 +92,6 @@ uninstall_package mailutils
 uninstall_package dovecot-pop3d
 uninstall_package php-xml
 
-# 删除目录
 remove_directory /etc/roundcube
 remove_directory /var/www/html/roundcube
 remove_directory /var/lib/mysql
@@ -106,18 +102,11 @@ remove_directory /var/log/mail.err
 remove_directory /var/log/dovecot.log
 remove_directory /etc/opendkim
 remove_directory /etc/letsencrypt
-# 不删除系统用户和组，或者添加检查
-if getent passwd www-data >/dev/null; then
-    deluser www-data
-fi
-if getent group www-data >/dev/null; then
-    delgroup www-data
-fi
-# 完全删除残留配置文件
+
 echo -e "${yellow}🔍 正在完全删除残留配置文件...${reset}"
 dpkg --purge libapache2-mod-php7.4 mariadb-client-10.3 mariadb-common mariadb-server-10.3 php7.4-cli php7.4-fpm php7.4-gd php7.4-imap php7.4-intl php7.4-json php7.4-mysql php7.4-opcache php7.4-readline php7.4-xml
 apt purge -y php-common php-mbstring php7.4-common php7.4-mbstring
-# 清理系统残余
+
 echo -n "🔍 清理系统残余..."
 apt autoremove -y && apt clean
 if [ $? -eq 0 ]; then
@@ -126,7 +115,6 @@ else
   echo -e "${red} ✗ 清理失败${reset}"
 fi
 
-# 收尾输出
 draw_footer
 
 if [ $fail_all -eq 0 ]; then
