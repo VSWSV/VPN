@@ -264,8 +264,8 @@ return_to_menu() {
 show_menu() {
     clear
     draw_header
-    echo -e "${green} 1. 新建数据库${reset}         ${green}2. 删除数据库${reset}   ${green}4. 查看数据库${reset}"
-    echo -e "${green} 3. 修改密码${reset}          ${green}5. 查看用户${reset}      ${red}0. 返回${reset}"
+    echo -e "${green}  1. 新建数据库${reset}              ${green}2. 删除数据库${reset}        ${green}4. 查看数据库${reset}"
+    echo -e "${green}  3. 修改密码${reset}                ${green}5. 查看用户${reset}            ${red}0. 返回${reset}"
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
     echo -n "请选择操作 : "
 }
