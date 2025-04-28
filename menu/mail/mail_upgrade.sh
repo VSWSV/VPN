@@ -106,13 +106,13 @@ remove_directory /var/log/mail.err
 remove_directory /var/log/dovecot.log
 remove_directory /etc/opendkim
 remove_directory /etc/letsencrypt
-
-# 删除系统用户和组
-deluser www-data
-delgroup www-data
-deluser postfix
-delgroup postfix
-
+# 不删除系统用户和组，或者添加检查
+if getent passwd www-data >/dev/null; then
+    deluser www-data
+fi
+if getent group www-data >/dev/null; then
+    delgroup www-data
+fi
 # 完全删除残留配置文件
 echo -e "${yellow}🔍 正在完全删除残留配置文件...${reset}"
 dpkg --purge libapache2-mod-php7.4 mariadb-client-10.3 mariadb-common mariadb-server-10.3 php7.4-cli php7.4-fpm php7.4-gd php7.4-imap php7.4-intl php7.4-json php7.4-mysql php7.4-opcache php7.4-readline php7.4-xml
