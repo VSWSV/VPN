@@ -129,7 +129,7 @@ create_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "CREATE DATABASE \$db_name\ CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >/dev/null; then
+            if run_mysql "CREATE DATABASE \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 创建成功${reset}"
                 success=true
             else
@@ -180,7 +180,7 @@ create_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \$db_name\.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
+            if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \`$db_name\`.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
                 echo -e "${green}用户 ${username} 创建并授权成功${reset}"
             else
                 echo -e "${red}用户创建失败${reset}"
