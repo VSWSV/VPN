@@ -106,19 +106,22 @@ list_databases() {
 
 # 创建新数据库并自动创建用户
 create_database() {
-
     local db_type=$(detect_db)
     local success=false
     
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                                   ${orange}✨ 新建数据库${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+    echo -e "                                   ${orange}✨ 新建数据库${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     
     while true; do
         echo -n "输入数据库名称: "
         read db_name
-        if [ -z "$db_name" ]; then
-            echo -e "${red}错误：数据库名不能为空！${reset}"
+        # 检查是否为空或仅包含空格
+        if [[ -z "${db_name// }" ]]; then
+            echo -e "${red}错误：数据库名不能为空或仅包含空格！${reset}"
+        # 检查是否包含空格
+        elif [[ "$db_name" =~ [[:space:]] ]]; then
+            echo -e "${red}错误：数据库名不能包含空格！${reset}"
         else
             break
         fi
@@ -150,11 +153,30 @@ create_database() {
     esac
 
     # 自动创建与数据库关联的用户
-    echo -n "输入用户名: "
-    read username
-    echo -n "输入密码（输入不可见）: "
-    read -s password
-    echo
+    while true; do
+        echo -n "输入用户名: "
+        read username
+        if [[ -z "${username// }" ]]; then
+            echo -e "${red}错误：用户名不能为空或仅包含空格！${reset}"
+        elif [[ "$username" =~ [[:space:]] ]]; then
+            echo -e "${red}错误：用户名不能包含空格！${reset}"
+        else
+            break
+        fi
+    done
+
+    while true; do
+        echo -n "输入密码（输入不可见）: "
+        read -s password
+        echo
+        if [[ -z "${password// }" ]]; then
+            echo -e "${red}错误：密码不能为空或仅包含空格！${reset}"
+        elif [[ "$password" =~ [[:space:]] ]]; then
+            echo -e "${red}错误：密码不能包含空格！${reset}"
+        else
+            break
+        fi
+    done
 
     case $db_type in
         mysql)
