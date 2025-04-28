@@ -120,6 +120,7 @@ fi
 echo -e "${yellow}➤ 正在创建美化终端信息脚本 /etc/profile.d/motd.sh${reset}"
 cat << 'EOF' > /etc/profile.d/motd.sh
 #!/bin/bash
+
 function bar() {
   local percent=$1
   local blocks=$((percent * 50 / 100))
@@ -133,20 +134,34 @@ function bar() {
   echo -e "$color$bar\033[0m"
 }
 
-load=$(uptime | awk -F'load average: ' '{print $2}' | cut -d, -f1)
-cpu_perc=$(awk -v l="$load" 'BEGIN { printf("%.0f", l*10) }')
+cpu_idle_old=$(awk '/cpu / {print $5}' /proc/stat)
+sleep 1
+cpu_idle_new=$(awk '/cpu / {print $5}' /proc/stat)
+
+cpu_total_old=$(awk '/cpu / {print $2+$3+$4+$5+$6+$7+$8+$9}' /proc/stat)
+sleep 1
+cpu_total_new=$(awk '/cpu / {print $2+$3+$4+$5+$6+$7+$8+$9}' /proc/stat)
+
+cpu_idle_diff=$((cpu_idle_new - cpu_idle_old))
+cpu_total_diff=$((cpu_total_new - cpu_total_old))
+
+cpu_perc=$((100 * (cpu_total_diff - cpu_idle_diff) / cpu_total_diff))
 cpu_bar=$(bar $cpu_perc)
+
 mem_used=$(free | awk '/Mem:/ {printf("%.0f", $3/$2*100)}')
 mem_bar=$(bar $mem_used)
+
 disk_used=$(df / | awk 'END {print $5}' | tr -d '%')
 disk_bar=$(bar $disk_used)
+
 swap_used=$(free | awk '/Swap:/ { if ($2==0) print 0; else printf("%.0f", $3/$2*100) }')
 swap_bar=$(bar $swap_used)
+
 ipv4=$(hostname -I | awk '{print $1}')
 ipv6=$(ip -6 addr show scope global | awk '/inet6/ {print $2}' | cut -d/ -f1 | head -n 1)
+
 current_time=$(date +"%Y-%m-%d %H:%M:%S")
 
-# 打印结果
 echo -e "CPU 使用率:        $cpu_bar  $cpu_perc%"
 echo
 echo -e "内存使用率:        $mem_bar  ${mem_used}%"
@@ -160,6 +175,7 @@ echo
 echo -e "公网 IPv6 地址:    \033[1;36m$ipv6\033[0m"
 echo
 echo -e "当前时间:          \033[1;34m$current_time\033[0m"
+echo
 EOF
 
 chmod +x /etc/profile.d/motd.sh && source /etc/profile.d/motd.sh
