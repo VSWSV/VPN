@@ -182,9 +182,9 @@ delete_database() {
 
     local db_type=$(detect_db)
     
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                                   ${orange}❌ 删除数据库${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+    echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+    echo -e "                                   ${orange}❌ 删除数据库${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     
     while true; do
         echo -n "输入要删除的数据库名称: "
@@ -198,32 +198,48 @@ delete_database() {
 
     case $db_type in
         mysql)
+            # 删除数据库
             if run_mysql "DROP DATABASE \`$db_name\`;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
-                # 删除关联用户
-                if run_mysql "DROP USER '$db_name'@'%';" >/dev/null; then
-                    echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
+                
+                # 删除与数据库相关的用户（不依赖数据库名）
+                if run_mysql "SELECT User, Host FROM mysql.user WHERE User = '$db_name';" | grep -q "$db_name"; then
+                    if run_mysql "DROP USER '$db_name'@'%';" >/dev/null; then
+                        echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
+                    else
+                        echo -e "${red}关联用户删除失败${reset}"
+                    fi
                 else
-                    echo -e "${red}关联用户删除失败${reset}"
+                    echo -e "${yellow}未找到与数据库相关的用户 ${db_name}，跳过用户删除${reset}"
                 fi
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
             ;;
+
         postgres)
+            # 关闭与数据库相关的连接
             run_psql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db_name';" >/dev/null 2>&1
+
+            # 删除数据库
             if run_psql "DROP DATABASE \"$db_name\";" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
-                # 删除关联用户
-                if run_psql "DROP USER \"$db_name\";" >/dev/null; then
-                    echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
+
+                # 删除与数据库相关的用户（不依赖数据库名）
+                if run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$db_name';" | grep -q "1"; then
+                    if run_psql "DROP USER \"$db_name\";" >/dev/null; then
+                        echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
+                    else
+                        echo -e "${red}关联用户删除失败${reset}"
+                    fi
                 else
-                    echo -e "${red}关联用户删除失败${reset}"
+                    echo -e "${yellow}未找到与数据库相关的用户 ${db_name}，跳过用户删除${reset}"
                 fi
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
             ;;
+
     esac
     draw_footer
     return_to_menu
