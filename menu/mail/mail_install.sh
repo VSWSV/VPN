@@ -156,7 +156,7 @@ fail_all=$((fail_all+fail_roundcube))
 echo -e "${yellow}🛠️ 正在设置PHP时区为 中国标准时间（Asia/Shanghai）...${reset}"
 sed -i "s@^;date.timezone =@date.timezone = Asia/Shanghai@" /etc/php/7.4/apache2/php.ini
 systemctl restart apache2
-echo -e "${green}✓ PHP时区设置完成（$(date '+%F %T')）${reset}"
+echo -e "${green} ✓ 成功${reset}"
 # 输出Roundcube安装器地址
 ip=$(curl -s ipv4.ip.sb)
 echo -e "${yellow}🔗 Roundcube安装器入口: ${green}http://${ip}/roundcube/installer/${reset}"
