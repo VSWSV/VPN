@@ -94,7 +94,6 @@ uninstall_package opendkim-tools
 uninstall_package certbot
 
 # 删除目录
-remove_directory /root/VPN/MAIL
 remove_directory /var/www/html/roundcube
 
 # 清理缓存
