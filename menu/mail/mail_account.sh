@@ -1,23 +1,39 @@
 #!/bin/bash
 
+# ==============================================
+# 数据库管理脚本 (MySQL/PostgreSQL)
+# 版本：v2.3 (错误处理优化版)
+# ==============================================
+
+# ----------------------------
+# 颜色定义
+# ----------------------------
+orange='\033[0;33m'
 cyan='\033[0;36m'
 red='\033[0;31m'
 green='\033[0;32m'
 blue='\033[0;34m'
 reset='\033[0m'
 
-
+# ----------------------------
+# 绘制标题边框
+# ----------------------------
 draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
   echo -e "                                 ${orange}🛢️ 数据库管理系统${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-
+# ----------------------------
+# 绘制底部边框
+# ----------------------------
 draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
+# ----------------------------
+# 安全输入函数（只能输入Y/y/N/n）
+# ----------------------------
 safe_yn_input() {
   local prompt="$1"
   local var_name="$2"
@@ -31,6 +47,9 @@ safe_yn_input() {
   done
 }
 
+# ----------------------------
+# 执行MySQL命令（带错误捕获）
+# ----------------------------
 run_mysql() {
   local sql="$1"
   mysql -u root -p -e "$sql" 2>/tmp/mysql_error.log
@@ -42,6 +61,9 @@ run_mysql() {
   return 0
 }
 
+# ----------------------------
+# 执行PostgreSQL命令（带错误捕获）
+# ----------------------------
 run_psql() {
   local sql="$1"
   sudo -u postgres psql -c "$sql" 2>/tmp/psql_error.log
@@ -53,6 +75,9 @@ run_psql() {
   return 0
 }
 
+# ----------------------------
+# 检测当前数据库类型
+# ----------------------------
 detect_db() {
     if systemctl is-active --quiet mysql; then
         echo "mysql"
@@ -64,6 +89,9 @@ detect_db() {
     fi
 }
 
+# ----------------------------
+# 查看所有用户
+# ----------------------------
 list_users() {
     draw_header
     local db_type=$(detect_db)
@@ -81,12 +109,16 @@ list_users() {
     return_to_menu
 }
 
+# ----------------------------
+# 新建数据库（优化版）
+# ----------------------------
 create_database() {
     draw_header
     local db_type=$(detect_db)
     
     echo -e "${blue}=== 新建数据库 ===${reset}"
-
+    
+    # 1. 输入数据库名称
     while true; do
         echo -n "输入数据库名称: "
         read db_name
@@ -97,6 +129,7 @@ create_database() {
         fi
     done
 
+    # 2. 自动配置最佳字符集/排序规则
     case $db_type in
         mysql)
             charset="utf8mb4"
@@ -108,6 +141,7 @@ create_database() {
             ;;
     esac
 
+    # 3. 创建数据库
     case $db_type in
         mysql)
             if run_mysql "CREATE DATABASE \`$db_name\` CHARACTER SET $charset COLLATE $collation;"; then
@@ -131,6 +165,7 @@ create_database() {
             ;;
     esac
 
+    # 4. 创建用户流程
     safe_yn_input "是否创建关联用户" create_user
     if [[ "$create_user" =~ [Yy] ]]; then
         while true; do
@@ -168,6 +203,9 @@ create_database() {
     return_to_menu
 }
 
+# ----------------------------
+# 删除数据库（优化版）
+# ----------------------------
 delete_database() {
     draw_header
     local db_type=$(detect_db)
@@ -185,6 +223,7 @@ delete_database() {
         fi
     done
 
+    # 2. 执行删除
     case $db_type in
         mysql)
             if run_mysql "DROP DATABASE \`$db_name\`;"; then
@@ -194,7 +233,7 @@ delete_database() {
             fi
             ;;
         postgres)
-
+            # 终止活跃连接
             run_psql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db_name';" >/dev/null 2>&1
             if run_psql "DROP DATABASE \"$db_name\";"; then
                 echo -e "${green}PostgreSQL数据库 '$db_name' 已删除！${reset}"
@@ -207,18 +246,25 @@ delete_database() {
     return_to_menu
 }
 
+# ----------------------------
+# 修改密码（简化版）
+# ----------------------------
+change_password() {
     draw_header
     local db_type=$(detect_db)
     
     echo -e "${blue}=== 修改密码 ===${reset}"
-
-    echo -n "输入要修改的用户名 : "
+    
+    # 1. 输入用户名
+    echo -n "输入要修改的用户名（如root）: "
     read username
-
+    
+    # 2. 输入新密码
     echo -n "输入新密码（输入不可见）: "
     read -s new_pass
     echo
 
+    # 3. 执行修改
     case $db_type in
         mysql)
             if run_mysql "ALTER USER '$username'@'localhost' IDENTIFIED BY '$new_pass'; FLUSH PRIVILEGES;"; then
@@ -239,6 +285,9 @@ delete_database() {
     return_to_menu
 }
 
+# ----------------------------
+# 列出所有数据库
+# ----------------------------
 list_databases() {
     draw_header
     local db_type=$(detect_db)
@@ -256,10 +305,16 @@ list_databases() {
     return_to_menu
 }
 
+# ----------------------------
+# 返回菜单
+# ----------------------------
 return_to_menu() {
     read -p "$(echo -e "💬 ${cyan}按回车键返回主菜单...${reset}")" dummy
 }
 
+# ----------------------------
+# 主菜单
+# ----------------------------
 show_menu() {
     clear
     draw_header
@@ -270,16 +325,20 @@ show_menu() {
     echo -e "${orange}5. 查看所有用户${reset}"
     echo -e "${red}0. 退出脚本${reset}"
     echo -e "${cyan}══════════════════════════════════════════════════════════════════════════════${reset}"
-    echo -n "请选择操作 : "
+    echo -n "请选择操作 [0-5]: "
 }
 
+# ----------------------------
+# 主程序
+# ----------------------------
 main() {
-
+    # 检查root权限
     if [ "$(id -u)" -ne 0 ]; then
         echo -e "${red}错误: 此脚本需要root权限. 请使用 sudo 运行.${reset}"
         exit 1
     fi
 
+    # 清理临时文件
     trap "rm -f /tmp/mysql_error.log /tmp/psql_error.log" EXIT
 
     while true; do
@@ -298,4 +357,5 @@ main() {
     done
 }
 
+# 启动脚本
 main
