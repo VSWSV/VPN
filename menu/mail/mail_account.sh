@@ -106,19 +106,22 @@ list_databases() {
 
 # 创建新数据库并自动创建用户
 create_database() {
-
     local db_type=$(detect_db)
     local success=false
-
+    
     echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
     echo -e "                                   ${orange}✨ 新建数据库${reset}"
     echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
-
+    
     while true; do
         echo -n "输入数据库名称: "
         read db_name
-        if [[ -z "$db_name" || "$db_name" =~ ^[[:space:]]*$ || "$db_name" =~ \  ]]; then
-            echo -e "${red}错误：数据库名不能为空、仅包含空格或包含空格！${reset}"
+        # 检查是否为空或仅包含空格
+        if [[ -z "${db_name// }" ]]; then
+            echo -e "${red}错误：数据库名不能为空或仅包含空格！${reset}"
+        # 检查是否包含空格
+        elif [[ "$db_name" =~ [[:space:]] ]]; then
+            echo -e "${red}错误：数据库名不能包含空格！${reset}"
         else
             break
         fi
@@ -130,7 +133,7 @@ create_database() {
                 echo -e "${green}数据库 ${db_name} 创建成功${reset}"
                 success=true
             else
-                echo -e "${red}数据库 ${db_name} 创建失败，可能是由于权限或配置问题。${reset}"
+                echo -e "${red}数据库 ${db_name} 创建失败${reset}"
                 draw_footer
                 return_to_menu
                 return
@@ -141,7 +144,7 @@ create_database() {
                 echo -e "${green}数据库 ${db_name} 创建成功${reset}"
                 success=true
             else
-                echo -e "${red}数据库 ${db_name} 创建失败，可能是由于权限或配置问题。${reset}"
+                echo -e "${red}数据库 ${db_name} 创建失败${reset}"
                 draw_footer
                 return_to_menu
                 return
@@ -153,30 +156,41 @@ create_database() {
     while true; do
         echo -n "输入用户名: "
         read username
-        if [[ -z "$username" || "$username" =~ ^[[:space:]]*$ || "$username" =~ \  ]]; then
-            echo -e "${red}错误：用户名不能为空、仅包含空格或包含空格！${reset}"
+        if [[ -z "${username// }" ]]; then
+            echo -e "${red}错误：用户名不能为空或仅包含空格！${reset}"
+        elif [[ "$username" =~ [[:space:]] ]]; then
+            echo -e "${red}错误：用户名不能包含空格！${reset}"
         else
             break
         fi
     done
 
-    echo -n "输入密码（输入不可见）: "
-    read -s password
-    echo
+    while true; do
+        echo -n "输入密码（输入不可见）: "
+        read -s password
+        echo
+        if [[ -z "${password// }" ]]; then
+            echo -e "${red}错误：密码不能为空或仅包含空格！${reset}"
+        elif [[ "$password" =~ [[:space:]] ]]; then
+            echo -e "${red}错误：密码不能包含空格！${reset}"
+        else
+            break
+        fi
+    done
 
     case $db_type in
         mysql)
             if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \$db_name\.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
                 echo -e "${green}用户 ${username} 创建并授权成功${reset}"
             else
-                echo -e "${red}用户创建失败，可能是由于权限或配置问题。${reset}"
+                echo -e "${red}用户创建失败${reset}"
             fi
             ;;
         postgres)
             if run_psql "CREATE USER \"$username\" WITH PASSWORD '$password'; GRANT ALL ON DATABASE \"$db_name\" TO \"$username\";" >/dev/null; then
                 echo -e "${green}用户 ${username} 创建并授权成功${reset}"
             else
-                echo -e "${red}用户创建失败，可能是由于权限或配置问题。${reset}"
+                echo -e "${red}用户创建失败${reset}"
             fi
             ;;
     esac
