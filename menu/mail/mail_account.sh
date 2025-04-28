@@ -2,7 +2,7 @@
 
 # 颜色定义
 orange='\033[0;33m'
-cyan='\033[0;36m'
+cyan='\033[1;36m' 
 red='\033[0;31m'
 green='\033[0;32m'
 blue='\033[0;34m'
@@ -18,20 +18,6 @@ draw_header() {
 # 绘制底部
 draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
-}
-
-# 安全的 y/n 输入函数
-safe_yn_input() {
-  local prompt="$1"
-  local var_name="$2"
-  while true; do
-    echo -n "$prompt (y/n): "
-    read $var_name
-    case ${!var_name} in
-      [Yy]|[Nn]) break ;;
-      *) echo -e "${red}错误：请输入 y 或 n${reset}" ;;
-    esac
-  done
 }
 
 # 运行 MySQL 命令
@@ -81,7 +67,7 @@ list_users() {
     local output
     case $db_type in
         mysql)
-            output=$(run_mysql "SELECT user,host FROM mysql.user;")
+            output=$(run_mysql "SELECT user, host FROM mysql.user;")
             [[ $? -eq 0 ]] && echo "$output"
             ;;
         postgres)
@@ -93,7 +79,28 @@ list_users() {
     return_to_menu
 }
 
-# 创建新数据库
+# 列出所有数据库
+list_databases() {
+    draw_header
+    local db_type=$(detect_db)
+
+    echo -e "${blue}=== 数据库列表 ===${reset}"
+    local output
+    case $db_type in
+        mysql)
+            output=$(run_mysql "SHOW DATABASES;")
+            [[ $? -eq 0 ]] && echo "$output"
+            ;;
+        postgres)
+            output=$(run_psql "\l")
+            [[ $? -eq 0 ]] && echo "$output"
+            ;;
+    esac
+    draw_footer
+    return_to_menu
+}
+
+# 创建新数据库并自动创建用户
 create_database() {
     draw_header
     local db_type=$(detect_db)
@@ -136,46 +143,35 @@ create_database() {
             ;;
     esac
 
-    if $success; then
-        safe_yn_input "是否创建关联用户" create_user
-        if [[ "$create_user" =~ [Yy] ]]; then
-            while true; do
-                echo -n "输入用户名: "
-                read username
-                if [ -z "$username" ]; then
-                    echo -e "${red}错误：用户名不能为空！${reset}"
-                else
-                    break
-                fi
-            done
+    # 自动创建与数据库关联的用户
+    echo -n "输入用户名: "
+    read username
+    echo -n "输入密码（输入不可见）: "
+    read -s password
+    echo
 
-            echo -n "输入密码（输入不可见）: "
-            read -s password
-            echo
+    case $db_type in
+        mysql)
+            if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \`$db_name\`.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
+                echo -e "${green}用户 ${username} 创建并授权成功${reset}"
+            else
+                echo -e "${red}用户创建失败${reset}"
+            fi
+            ;;
+        postgres)
+            if run_psql "CREATE USER \"$username\" WITH PASSWORD '$password'; GRANT ALL ON DATABASE \"$db_name\" TO \"$username\";" >/dev/null; then
+                echo -e "${green}用户 ${username} 创建并授权成功${reset}"
+            else
+                echo -e "${red}用户创建失败${reset}"
+            fi
+            ;;
+    esac
 
-            case $db_type in
-                mysql)
-                    if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \`$db_name\`.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
-                        echo -e "${green}用户 ${username} 创建并授权成功${reset}"
-                    else
-                        echo -e "${red}用户创建失败${reset}"
-                    fi
-                    ;;
-                postgres)
-                    if run_psql "CREATE USER \"$username\" WITH PASSWORD '$password'; GRANT ALL ON DATABASE \"$db_name\" TO \"$username\";" >/dev/null; then
-                        echo -e "${green}用户 ${username} 创建并授权成功${reset}"
-                    else
-                        echo -e "${red}用户创建失败${reset}"
-                    fi
-                    ;;
-            esac
-        fi
-    fi
     draw_footer
     return_to_menu
 }
 
-# 删除数据库
+# 删除数据库及其关联用户
 delete_database() {
     draw_header
     local db_type=$(detect_db)
@@ -196,6 +192,12 @@ delete_database() {
         mysql)
             if run_mysql "DROP DATABASE \`$db_name\`;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
+                # 删除关联用户
+                if run_mysql "DROP USER '$db_name'@'%';" >/dev/null; then
+                    echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
+                else
+                    echo -e "${red}关联用户删除失败${reset}"
+                fi
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
@@ -204,6 +206,12 @@ delete_database() {
             run_psql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db_name';" >/dev/null 2>&1
             if run_psql "DROP DATABASE \"$db_name\";" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
+                # 删除关联用户
+                if run_psql "DROP USER \"$db_name\";" >/dev/null; then
+                    echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
+                else
+                    echo -e "${red}关联用户删除失败${reset}"
+                fi
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
@@ -247,27 +255,6 @@ change_password() {
     return_to_menu
 }
 
-# 列出所有数据库
-list_databases() {
-    draw_header
-    local db_type=$(detect_db)
-
-    echo -e "${blue}=== 数据库列表 ===${reset}"
-    local output
-    case $db_type in
-        mysql)
-            output=$(run_mysql "SHOW DATABASES;")
-            [[ $? -eq 0 ]] && echo "$output"
-            ;;
-        postgres)
-            output=$(run_psql "\l")
-            [[ $? -eq 0 ]] && echo "$output"
-            ;;
-    esac
-    draw_footer
-    return_to_menu
-}
-
 # 返回主菜单
 return_to_menu() {
     read -p "$(echo -e "💬 ${cyan}按回车键继续...${reset}")" dummy
@@ -277,15 +264,12 @@ return_to_menu() {
 show_menu() {
     clear
     draw_header
-    echo -e "${orange}1. 新建数据库${reset}"
-    echo -e "${orange}2. 删除数据库${reset}"
-    echo -e "${orange}3. 修改密码${reset}"
-    echo -e "${orange}4. 列出所有数据库${reset}"
-    echo -e "${orange}5. 查看所有用户${reset}"
-    echo -e "${red}0. 返回上级菜单${reset}"
-    echo -e "${cyan}══════════════════════════════════════════════════════════════════════════════${reset}"
-    echo -n "请选择操作 [0-5]: "
+    echo -e "${green}1. 新建数据库${reset}   ${green}2. 删除数据库${reset}   ${green}3. 修改密码${reset}"
+    echo -e "${green}4. 列出所有数据库${reset}   ${green}5. 查看所有用户${reset}   ${red}0. 返回上级菜单${reset}"
+  echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
+    echo -n "请选择操作 : "
 }
+
 
 # 主函数
 main() {
