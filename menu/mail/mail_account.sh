@@ -32,21 +32,25 @@ safe_yn_input() {
 
 run_mysql() {
   local sql="$1"
-  local result=$(mysql -u root -p -e "$sql" 2>&1 | grep -v "Using a password")
+  local result
+  result=$(mysql -u root -p -e "$sql" 2>&1 | grep -v "Using a password")
   if [[ $result == *"ERROR"* ]]; then
     echo -e "${red}操作失败：${result#*ERROR}${reset}"
     return 1
   fi
+  echo "$result"
   return 0
 }
 
 run_psql() {
   local sql="$1"
-  local result=$(sudo -u postgres psql -c "$sql" 2>&1)
+  local result
+  result=$(sudo -u postgres psql -c "$sql" 2>&1)
   if [[ $result == *"ERROR"* || $result == *"错误"* ]]; then
     echo -e "${red}操作失败：${result#*ERROR}${reset}"
     return 1
   fi
+  echo "$result"
   return 0
 }
 
@@ -66,9 +70,16 @@ list_users() {
     local db_type=$(detect_db)
     
     echo -e "${blue}=== 用户列表 ===${reset}"
+    local output
     case $db_type in
-        mysql) run_mysql "SELECT user,host FROM mysql.user;" ;;
-        postgres) run_psql "\du" ;;
+        mysql)
+            output=$(run_mysql "SELECT user,host FROM mysql.user;")
+            [[ $? -eq 0 ]] && echo "$output"
+            ;;
+        postgres)
+            output=$(run_psql "\du")
+            [[ $? -eq 0 ]] && echo "$output"
+            ;;
     esac
     draw_footer
     return_to_menu
@@ -92,12 +103,12 @@ create_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "CREATE DATABASE \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"; then
+            if run_mysql "CREATE DATABASE \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 创建成功${reset}"
             fi
             ;;
         postgres)
-            if run_psql "CREATE DATABASE \"$db_name\" ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8';"; then
+            if run_psql "CREATE DATABASE \"$db_name\" ENCODING 'UTF8' LC_COLLATE 'en_US.UTF-8';" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 创建成功${reset}"
             fi
             ;;
@@ -124,7 +135,7 @@ delete_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "DROP DATABASE \`$db_name\`;"; then
+            if run_mysql "DROP DATABASE \`$db_name\`;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
@@ -132,7 +143,7 @@ delete_database() {
             ;;
         postgres)
             run_psql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db_name';" >/dev/null 2>&1
-            if run_psql "DROP DATABASE \"$db_name\";"; then
+            if run_psql "DROP DATABASE \"$db_name\";" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
@@ -158,14 +169,14 @@ change_password() {
 
     case $db_type in
         mysql)
-            if run_mysql "ALTER USER '$username'@'localhost' IDENTIFIED BY '$new_pass'; FLUSH PRIVILEGES;"; then
+            if run_mysql "ALTER USER '$username'@'localhost' IDENTIFIED BY '$new_pass'; FLUSH PRIVILEGES;" >/dev/null; then
                 echo -e "${green}用户 ${username} 密码修改成功${reset}"
             else
                 echo -e "${red}用户 ${username} 密码修改失败${reset}"
             fi
             ;;
         postgres)
-            if run_psql "ALTER USER \"$username\" WITH PASSWORD '$new_pass';"; then
+            if run_psql "ALTER USER \"$username\" WITH PASSWORD '$new_pass';" >/dev/null; then
                 echo -e "${green}用户 ${username} 密码修改成功${reset}"
             else
                 echo -e "${red}用户 ${username} 密码修改失败${reset}"
@@ -181,9 +192,16 @@ list_databases() {
     local db_type=$(detect_db)
 
     echo -e "${blue}=== 数据库列表 ===${reset}"
+    local output
     case $db_type in
-        mysql) run_mysql "SHOW DATABASES;" ;;
-        postgres) run_psql "\l" ;;
+        mysql)
+            output=$(run_mysql "SHOW DATABASES;")
+            [[ $? -eq 0 ]] && echo "$output"
+            ;;
+        postgres)
+            output=$(run_psql "\l")
+            [[ $? -eq 0 ]] && echo "$output"
+            ;;
     esac
     draw_footer
     return_to_menu
