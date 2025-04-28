@@ -103,6 +103,7 @@ list_databases() {
     return_to_menu
 }
 
+
 # 创建新数据库并自动创建用户
 create_database() {
 
@@ -125,7 +126,7 @@ create_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "CREATE DATABASE \$db_name\ CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >/dev/null; then
+            if run_mysql "CREATE DATABASE \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 创建成功${reset}"
                 success=true
             else
@@ -157,7 +158,7 @@ create_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \$db_name\.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
+            if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \`$db_name\`.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
                 echo -e "${green}用户 ${username} 创建并授权成功${reset}"
             else
                 echo -e "${red}用户创建失败${reset}"
@@ -197,7 +198,7 @@ delete_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "DROP DATABASE \$db_name\;" >/dev/null; then
+            if run_mysql "DROP DATABASE \`$db_name\`;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
                 # 删除关联用户
                 if run_mysql "DROP USER '$db_name'@'%';" >/dev/null; then
