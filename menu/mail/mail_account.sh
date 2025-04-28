@@ -202,16 +202,28 @@ delete_database() {
             if run_mysql "DROP DATABASE \`$db_name\`;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
                 
-                # 删除与数据库相关的用户（不依赖数据库名）
-                if run_mysql "SELECT User, Host FROM mysql.user WHERE User = '$db_name';" | grep -q "$db_name"; then
-                    if run_mysql "DROP USER '$db_name'@'%';" >/dev/null; then
-                        echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
-                    else
-                        echo -e "${red}关联用户删除失败${reset}"
+                # 删除与数据库相关的用户
+                users=$(run_mysql "SELECT User, Host FROM mysql.user;")
+                for user_info in $users; do
+                    user=$(echo $user_info | awk '{print $1}')
+                    host=$(echo $user_info | awk '{print $2}')
+                    
+                    # 排除系统用户（例如 root）
+                    if [[ "$user" == "root" || "$user" == "mysql.session" || "$user" == "mysql.sys" ]]; then
+                        continue
                     fi
-                else
-                    echo -e "${yellow}未找到与数据库相关的用户 ${db_name}，跳过用户删除${reset}"
-                fi
+                    
+                    # 查询该用户是否有数据库相关权限
+                    grants=$(run_mysql "SHOW GRANTS FOR '$user'@'$host';")
+                    if echo "$grants" | grep -q "$db_name"; then
+                        # 删除该用户
+                        if run_mysql "DROP USER '$user'@'$host';" >/dev/null; then
+                            echo -e "${green}关联用户 ${user} 删除成功${reset}"
+                        else
+                            echo -e "${red}关联用户删除失败${reset}"
+                        fi
+                    fi
+                done
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
@@ -225,16 +237,23 @@ delete_database() {
             if run_psql "DROP DATABASE \"$db_name\";" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
 
-                # 删除与数据库相关的用户（不依赖数据库名）
-                if run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$db_name';" | grep -q "1"; then
-                    if run_psql "DROP USER \"$db_name\";" >/dev/null; then
-                        echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
-                    else
-                        echo -e "${red}关联用户删除失败${reset}"
+                # 删除与数据库相关的用户
+                users=$(run_psql "SELECT rolname FROM pg_roles;")
+                for user in $users; do
+                    # 排除系统用户（例如 postgres）
+                    if [[ "$user" == "postgres" ]]; then
+                        continue
                     fi
-                else
-                    echo -e "${yellow}未找到与数据库相关的用户 ${db_name}，跳过用户删除${reset}"
-                fi
+
+                    if run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$user' AND has_database_privilege('$user', '$db_name', 'CREATE');" | grep -q "1"; then
+                        # 删除该用户
+                        if run_psql "DROP USER \"$user\";" >/dev/null; then
+                            echo -e "${green}关联用户 ${user} 删除成功${reset}"
+                        else
+                            echo -e "${red}关联用户删除失败${reset}"
+                        fi
+                    fi
+                done
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
@@ -244,6 +263,7 @@ delete_database() {
     draw_footer
     return_to_menu
 }
+
 
 # 修改用户密码
 change_password() {
