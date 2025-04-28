@@ -109,16 +109,16 @@ create_database() {
 
     local db_type=$(detect_db)
     local success=false
-    
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                                   ${orange}✨ 新建数据库${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+
+    echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+    echo -e "                                   ${orange}✨ 新建数据库${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     
     while true; do
         echo -n "输入数据库名称: "
         read db_name
-        if [ -z "$db_name" ]; then
-            echo -e "${red}错误：数据库名不能为空！${reset}"
+        if [[ -z "$db_name" || "$db_name" =~ ^[[:space:]]*$ ]]; then
+            echo -e "${red}错误：数据库名不能为空或仅包含空格！${reset}"
         else
             break
         fi
@@ -126,7 +126,7 @@ create_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "CREATE DATABASE \`$db_name\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >/dev/null; then
+            if run_mysql "CREATE DATABASE \$db_name\ CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 创建成功${reset}"
                 success=true
             else
@@ -150,15 +150,23 @@ create_database() {
     esac
 
     # 自动创建与数据库关联的用户
-    echo -n "输入用户名: "
-    read username
+    while true; do
+        echo -n "输入用户名: "
+        read username
+        if [[ -z "$username" || "$username" =~ ^[[:space:]]*$ ]]; then
+            echo -e "${red}错误：用户名不能为空或仅包含空格！${reset}"
+        else
+            break
+        fi
+    done
+
     echo -n "输入密码（输入不可见）: "
     read -s password
     echo
 
     case $db_type in
         mysql)
-            if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \`$db_name\`.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
+            if run_mysql "CREATE USER '$username'@'%' IDENTIFIED BY '$password'; GRANT ALL ON \$db_name\.* TO '$username'@'%'; FLUSH PRIVILEGES;" >/dev/null; then
                 echo -e "${green}用户 ${username} 创建并授权成功${reset}"
             else
                 echo -e "${red}用户创建失败${reset}"
@@ -182,9 +190,9 @@ delete_database() {
 
     local db_type=$(detect_db)
     
-    echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-    echo -e "                                   ${orange}❌ 删除数据库${reset}"
-    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+  echo -e "                                   ${orange}❌ 删除数据库${reset}"
+  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     
     while true; do
         echo -n "输入要删除的数据库名称: "
@@ -198,72 +206,36 @@ delete_database() {
 
     case $db_type in
         mysql)
-            # 删除数据库
-            if run_mysql "DROP DATABASE \`$db_name\`;" >/dev/null; then
+            if run_mysql "DROP DATABASE \$db_name\;" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
-                
-                # 删除与数据库相关的用户
-                users=$(run_mysql "SELECT User, Host FROM mysql.user;")
-                for user_info in $users; do
-                    user=$(echo $user_info | awk '{print $1}')
-                    host=$(echo $user_info | awk '{print $2}')
-                    
-                    # 排除系统用户（例如 root）
-                    if [[ "$user" == "root" || "$user" == "mysql.session" || "$user" == "mysql.sys" ]]; then
-                        continue
-                    fi
-                    
-                    # 查询该用户是否有数据库相关权限
-                    grants=$(run_mysql "SHOW GRANTS FOR '$user'@'$host';")
-                    if echo "$grants" | grep -q "$db_name"; then
-                        # 删除该用户
-                        if run_mysql "DROP USER '$user'@'$host';" >/dev/null; then
-                            echo -e "${green}关联用户 ${user} 删除成功${reset}"
-                        else
-                            echo -e "${red}关联用户删除失败${reset}"
-                        fi
-                    fi
-                done
+                # 删除关联用户
+                if run_mysql "DROP USER '$db_name'@'%';" >/dev/null; then
+                    echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
+                else
+                    echo -e "${red}关联用户删除失败${reset}"
+                fi
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
             ;;
-
         postgres)
-            # 关闭与数据库相关的连接
             run_psql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db_name';" >/dev/null 2>&1
-
-            # 删除数据库
             if run_psql "DROP DATABASE \"$db_name\";" >/dev/null; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
-
-                # 删除与数据库相关的用户
-                users=$(run_psql "SELECT rolname FROM pg_roles;")
-                for user in $users; do
-                    # 排除系统用户（例如 postgres）
-                    if [[ "$user" == "postgres" ]]; then
-                        continue
-                    fi
-
-                    if run_psql "SELECT 1 FROM pg_roles WHERE rolname = '$user' AND has_database_privilege('$user', '$db_name', 'CREATE');" | grep -q "1"; then
-                        # 删除该用户
-                        if run_psql "DROP USER \"$user\";" >/dev/null; then
-                            echo -e "${green}关联用户 ${user} 删除成功${reset}"
-                        else
-                            echo -e "${red}关联用户删除失败${reset}"
-                        fi
-                    fi
-                done
+                # 删除关联用户
+                if run_psql "DROP USER \"$db_name\";" >/dev/null; then
+                    echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
+                else
+                    echo -e "${red}关联用户删除失败${reset}"
+                fi
             else
                 echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
             fi
             ;;
-
     esac
     draw_footer
     return_to_menu
 }
-
 
 # 修改用户密码
 change_password() {
