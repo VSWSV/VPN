@@ -116,7 +116,7 @@ else
 fi
 
 # 解压Roundcube
-echo -n "🔍 解压 Roundcube源码..."
+echo -n "${yellow}🔍 解压 Roundcube源码...${reset}"
 if tar -xzf roundcube.tar.gz; then
   echo -e "${green} ✓ 成功${reset}"
   success_roundcube=$((success_roundcube+1))
@@ -131,7 +131,7 @@ if [ -d "roundcubemail-1.6.6" ]; then
 fi
 
 # 修复Roundcube权限
-echo -n "▶ 修复 Roundcube目录权限..."
+echo -n "${yellow}🛠️ 修复 Roundcube目录权限...${reset}"
 if [ -d "/var/www/html/roundcube" ]; then
   chown -R www-data:www-data /var/www/html/roundcube && echo -e "${green} ✓ 成功${reset}" || {
     echo -e "${red} ✗ 失败${reset}"; fail_roundcube=$((fail_roundcube+1));
@@ -149,7 +149,7 @@ success_all=$((success_all+success_roundcube))
 fail_all=$((fail_all+fail_roundcube))
 
 ip=$(curl -s ipv4.ip.sb)
-echo -e "${green}🔗 Roundcube安装器入口: http://${ip}/roundcube/installer/ ✓ 成功${reset}"
+echo -e "${yellow}🔗 Roundcube安装器入口: ${green}http://${ip}/roundcube/installer/${reset}"
 
 if [ $fail_all -eq 0 ]; then
   echo -e "${green}✅ 邮局系统所有组件安装成功！${reset}"
