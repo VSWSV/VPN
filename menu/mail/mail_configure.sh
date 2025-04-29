@@ -43,9 +43,9 @@ function check_and_kill_port() {
             warn "端口 ${port} 被占用，进程名: ${pname} (PID: ${pid})"
             kill -9 "$pid" && success "已释放端口 ${port}（进程 $pname）"
         done
-    else
-        success "端口 ${port} 空闲，可以使用。"
     fi
+    # 无论是否杀掉进程，最后都补充一句
+    success "端口 ${port} 空闲，可以使用。"
 }
 
 # 检查必要端口
@@ -88,7 +88,6 @@ function input_db() {
     success "MariaDB连接正常。"
     draw_line
 }
-
 # 创建数据库及表
 function setup_db() {
     draw_line
@@ -125,6 +124,7 @@ EOF
     success "数据库 ${DBNAME} 及相关表创建完成。"
     draw_line
 }
+
 # 配置Postfix主参数
 function config_postfix() {
     draw_line
@@ -147,7 +147,7 @@ function config_postfix() {
     draw_line
 }
 
-# 配置Postfix MySQL
+# 配置Postfix MySQL集成
 function config_postfix_mysql() {
     draw_line
     echo -e "${green}正在配置Postfix与MySQL集成...${reset}"
@@ -179,7 +179,6 @@ EOF
     success "Postfix MySQL 配置文件创建完成。"
     draw_line
 }
-
 # 配置Dovecot
 function config_dovecot() {
     draw_line
@@ -284,39 +283,69 @@ EOF
     draw_line
 }
 
-# 自动补充Roundcube数据库连接
+# 自动补充Roundcube数据库连接（智能处理）
 function config_roundcube() {
     draw_line
-    echo -e "${green}正在配置Roundcube数据库连接信息...${reset}"
+    echo -e "${green}正在检测并配置Roundcube数据库连接信息...${reset}"
+
     local config_path=""
     if [ -f /etc/roundcube/config.inc.php ]; then
         config_path="/etc/roundcube/config.inc.php"
     elif [ -f /var/lib/roundcube/config/config.inc.php ]; then
         config_path="/var/lib/roundcube/config/config.inc.php"
+    else
+        warn "未找到标准Roundcube配置文件。"
+        echo
+        while true; do
+            read -p "是否手动输入 Roundcube 配置文件路径？(Y/N): " yn
+            case $yn in
+                [Yy]* )
+                    read -p "请输入 Roundcube 配置文件绝对路径: " input_path
+                    if [[ -f "$input_path" ]]; then
+                        config_path="$input_path"
+                        break
+                    else
+                        warn "路径无效或文件不存在，请重新输入！"
+                    fi
+                    ;;
+                [Nn]* )
+                    warn "跳过 Roundcube数据库连接配置。"
+                    return
+                    ;;
+                * )
+                    warn "请输入 Y 或 N。"
+                    ;;
+            esac
+        done
     fi
 
     if [[ -n "$config_path" ]]; then
         sed -i "/\$config\['db_dsnw'\]/d" $config_path
         echo "\$config['db_dsnw'] = 'mysqli://${DBUSER}:${DBPASS}@localhost/${DBNAME}';" >> $config_path
         success "Roundcube数据库连接配置完成：$config_path"
-    else
-        warn "未找到Roundcube配置文件，跳过。"
     fi
+
     draw_line
 }
-
 # 输出DNS配置建议
 function output_dns() {
     draw_line
     echo -e "${green}请根据以下信息配置您的DNS记录：${reset}"
-    echo -e "${yellow}  - 类型: A   主机名: @       内容: [服务器公网IP]   TTL: 3600${reset}"
-    echo -e "${yellow}  - 类型: A   主机名: $SUB    内容: [服务器公网IP]   TTL: 3600${reset}"
+
+    local server_ip=$(curl -s https://api.ipify.org)
+
+    echo -e "${yellow}  - 类型: A   主机名: @       内容: ${server_ip}   TTL: 3600${reset}"
+    echo -e "${yellow}  - 类型: A   主机名: $SUB    内容: ${server_ip}   TTL: 3600${reset}"
     echo -e "${yellow}  - 类型: MX  主机名: @       内容: $MAILDOMAIN (优先级10) TTL: 3600${reset}"
     echo -e "${yellow}  - 类型: TXT 主机名: @       内容: \"v=spf1 mx ~all\" TTL: 3600${reset}"
 
     if [[ -f /etc/opendkim/keys/${DOMAIN}/default.txt ]]; then
-        DKIMTXT=$(awk 'NR>1 && NR<NR-1 {gsub(/ /,""); printf $0} END{print ""}' /etc/opendkim/keys/${DOMAIN}/default.txt)
-        echo -e "${yellow}  - 类型: TXT 主机名: default._domainkey.${DOMAIN} 内容: \"${DKIMTXT}\" TTL: 3600${reset}"
+        DKIMTXT=$(awk '/-----BEGIN/ {flag=1;next} /-----END/ {flag=0} flag' /etc/opendkim/keys/${DOMAIN}/default.txt | tr -d '\n')
+        if [[ -n "$DKIMTXT" ]]; then
+            echo -e "${yellow}  - 类型: TXT 主机名: default._domainkey.${DOMAIN} 内容: \"v=DKIM1; k=rsa; p=${DKIMTXT}\" TTL: 3600${reset}"
+        else
+            warn "提取DKIM公钥失败，请手动检查 default.txt 文件内容！"
+        fi
     else
         warn "未找到DKIM公钥文件，无法输出DKIM记录。"
     fi
