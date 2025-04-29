@@ -1,8 +1,8 @@
 #!/bin/bash
 # ==============================================
-# 邮局服务器配置脚本 FINAL版（适配 Ubuntu 20.04）
-# By VSWSV 定制，全中文提示，美化输出
-# 功能：自动释放端口、配置Postfix+Dovecot+Roundcube、SSL、Apache、DNS指引
+# 邮局服务器配置脚本 FINAL终极修正版
+# 适配 Ubuntu 20.04，全中文提示，美化输出
+# 功能：释放端口、配置Postfix+Dovecot+Roundcube、SSL、Apache、DNS指引
 # ==============================================
 
 # 颜色定义
@@ -12,7 +12,7 @@ red="\033[1;31m"
 blue="\033[1;34m"
 reset="\033[0m"
 
-# 美化分割线
+# 分隔线
 function draw_line() {
     echo -e "${blue}================================================================================${reset}"
 }
@@ -33,14 +33,16 @@ function error_exit() {
     exit 1
 }
 
-# 检查端口是否被占用，如果占用则杀掉
+# 检查并逐个杀死占用端口的进程
 function check_and_kill_port() {
-    port=$1
-    pid_info=$(lsof -i :${port} -t)
-    if [[ -n "$pid_info" ]]; then
-        pname=$(ps -p "$pid_info" -o comm=)
-        warn "端口 ${port} 已被占用，进程名: ${pname} (PID: ${pid_info})"
-        kill -9 "$pid_info" && success "已释放端口 ${port}（进程 $pname）"
+    local port=$1
+    pids=$(lsof -i :${port} -t)
+    if [[ -n "$pids" ]]; then
+        for pid in $pids; do
+            pname=$(ps -p "$pid" -o comm=)
+            warn "端口 ${port} 被占用，进程名: ${pname} (PID: ${pid})"
+            kill -9 "$pid" && success "已释放端口 ${port}（进程 $pname）"
+        done
     else
         success "端口 ${port} 空闲，可以使用。"
     fi
@@ -56,7 +58,7 @@ function check_ports() {
     draw_line
 }
 
-# 输入域名信息
+# 输入基本域名
 function input_domain() {
     draw_line
     echo -e "${green}请输入基本域名信息${reset}"
@@ -87,7 +89,7 @@ function input_db() {
     draw_line
 }
 
-# 创建数据库和表
+# 创建数据库及表
 function setup_db() {
     draw_line
     echo -e "${green}正在创建数据库和表结构...${reset}"
@@ -123,7 +125,6 @@ EOF
     success "数据库 ${DBNAME} 及相关表创建完成。"
     draw_line
 }
-
 # 配置Postfix主参数
 function config_postfix() {
     draw_line
@@ -145,11 +146,12 @@ function config_postfix() {
     success "Postfix主参数配置完成。"
     draw_line
 }
-# 配置Postfix查询MySQL
+
+# 配置Postfix MySQL
 function config_postfix_mysql() {
     draw_line
     echo -e "${green}正在配置Postfix与MySQL集成...${reset}"
-    mkdir -p /etc/postfix/sql
+    mkdir -p /etc/postfix
     cat >/etc/postfix/mysql-virtual-domains.cf <<EOF
 user = ${DBUSER}
 password = ${DBPASS}
@@ -182,9 +184,7 @@ EOF
 function config_dovecot() {
     draw_line
     echo -e "${green}正在配置Dovecot主参数...${reset}"
-
     sed -i "s|^#mail_location =.*|mail_location = maildir:/var/mail/vhosts/%d/%n|" /etc/dovecot/conf.d/10-mail.conf
-
     sed -i "s/^!include auth-system.conf.ext/#!include auth-system.conf.ext/" /etc/dovecot/conf.d/10-auth.conf
     sed -i "s/^#!include auth-sql.conf.ext/!include auth-sql.conf.ext/" /etc/dovecot/conf.d/10-auth.conf
 
@@ -222,8 +222,7 @@ function setup_dkim() {
     success "DKIM密钥生成成功。"
     draw_line
 }
-
-# 检查并申请SSL证书
+# 申请SSL证书
 function setup_ssl() {
     draw_line
     echo -e "${green}准备申请 Let's Encrypt 证书...${reset}"
@@ -284,14 +283,22 @@ EOF
     success "Apache配置完成，绑定子域 ${MAILDOMAIN}"
     draw_line
 }
-# 配置Roundcube连接数据库
+
+# 自动补充Roundcube数据库连接
 function config_roundcube() {
     draw_line
     echo -e "${green}正在配置Roundcube数据库连接信息...${reset}"
+    local config_path=""
     if [ -f /etc/roundcube/config.inc.php ]; then
-        sed -i "/\$config\['db_dsnw'\]/d" /etc/roundcube/config.inc.php
-        echo "\$config['db_dsnw'] = 'mysqli://${DBUSER}:${DBPASS}@localhost/${DBNAME}';" >> /etc/roundcube/config.inc.php
-        success "Roundcube数据库连接配置完成。"
+        config_path="/etc/roundcube/config.inc.php"
+    elif [ -f /var/lib/roundcube/config/config.inc.php ]; then
+        config_path="/var/lib/roundcube/config/config.inc.php"
+    fi
+
+    if [[ -n "$config_path" ]]; then
+        sed -i "/\$config\['db_dsnw'\]/d" $config_path
+        echo "\$config['db_dsnw'] = 'mysqli://${DBUSER}:${DBPASS}@localhost/${DBNAME}';" >> $config_path
+        success "Roundcube数据库连接配置完成：$config_path"
     else
         warn "未找到Roundcube配置文件，跳过。"
     fi
@@ -306,22 +313,25 @@ function output_dns() {
     echo -e "${yellow}  - 类型: A   主机名: $SUB    内容: [服务器公网IP]   TTL: 3600${reset}"
     echo -e "${yellow}  - 类型: MX  主机名: @       内容: $MAILDOMAIN (优先级10) TTL: 3600${reset}"
     echo -e "${yellow}  - 类型: TXT 主机名: @       内容: \"v=spf1 mx ~all\" TTL: 3600${reset}"
+
     if [[ -f /etc/opendkim/keys/${DOMAIN}/default.txt ]]; then
-        DKIMTXT=$(grep -v '-----' /etc/opendkim/keys/${DOMAIN}/default.txt | sed ':a;N;$!ba;s/\n//g' | sed 's/ //g')
+        DKIMTXT=$(awk 'NR>1 && NR<NR-1 {gsub(/ /,""); printf $0} END{print ""}' /etc/opendkim/keys/${DOMAIN}/default.txt)
         echo -e "${yellow}  - 类型: TXT 主机名: default._domainkey.${DOMAIN} 内容: \"${DKIMTXT}\" TTL: 3600${reset}"
     else
-        warn "未找到DKIM公钥，请手动检查。"
+        warn "未找到DKIM公钥文件，无法输出DKIM记录。"
     fi
+
     echo -e "${yellow}  - 类型: TXT 主机名: _dmarc 内容: \"v=DMARC1; p=none; rua=mailto:postmaster@${DOMAIN}\" TTL: 3600${reset}"
     echo
     echo -e "${blue}注意：使用Cloudflare等平台时，请设置为【仅DNS】，关闭小云朵代理！${reset}"
     draw_line
 }
 
-# 脚本执行入口
+# 主流程入口
 function main() {
     draw_line
-    echo -e "${green}🚀 欢迎使用 邮局服务器一键配置脚本 🚀${reset}"
+    echo -e "${green}🚀 欢迎使用 邮局服务器一键配置脚本 FINAL终极修正版 🚀${reset}"
+    draw_line
     check_ports
     input_domain
     input_db
@@ -339,5 +349,3 @@ function main() {
 }
 
 main
-
-
