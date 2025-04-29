@@ -101,12 +101,6 @@ else
   echo -e "${red} ✗ 失败${reset}"
   fail_roundcube=$((fail_roundcube+1))
 fi
-apt install php-xml
-
-rm -f /var/www/html/roundcube.tar.gz
-
-success_all=$((success_all+success_roundcube))
-
 fail_all=$((fail_all+fail_roundcube))
 echo -e "${yellow}🔍 解压 Roundcube源码...${reset}"
 if tar -xzf roundcube.tar.gz; then
@@ -132,7 +126,11 @@ else
   echo -e "${red} ✗ 失败${reset}"
   fail_roundcube=$((fail_roundcube+1))
 fi
+apt install php-xml
 
+rm -f /var/www/html/roundcube.tar.gz
+
+success_all=$((success_all+success_roundcube))
 echo -e "${yellow}🛠️ 正在设置PHP时区为 中国标准时间（Asia/Shanghai）...${reset}"
 sed -i "s@^;date.timezone =@date.timezone = Asia/Shanghai@" /etc/php/7.4/apache2/php.ini
 systemctl restart apache2
