@@ -296,8 +296,8 @@ return_to_menu() {
 show_menu() {
     clear
     draw_header
-    echo -e "${green}  1. 新建数据库${reset}                    ${green}2. 删除数据库${reset}                    ${green}4. 查看数据库${reset}"
-    echo -e "${green}  3. 修改密码${reset}                      ${green}5. 查看用户${reset}                      ${red}0. 返回${reset}"
+    echo -e "${green}   ① 新建数据库${reset}                    ${green} ② 删除数据库${reset}                    ${green} ③ 查看数据库${reset}"
+    echo -e "${green}   ④ 修改密码${reset}                      ${green} ⑤ 查看用户${reset}                      ${red} ⓪ 返回${reset}"
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
     echo -n "请选择操作 : "
 }
@@ -317,8 +317,8 @@ main() {
         case $choice in
             1) create_database ;;
             2) delete_database ;;
-            3) change_password ;;
-            4) list_databases ;;
+            3) list_databases ;;
+            4) change_password ;;
             5) list_users ;;
             0) bash /root/VPN/menu/mail.sh; exit ;;
             *) echo -e "${red}错误：无效选项！${reset}" ;;
