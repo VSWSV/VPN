@@ -17,7 +17,7 @@ show_menu() {
     echo -e "${pink}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "  ${yellow}❶${reset} ${green}邮局系统安装${reset}                   ${yellow}❷${reset} ${green}邮局域名配置${reset}                  ${yellow}❸${reset} ${green}邮局账户管理${reset}"
     echo -e "  ${yellow}❹${reset} ${green}服务启停状态${reset}                   ${yellow}❺${reset} ${green}数据库控制板${reset}                  ${yellow}❻${reset} ${green}邮局系统测试${reset}"
-    echo -e "  ${yellow}❼${reset} ${red}邮局系统卸载${reset}                     ${yellow}⓿${reset} ${red}返回主菜单${reset}"
+    echo -e "  ${yellow}❼${reset} ${red}邮局系统卸载${reset}                   ${yellow}⓿${reset} ${red}返回主菜单${reset}"
     echo -e "${pink}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
