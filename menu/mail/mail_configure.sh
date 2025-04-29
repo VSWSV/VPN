@@ -313,7 +313,7 @@ function config_roundcube_db() {
 
   if [[ -f "$RC_PATH" ]]; then
     sed -i "s#^\(\$config\['db_dsnw'\] = \).*#\1'mysql://${DBUSER}:${DBPASS}@localhost/${DBNAME}';#" "$RC_PATH"
-    success "Roundcube 配置文件已写入数据库连接信息"
+    echo -e "${green}[成功]${reset} 已写入 Roundcube 配置文件：${cyan}$RC_PATH${reset}"
   else
     warn "无法修改 Roundcube 配置文件，请手动配置数据库连接"
   fi
@@ -343,14 +343,13 @@ function output_dns() {
   echo -e "${yellow}  - 类型: MX   主机名: @         内容: mail.${DOMAIN} (优先级10) TTL: 3600${reset}"
   echo -e "${yellow}  - 类型: TXT  主机名: @         内容: \"v=spf1 mx ~all\"       TTL: 3600${reset}"
 
-  DKIMTXT=""
   DKIMFILE="/etc/opendkim/keys/${DOMAIN}/default.txt"
   if [[ -f "$DKIMFILE" ]]; then
-    DKIMTXT=$(grep "p=" "$DKIMFILE" | tr -d '\n' | sed -E 's/.*p=//;s/"//g;s/)//;s/;$//')
+    DKIMTXT=$(awk '/p=/{gsub(/"/, "", $0); print $0}' "$DKIMFILE" | tr -d '\n' | sed 's/.*p=//')
     if [[ -n "$DKIMTXT" ]]; then
       echo -e "${yellow}  - 类型: TXT  主机名: default._domainkey 内容: \"v=DKIM1; k=rsa; p=${DKIMTXT}\" TTL: 3600${reset}"
     else
-      warn "提取 DKIM 公钥失败"
+      warn "DKIM 公钥为空，请检查 $DKIMFILE 文件内容"
     fi
   else
     warn "未找到 DKIM 公钥文件"
