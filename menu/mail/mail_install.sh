@@ -38,7 +38,7 @@ fi
 install_single() {
   local pkg=$1
   echo -n "🔍 安装 ${pkg}..."
-  if apt install -y $pkg; then
+  if apt install $pkg; then
     echo -e "${green} ✓ 安装成功${reset}"
     return 0
   else
@@ -78,7 +78,7 @@ install_category() {
 draw_header
 
 echo -e "${green}▶ 更新系统源中...${reset}"
-apt update -y && echo -e "${green}✅ 系统更新完成${reset}" || echo -e "${red}❌ 系统更新失败${reset}"
+apt update && echo -e "${green}✅ 系统更新完成${reset}" || echo -e "${red}❌ 系统更新失败${reset}"
 sleep 1
 
 install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql mailutils dovecot-pop3d
@@ -127,7 +127,7 @@ else
   fail_roundcube=$((fail_roundcube+1))
 fi
 
-apt install -y php-xml >/dev/null 2>&1
+apt install php-xml
 
 rm -f /var/www/html/roundcube.tar.gz
 
