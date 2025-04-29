@@ -34,10 +34,14 @@ function check_and_release_ports() {
   for PORT in "${PORTS[@]}"; do
     LISTEN_INFO=$(ss -tunlp | grep ":$PORT ")
     if [[ -n "$LISTEN_INFO" ]]; then
-      PID=$(echo "$LISTEN_INFO" | awk '{print $NF}' | cut -d',' -f2)
-      PROC=$(ps -p $PID -o comm=)
-      echo -e "${yellow}[警告] 端口 $PORT 被占用，进程名: $PROC (PID: $PID)${reset}"
-      kill -9 $PID >/dev/null 2>&1 && echo -e "${green}[成功] 已释放端口 $PORT（进程 $PROC）${reset}"
+      PID=$(echo "$LISTEN_INFO" | grep -oP 'pid=\K[0-9]+' | head -n1)
+      PROC=$(ps -p $PID -o comm= 2>/dev/null)
+      if [[ -n "$PID" ]]; then
+        echo -e "${yellow}[警告] 端口 $PORT 被占用，进程名: $PROC (PID: $PID)${reset}"
+        kill -9 $PID >/dev/null 2>&1 && echo -e "${green}[成功] 已释放端口 $PORT（进程 $PROC）${reset}"
+      else
+        warn "端口 $PORT 占用进程PID解析失败"
+      fi
     else
       echo -e "${green}[成功] 端口 $PORT 空闲，可以使用。${reset}"
     fi
