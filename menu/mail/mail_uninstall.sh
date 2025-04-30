@@ -22,21 +22,11 @@ function draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
-# 提前停止服务并处理 MariaDB 残留
-function force_clean_mysql() {
-  echo -e "\n${yellow}🛑 正在强制停止相关服务并清理数据库残留...${reset}"
-  systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
-  dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
-  apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
-  rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb
-  echo -e "${green}✓ MariaDB 清理完成${reset}"
-}
-
 function uninstall_package() {
   local pkg=$1
   echo -e "\n🔍 ${yellow}正在卸载软件包: ${pkg}${reset}"
   if dpkg -s "$pkg" >/dev/null 2>&1; then
-    apt purge -y "$pkg"
+    DEBIAN_FRONTEND=noninteractive apt purge -y "$pkg"
     if [ $? -eq 0 ]; then
       echo -e "${green}✓ 已成功卸载 $pkg${reset}"
       success_all=$((success_all+1))
@@ -68,11 +58,10 @@ function remove_path() {
 
 function remove_users() {
   echo -e "\n🔍 ${yellow}尝试删除系统用户与组 vmail / opendkim${reset}"
-  deluser --remove-home vmail >/dev/null 2>&1 && echo -e "${green}✓ 删除用户 vmail${reset}" || echo -e "${yellow}⚠ 用户 vmail 不存在${reset}"
+  deluser --remove-home vmail >/dev/null 2>&1 && echo -e "${green}✓ 已删除用户 vmail${reset}" || echo -e "${yellow}⚠ 用户 vmail 不存在${reset}"
   delgroup vmail >/dev/null 2>&1 || echo -e "${yellow}⚠ 组 vmail 不存在${reset}"
-  deluser opendkim >/dev/null 2>&1 && echo -e "${green}✓ 删除用户 opendkim${reset}" || echo -e "${yellow}⚠ 用户 opendkim 不存在${reset}"
+  deluser opendkim >/dev/null 2>&1 && echo -e "${green}✓ 已删除用户 opendkim${reset}" || echo -e "${yellow}⚠ 用户 opendkim 不存在${reset}"
   delgroup opendkim >/dev/null 2>&1 || echo -e "${yellow}⚠ 组 opendkim 不存在${reset}"
-  echo -e "${green}✓ 系统用户处理完成${reset}"
 }
 
 echo -e "${yellow}⚡ 卸载操作需要输入密码确认${reset}"
@@ -89,11 +78,17 @@ else
 fi
 
 draw_header
-force_clean_mysql
 
+echo -e "${yellow}🛑 正在强制停止相关服务并清理数据库残留...${reset}"
+systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
+DEBIAN_FRONTEND=noninteractive dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
+DEBIAN_FRONTEND=noninteractive apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
+rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb
+
+# 卸载软件包
 packages=(
   postfix dovecot-core dovecot-imapd dovecot-mysql dovecot-pop3d mailutils
-  apache2 certbot opendkim opendkim-tools
+  mariadb-server apache2 certbot opendkim opendkim-tools
   php php-cli php-fpm php-mysql php-zip php-xml php-mbstring php-intl php-imap php-ldap php-gd php-imagick
 )
 
@@ -101,8 +96,9 @@ for p in "${packages[@]}"; do
   uninstall_package "$p"
 done
 
+# 删除文件与目录
 paths=(
-  /etc/roundcube /var/www/html/roundcube /etc/mysql /var/lib/mysql
+  /etc/roundcube /var/www/html/roundcube /var/lib/mysql /etc/mysql
   /var/spool/postfix /etc/opendkim /etc/letsencrypt
   /var/log/mail.log /var/log/mail.err /var/log/dovecot.log
   /var/mail/vhosts
@@ -115,7 +111,7 @@ done
 remove_users
 
 echo -e "\n🔍 ${yellow}清理系统残余组件...${reset}"
-apt autoremove -y
+DEBIAN_FRONTEND=noninteractive apt autoremove -y
 apt clean
 echo -e "${green}✓ 系统清理完成${reset}"
 
