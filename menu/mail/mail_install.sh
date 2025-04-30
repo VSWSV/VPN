@@ -85,7 +85,7 @@ dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
 rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb >/dev/null 2>&1
 apt clean && apt autoremove -y >/dev/null 2>&1
 
-install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql mailutils dovecot-pop3d
+install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql mailutils dovecot-pop3d dovecot-sql
 install_category "🛢️ 安装数据库服务..." mariadb-server
 install_category "🌐 安装Web服务器..." apache2
 install_category "🧩 安装PHP及扩展..." php php-cli php-fpm php-mysql php-curl php-zip php-xml php-mbstring php-intl php-gd php-imap php-ldap php-imagick
