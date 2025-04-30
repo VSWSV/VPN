@@ -19,7 +19,7 @@ function draw_header() {
 }
 
 function 
-# ✅ 强制停止服务并清理数据库残留
+# 强制停止服务并清理数据库残留
 systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
 dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
 apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
@@ -118,7 +118,7 @@ apt clean
 echo -e "${green}✓ 系统清理完成${reset}"
 
 
-# ✅ 强制停止服务并清理数据库残留
+#  强制停止服务并清理数据库残留
 systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
 dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
 apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
