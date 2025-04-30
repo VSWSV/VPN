@@ -12,11 +12,6 @@ reset="\033[0m"
 success_all=0
 fail_all=0
 
-# 强制停止服务并清理数据库残留
-systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
-dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
-apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
-rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb
 
 function draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
@@ -27,6 +22,11 @@ function draw_header() {
 draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
+# 强制停止服务并清理数据库残留
+systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
+dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
+apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
+rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb
 
 function uninstall_package() {
   local pkg=$1
