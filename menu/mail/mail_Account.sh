@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================
-# 邮箱账户管理脚本 FINAL版（修复密码隐藏/换行、多行插入BUG）
-# 适配 Ubuntu 20.04+
+# 邮箱账户管理脚本 FINAL V3（修复全部功能异常）
+# 适配 Ubuntu 20.04+，MySQL 后端，Roundcube/Postfix 环境
 # ==============================================
 
 green="\033[1;32m"
@@ -56,7 +56,6 @@ function create_account() {
     [[ -z "$DOMAIN" ]] && error_exit "域名不能为空！"
     read -p "请输入邮箱用户备注名: " NAME
     [[ -z "$NAME" ]] && NAME="$USERNAME"
-
     read -p "请输入邮箱密码（可见）: " PASSWORD
     [[ -z "$PASSWORD" ]] && error_exit "密码不能为空！"
     if [[ "$PASSWORD" =~ $'\n' || "$PASSWORD" =~ $'\r' ]]; then
@@ -88,7 +87,7 @@ function delete_account() {
     USERNAME=$(echo $EMAIL | cut -d@ -f1)
     DOMAIN=$(echo $EMAIL | cut -d@ -f2)
 
-    ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT m.id FROM ${DBNAME}.mailbox m JOIN ${DBNAME}.domain d ON m.domain_id=d.id WHERE m.username='${EMAIL}' AND d.name='${DOMAIN}';")
+    ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT m.id FROM ${DBNAME}.mailbox m JOIN ${DBNAME}.domain d ON m.domain_id=d.id WHERE m.username='${EMAIL}' AND d.name='${DOMAIN}';" | head -n1)
     if [[ -z "$ID" ]]; then
         warn "未找到邮箱账户 ${EMAIL}，跳过删除。"
     else
@@ -108,11 +107,10 @@ function change_password() {
     USERNAME=$(echo $EMAIL | cut -d@ -f1)
     DOMAIN=$(echo $EMAIL | cut -d@ -f2)
 
-    ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT m.id FROM ${DBNAME}.mailbox m JOIN ${DBNAME}.domain d ON m.domain_id=d.id WHERE m.username='${EMAIL}' AND d.name='${DOMAIN}';")
+    ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT m.id FROM ${DBNAME}.mailbox m JOIN ${DBNAME}.domain d ON m.domain_id=d.id WHERE m.username='${EMAIL}' AND d.name='${DOMAIN}';" | head -n1)
     [[ -z "$ID" ]] && error_exit "未找到邮箱账户 ${EMAIL}！"
 
     read -p "请输入新密码（可见）: " NEWPASS
-    echo
     [[ -z "$NEWPASS" ]] && error_exit "新密码不能为空！"
     ENCRYPT_NEWPASS=$(doveadm pw -s MD5-CRYPT -p "$NEWPASS")
     mysql -u${DBUSER} -p${DBPASS} -e "UPDATE ${DBNAME}.mailbox SET password='${ENCRYPT_NEWPASS}' WHERE id=${ID};"
@@ -129,13 +127,13 @@ function set_catch_all() {
     read -p "请输入转发到的邮箱 (例如 admin@vswsv.com): " TARGET
     [[ -z "$TARGET" ]] && error_exit "目标邮箱不能为空！"
 
-    DOMAIN_ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT id FROM ${DBNAME}.domain WHERE name='${DOMAIN}' AND active=1;")
+    DOMAIN_ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT id FROM ${DBNAME}.domain WHERE name='${DOMAIN}' AND active=1;" | head -n1)
     [[ -z "$DOMAIN_ID" ]] && error_exit "未找到域名 ${DOMAIN}！"
 
     mysql -u${DBUSER} -p${DBPASS} -e "DELETE FROM ${DBNAME}.alias WHERE source='@${DOMAIN}';"
     mysql -u${DBUSER} -p${DBPASS} -e "INSERT INTO ${DBNAME}.alias (domain_id, source, destination, active) VALUES (${DOMAIN_ID}, '@${DOMAIN}', '${TARGET}', 1);"
 
-    success "Catch-All设置成功，所有发往${DOMAIN}未匹配的邮件将转发到${TARGET}。"
+    success "Catch-All 设置成功，所有发往 ${DOMAIN} 未匹配的邮件将转发到 ${TARGET}。"
     draw_line
 }
 
