@@ -1,8 +1,7 @@
 #!/bin/bash
 # ==============================================
-# 邮箱账户管理脚本 FINAL版（适配 Ubuntu 20.04）
-# By VSWSV 定制，全中文提示，美化输出
-# 功能：创建、删除、修改密码、设置Catch-All、列出账户
+# 邮箱账户管理脚本 FINAL版（修复密码隐藏/换行、多行插入BUG）
+# 适配 Ubuntu 20.04+
 # ==============================================
 
 green="\033[1;32m"
@@ -58,25 +57,25 @@ function create_account() {
     read -p "请输入邮箱用户备注名: " NAME
     [[ -z "$NAME" ]] && NAME="$USERNAME"
 
-    read -s -p "请输入邮箱密码: " PASSWORD
-    echo
+    read -p "请输入邮箱密码（可见）: " PASSWORD
     [[ -z "$PASSWORD" ]] && error_exit "密码不能为空！"
-    if [[ "$PASSWORD" =~ $'\n' ]]; then
-        error_exit "密码中不能包含回车符！"
+    if [[ "$PASSWORD" =~ $'\n' || "$PASSWORD" =~ $'\r' ]]; then
+        error_exit "密码中不能包含换行或回车字符，请重新输入。"
     fi
 
-    DOMAIN_ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT id FROM ${DBNAME}.domain WHERE name='${DOMAIN}' AND active=1;")
+    DOMAIN_ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT id FROM ${DBNAME}.domain WHERE name='${DOMAIN}' AND active=1;" | head -n1)
     [[ -z "$DOMAIN_ID" ]] && error_exit "未找到域名 ${DOMAIN}，请先在数据库中添加！"
 
     ENCRYPT_PASS=$(doveadm pw -s MD5-CRYPT -p "$PASSWORD")
     MAILDIR="${DOMAIN}/${USERNAME}/"
+    EMAIL="${USERNAME}@${DOMAIN}"
 
-    mysql -u${DBUSER} -p${DBPASS} -e "INSERT INTO ${DBNAME}.mailbox (domain_id, username, password, name, maildir, active) VALUES (${DOMAIN_ID}, '${USERNAME}@${DOMAIN}', '${ENCRYPT_PASS}', '${NAME}', '${MAILDIR}', 1);"
+    mysql -u${DBUSER} -p${DBPASS} -e "INSERT INTO ${DBNAME}.mailbox (domain_id, username, password, name, maildir, active) VALUES (${DOMAIN_ID}, '${EMAIL}', '${ENCRYPT_PASS}', '${NAME}', '${MAILDIR}', 1);"
 
     mkdir -p /var/mail/vhosts/${DOMAIN}/${USERNAME}
     chown -R vmail:vmail /var/mail/vhosts/${DOMAIN}/${USERNAME}
 
-    success "邮箱账户 ${USERNAME}@${DOMAIN} 创建完成。"
+    success "邮箱账户 ${EMAIL} 创建完成。"
     draw_line
 }
 
@@ -112,7 +111,7 @@ function change_password() {
     ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT m.id FROM ${DBNAME}.mailbox m JOIN ${DBNAME}.domain d ON m.domain_id=d.id WHERE m.username='${EMAIL}' AND d.name='${DOMAIN}';")
     [[ -z "$ID" ]] && error_exit "未找到邮箱账户 ${EMAIL}！"
 
-    read -s -p "请输入新密码: " NEWPASS
+    read -p "请输入新密码（可见）: " NEWPASS
     echo
     [[ -z "$NEWPASS" ]] && error_exit "新密码不能为空！"
     ENCRYPT_NEWPASS=$(doveadm pw -s MD5-CRYPT -p "$NEWPASS")
@@ -143,15 +142,12 @@ function set_catch_all() {
 function list_accounts() {
     draw_line
     echo -e "${green}当前所有邮箱账户：${reset}"
-
     SAMPLE_EMAIL=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT username FROM ${DBNAME}.mailbox LIMIT 1;" 2>/dev/null)
-
     if [[ "$SAMPLE_EMAIL" == *@* ]]; then
         mysql -u${DBUSER} -p${DBPASS} -e "SELECT username AS 邮箱地址, name AS 用户名 FROM ${DBNAME}.mailbox WHERE active=1;"
     else
         mysql -u${DBUSER} -p${DBPASS} -e "SELECT CONCAT(m.username, '@', d.name) AS 邮箱地址, m.name AS 用户名 FROM ${DBNAME}.mailbox m JOIN ${DBNAME}.domain d ON m.domain_id=d.id WHERE m.active=1;"
     fi
-
     draw_line
 }
 
