@@ -274,34 +274,52 @@ EOF
   postconf -e "non_smtpd_milters = inet:localhost:12301"
   success "opendkim配置完成并与Postfix关联"
 }
-# ⑱ 申请 SSL 证书（自动关闭 Apache，防止端口冲突）
+# ⑱ 申请或导入 SSL 证书
 function setup_ssl() {
   line
-  command -v certbot >/dev/null 2>&1 || apt install -y certbot
+  echo -e "${yellow}❗请选择 SSL 证书方式：${reset}"
+  echo -e "${green}1.${reset} 自动申请（Certbot）"
+  echo -e "${green}2.${reset} 手动粘贴证书与私钥"
 
-  read -p "请输入申请SSL证书使用的邮箱地址（如 admin@$DOMAIN）: " SSLEMAIL
+  read -p "请输入选项编号 (1/2): " ssl_mode
 
-  echo -e "${yellow}❗临时关闭 Apache 以释放 80 端口...${reset}"
-  systemctl stop apache2
+  if [[ "$ssl_mode" == "1" ]]; then
+    command -v certbot >/dev/null 2>&1 || apt install -y certbot
+    read -p "请输入申请SSL证书使用的邮箱地址（如 admin@$DOMAIN）: " SSLEMAIL
 
-  CERTBOT_LOG="/tmp/certbot.log"
-  certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive > "$CERTBOT_LOG" 2>&1
+    echo -e "${yellow}❗临时关闭 Apache 以释放 80 端口...${reset}"
+    systemctl stop apache2
 
-  systemctl start apache2
+    certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive
 
-  if [[ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]]; then
-    if grep -q "Certificate not yet due for renewal" "$CERTBOT_LOG"; then
-      echo -e "${yellow}💡证书仍在有效期内，无需重新签发${reset}"
-    else
+    systemctl start apache2
+
+    if [[ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]]; then
       echo -e "${green}[成功] SSL证书申请成功${reset}"
+    else
+      echo -e "${red}[错误] 证书申请失败，请检查域名解析和端口占用${reset}"
+      exit 1
+    fi
+
+  elif [[ "$ssl_mode" == "2" ]]; then
+    echo -e "${yellow}✍️ 请粘贴你的 SSL 公钥证书（PEM 格式），完成后按 Ctrl+D 结束输入：${reset}"
+    cat > /etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
+
+    echo -e "${yellow}✍️ 请粘贴你的 SSL 私钥（KEY 格式），完成后按 Ctrl+D 结束输入：${reset}"
+    cat > /etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
+
+    if [[ -s "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" && -s "/etc/letsencrypt/live/$MAILDOMAIN/privkey.pem" ]]; then
+      echo -e "${green}[成功] 手动导入证书成功${reset}"
+    else
+      echo -e "${red}[错误] 文件为空，导入失败${reset}"
+      exit 1
     fi
   else
-    echo -e "${red}[错误] 证书申请失败，请检查域名解析和端口占用${reset}"
-    exit 1
+    echo -e "${red}无效输入，已取消操作${reset}"
+    return
   fi
-
-  rm -f "$CERTBOT_LOG"
 }
+
 
 # ⑲ 配置 Apache 虚拟主机
 function config_apache() {
