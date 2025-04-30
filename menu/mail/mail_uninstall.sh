@@ -79,10 +79,16 @@ fi
 
 draw_header
 
-echo -e "${yellow}🛑 正在强制停止相关服务并清理数据库残留...${reset}"
-systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
-DEBIAN_FRONTEND=noninteractive dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
-DEBIAN_FRONTEND=noninteractive apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
+echo -e "${yellow}🛑 正在强制停止相关服务...${reset}"
+systemctl stop mariadb
+systemctl stop mysql
+systemctl stop apache2
+systemctl stop dovecot
+systemctl stop postfix
+
+echo -e "${yellow}🧹 正在清除数据库残留...${reset}"
+dpkg --remove --force-remove-reinstreq mariadb-common
+apt purge -y mariadb-* mysql* libmariadb3 galera-*
 rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb
 
 # 卸载软件包
