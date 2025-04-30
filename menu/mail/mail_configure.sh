@@ -387,21 +387,6 @@ function config_roundcube_db() {
     echo -e "${red}[错误] Roundcube 配置文件不可写，请检查权限${reset}"
   fi
 }
-# ㉑ 创建测试邮箱账户
-function create_test_account() {
-  line
-  TESTMAIL="admin@$DOMAIN"
-  TESTPASS=$(openssl passwd -1 "admin123")
-  mysql -uroot -p"$ROOTPASS" <<EOF
-INSERT INTO ${DBNAME}.mailbox (domain_id, username, password, maildir, active)
-VALUES (1, '$TESTMAIL', '$TESTPASS', '$DOMAIN/admin/', 1)
-ON DUPLICATE KEY UPDATE password='$TESTPASS';
-EOF
-  mkdir -p /var/mail/vhosts/$DOMAIN/admin
-  chown -R vmail:vmail /var/mail/vhosts/$DOMAIN
-  success "测试账户 admin@$DOMAIN 创建成功，密码：admin123"
-}
-
 # ㉒ 输出 DNS 配置建议（A/MX/TXT/SPF/DKIM/DMARC）
 function output_dns() {
   line
@@ -459,7 +444,6 @@ function main() {
   setup_ssl
   config_apache
   config_roundcube_db
-  create_test_account
   output_dns
   restart_services_and_check_ports
   echo -e "${green}🎉 邮局系统配置完成！请通过 Roundcube 登录测试。${reset}"
