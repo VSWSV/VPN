@@ -31,7 +31,7 @@ function fail_exit() {
 function check_and_release_ports() {
   line
   echo -e "${green}检查必要端口是否被占用...${reset}"
-  PORTS=(25 80 465 587 143 993 110 995)
+  PORTS=(25  465 587 143 993 110 995)
   for PORT in "${PORTS[@]}"; do
     LISTEN_INFO=$(ss -tunlp | grep ":$PORT ")
     if [[ -n "$LISTEN_INFO" ]]; then
