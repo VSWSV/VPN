@@ -274,19 +274,14 @@ EOF
   postconf -e "non_smtpd_milters = inet:localhost:12301"
   success "opendkim配置完成并与Postfix关联"
 }
-# 工具检测函数
-check_command() {
-  command -v "$1" >/dev/null 2>&1
-}
-
 # ⑱ 申请 SSL 证书（自动关闭 Apache，防止端口冲突）
 function setup_ssl() {
   line
-  check_command certbot || apt install -y certbot
+  command -v certbot >/dev/null 2>&1 || apt install -y certbot
 
   read -p "请输入申请SSL证书使用的邮箱地址（如 admin@$DOMAIN）: " SSLEMAIL
 
-  info "临时关闭 Apache 以释放 80 端口..."
+  echo -e "${yellow}❗临时关闭 Apache 以释放 80 端口...${reset}"
   systemctl stop apache2
 
   certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive
@@ -299,7 +294,6 @@ function setup_ssl() {
     fail_exit "证书申请失败，请检查域名解析和端口占用"
   fi
 }
-
 # ⑲ 配置 Apache 虚拟主机
 function config_apache() {
   line
