@@ -52,7 +52,7 @@ function check_and_release_ports() {
 # ⑦ 输入基础域名
 function get_basic_info() {
   line
-  read -p "请输入主域名（例如 vswsv.com）: " DOMAIN
+  read -p "请输入主域名（例如 google.com）: " DOMAIN
   [[ -z "$DOMAIN" ]] && fail_exit "主域名不能为空"
   read -p "请输入子域名前缀（默认 mail）: " SUB
   [[ -z "$SUB" ]] && SUB="mail"
@@ -63,10 +63,10 @@ function get_basic_info() {
 # ⑧ 输入数据库信息
 function input_db_info() {
   line
-  read -p "数据库名称（默认 mailserver）: " DBNAME
-  [[ -z "$DBNAME" ]] && DBNAME="mailserver"
-  read -p "数据库用户名（默认 mailuser）: " DBUSER
-  [[ -z "$DBUSER" ]] && DBUSER="mailuser"
+  read -p "数据库名称（默认 mail）: " DBNAME
+  [[ -z "$DBNAME" ]] && DBNAME="mail"
+  read -p "数据库用户名（默认 mail）: " DBUSER
+  [[ -z "$DBUSER" ]] && DBUSER="mail"
   read -p "数据库密码（必填）: " DBPASS
   [[ -z "$DBPASS" ]] && fail_exit "数据库密码不能为空"
   read -p "请输入 MariaDB root 密码： " ROOTPASS
