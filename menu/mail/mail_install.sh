@@ -130,11 +130,18 @@ apt install php-xml
 
 rm -f /var/www/html/roundcube.tar.gz
 
-success_all=$((success_all+success_roundcube))
-echo -e "${yellow}🛠️ 正在设置PHP时区为 中国标准时间（Asia/Shanghai）...${reset}"
-sed -i "s@^;date.timezone =@date.timezone = Asia/Shanghai@" /etc/php/7.4/apache2/php.ini
-systemctl restart apache2
-echo -e "${green} ✓ 成功${reset}"
+php_version=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+php_ini="/etc/php/${php_version}/apache2/php.ini"
+
+if [ -f "$php_ini" ]; then
+    echo -e "${yellow}🛠️ 正在设置PHP时区为 中国标准时间（Asia/Shanghai）...${reset}"
+    sed -i "s@^;date.timezone =@date.timezone = Asia/Shanghai@" "$php_ini"
+    systemctl restart apache2
+    echo -e "${green} ✓ 成功${reset}"
+else
+    echo -e "${red}✖ 未找到 $php_ini，请确认 PHP 是否安装或 Apache PHP 模块是否正确安装${reset}"
+fi
+
 
 ip=$(curl -s ipv4.ip.sb)
 echo -e "${yellow}🔗 Roundcube安装器入口: ${green}http://${ip}/roundcube/installer/${reset}"
