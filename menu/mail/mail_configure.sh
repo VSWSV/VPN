@@ -291,7 +291,7 @@ function setup_ssl() {
 
   if [[ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]]; then
     if grep -q "Certificate not yet due for renewal" "$CERTBOT_LOG"; then
-      echo -e "${yellow}[提示] 证书仍在有效期内，无需重新签发${reset}"
+      echo -e "${yellow}💡证书仍在有效期内，无需重新签发${reset}"
     else
       echo -e "${green}[成功] SSL证书申请成功${reset}"
     fi
