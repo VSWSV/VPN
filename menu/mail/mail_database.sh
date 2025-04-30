@@ -201,15 +201,14 @@ create_database() {
 
 # 删除数据库及其关联用户
 delete_database() {
-
     local db_type=$(detect_db)
-    
-  echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                                   ${orange}❌ 删除数据库${reset}"
-  echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
+
+    echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
+    echo -e "                                   ${orange}❌ 删除数据库${reset}"
+    echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     
     while true; do
-        echo -n "输入要删除的数据库名称: "
+        echo -n "输入要删除的数据库名称（或用户名）: "
         read db_name
         if [ -z "$db_name" ]; then
             echo -e "${red}错误：数据库名不能为空！${reset}"
@@ -220,33 +219,35 @@ delete_database() {
 
     case $db_type in
         mysql)
-            if run_mysql "DROP DATABASE \`$db_name\`;" >/dev/null; then
+            if run_mysql "DROP DATABASE \`$db_name\`;" >/dev/null 2>&1; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
-                # 删除关联用户
-                if run_mysql "DROP USER '$db_name'@'%';" >/dev/null; then
-                    echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
-                else
-                    echo -e "${red}关联用户删除失败${reset}"
-                fi
             else
-                echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
+                echo -e "${yellow}数据库 ${db_name} 不存在或删除失败，跳过${reset}"
+            fi
+
+            if run_mysql "DROP USER '$db_name'@'%';" >/dev/null 2>&1 || run_mysql "DROP USER '$db_name'@'localhost';" >/dev/null 2>&1; then
+                echo -e "${green}用户 ${db_name} 删除成功${reset}"
+            else
+                echo -e "${yellow}用户 ${db_name} 不存在或删除失败${reset}"
             fi
             ;;
+        
         postgres)
             run_psql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db_name';" >/dev/null 2>&1
-            if run_psql "DROP DATABASE \"$db_name\";" >/dev/null; then
+            if run_psql "DROP DATABASE \"$db_name\";" >/dev/null 2>&1; then
                 echo -e "${green}数据库 ${db_name} 删除成功${reset}"
-                # 删除关联用户
-                if run_psql "DROP USER \"$db_name\";" >/dev/null; then
-                    echo -e "${green}关联用户 ${db_name} 删除成功${reset}"
-                else
-                    echo -e "${red}关联用户删除失败${reset}"
-                fi
             else
-                echo -e "${red}数据库 ${db_name} 不存在或删除失败${reset}"
+                echo -e "${yellow}数据库 ${db_name} 不存在或删除失败，跳过${reset}"
+            fi
+
+            if run_psql "DROP USER \"$db_name\";" >/dev/null 2>&1; then
+                echo -e "${green}用户 ${db_name} 删除成功${reset}"
+            else
+                echo -e "${yellow}用户 ${db_name} 不存在或删除失败${reset}"
             fi
             ;;
     esac
+
     draw_footer
     return_to_menu
 }
