@@ -13,7 +13,7 @@ reset="\033[0m"
 show_menu() {
     clear
     echo -e "${pink}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-    echo -e "                                  ${orange}✉️ 邮局-系统${reset}"
+    echo -e "                                   ${orange}✉️ 邮局-系统${reset}"
     echo -e "${pink}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
     echo -e "  ${yellow}❶${reset} ${green}邮局系统安装${reset}                   ${yellow}❷${reset} ${green}邮局域名配置${reset}                  ${yellow}❸${reset} ${green}邮局账户管理${reset}"
     echo -e "  ${yellow}❹${reset} ${green}服务启停状态${reset}                   ${yellow}❺${reset} ${green}数据库控制板${reset}                  ${yellow}❻${reset} ${green}邮局系统测试${reset}"
