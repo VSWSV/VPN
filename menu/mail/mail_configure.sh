@@ -157,10 +157,11 @@ EOF
   success "Postfix MySQL 集成配置完成"
 }
 
-# ⑫ 开启 Postfix所有相关端口监听
+# ⑫ 开启 Postfix 所有相关端口监听
 function config_postfix_ports() {
   line
   MASTER_CF="/etc/postfix/master.cf"
+
   if ! grep -q "^smtps " $MASTER_CF; then
 cat >>$MASTER_CF <<EOF
 
@@ -168,6 +169,8 @@ smtps     inet  n       -       y       -       -       smtpd
   -o syslog_name=postfix/smtps
   -o smtpd_tls_wrappermode=yes
   -o smtpd_sasl_auth_enable=yes
+  -o smtpd_sasl_type=dovecot
+  -o smtpd_sasl_path=private/auth
   -o smtpd_tls_cert_file=/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
   -o smtpd_tls_key_file=/etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
 EOF
@@ -180,41 +183,47 @@ submission inet n       -       y       -       -       smtpd
   -o syslog_name=postfix/submission
   -o smtpd_tls_security_level=encrypt
   -o smtpd_sasl_auth_enable=yes
+  -o smtpd_sasl_type=dovecot
+  -o smtpd_sasl_path=private/auth
   -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
   -o smtpd_tls_cert_file=/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
   -o smtpd_tls_key_file=/etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
 EOF
   fi
 
+  # 主配置中设置 Postfix 与 Dovecot 的认证对接和 TLS 证书位置
   postconf -e "smtpd_tls_cert_file = /etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem"
   postconf -e "smtpd_tls_key_file = /etc/letsencrypt/live/$MAILDOMAIN/privkey.pem"
   postconf -e "smtpd_tls_security_level = may"
-  postconf -e "smtpd_sasl_auth_enable = yes"
   postconf -e "smtpd_tls_auth_only = yes"
-  success "Postfix 已启用 25/465/587 端口监听"
+  postconf -e "smtpd_sasl_auth_enable = yes"
+
+  # 新增必要的虚拟用户目录参数
+  postconf -e "virtual_mailbox_base = /var/mail/vhosts"
+  postconf -e "virtual_uid_maps = static:5000"
+  postconf -e "virtual_gid_maps = static:5000"
+
+  success "Postfix 已启用 25/465/587 端口监听与认证配置"
 }
 
 # ⑬ 配置 Dovecot 所有端口协议支持
 function config_dovecot() {
   line
-  sed -i 's/^#*\s*protocols =.*/protocols = imap pop3 lmtp/' /etc/dovecot/dovecot.conf
-  sed -i 's/^#*\s*ssl = .*/ssl = required/' /etc/dovecot/conf.d/10-ssl.conf
-  sed -i "s|^#*\s*ssl_cert =.*|ssl_cert = </etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem|" /etc/dovecot/conf.d/10-ssl.conf
-  sed -i "s|^#*\s*ssl_key =.*|ssl_key = </etc/letsencrypt/live/$MAILDOMAIN/privkey.pem|" /etc/dovecot/conf.d/10-ssl.conf
+  sed -i 's/^.*protocols =.*/protocols = imap pop3 lmtp/' /etc/dovecot/dovecot.conf
+  sed -i 's/^.*ssl = .*/ssl = required/' /etc/dovecot/conf.d/10-ssl.conf
+  sed -i "s|^.*ssl_cert =.*|ssl_cert = </etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem|" /etc/dovecot/conf.d/10-ssl.conf
+  sed -i "s|^.*ssl_key =.*|ssl_key = </etc/letsencrypt/live/$MAILDOMAIN/privkey.pem|" /etc/dovecot/conf.d/10-ssl.conf
+
+  # 启用 SQL 认证，禁用系统认证
   sed -i 's/^!include auth-system.conf.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf
   sed -i 's/^#!include auth-sql.conf.ext/!include auth-sql.conf.ext/' /etc/dovecot/conf.d/10-auth.conf
-  sed -i 's|^#mail_location =.*|mail_location = maildir:/var/mail/vhosts/%d/%n|' /etc/dovecot/conf.d/10-mail.conf
-  success "Dovecot IMAP/POP3/SSL端口已启用"
+
+  # 设置 mail_location
+  sed -i 's|^.*mail_location =.*|mail_location = maildir:/var/mail/vhosts/%d/%n|' /etc/dovecot/conf.d/10-mail.conf
+
+  success "Dovecot IMAP/POP3/SSL 协议及路径配置完成"
 }
-# ⑭ 创建邮件存储目录并授权
-function setup_maildir() {
-  line
-  mkdir -p /var/mail/vhosts/$DOMAIN
-  groupadd -g 5000 vmail >/dev/null 2>&1 || true
-  useradd -g vmail -u 5000 vmail -d /var/mail/vhosts >/dev/null 2>&1 || true
-  chown -R vmail:vmail /var/mail/vhosts
-  success "邮件存储目录已创建并授权"
-}
+
 
 # ⑮ 配置 Dovecot SQL 登录
 function config_dovecot_sql() {
