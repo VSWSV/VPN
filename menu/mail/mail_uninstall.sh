@@ -18,7 +18,14 @@ function draw_header() {
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-function draw_footer() {
+function 
+# ✅ 强制停止服务并清理数据库残留
+systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
+dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
+apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
+rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb
+
+draw_footer() {
   echo -e "${cyan}╚═════════════════════════════════════════════════════════════════════════════════╝${reset}"
 }
 
@@ -109,6 +116,13 @@ echo -e "\n🔍 ${yellow}清理系统残余组件...${reset}"
 apt autoremove -y
 apt clean
 echo -e "${green}✓ 系统清理完成${reset}"
+
+
+# ✅ 强制停止服务并清理数据库残留
+systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
+dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
+apt purge -y mariadb-* mysql* libmariadb3 galera-* >/dev/null 2>&1
+rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb
 
 draw_footer
 
