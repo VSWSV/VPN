@@ -38,7 +38,7 @@ fi
 install_single() {
   local pkg=$1
   echo -n "🔍 安装 ${pkg}..."
-  if apt install $pkg; then
+  if DEBIAN_FRONTEND=readline apt install "$pkg"; then
     echo -e "${green} ✓ 安装成功${reset}"
     return 0
   else
