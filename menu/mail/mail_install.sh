@@ -80,6 +80,10 @@ draw_header
 echo -e "${green}▶ 更新系统源中...${reset}"
 apt update && echo -e "${green}✅ 系统更新完成${reset}" || echo -e "${red}❌ 系统更新失败${reset}"
 sleep 1
+# 安装 MariaDB 前清理旧残留
+dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
+rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb >/dev/null 2>&1
+apt clean && apt autoremove -y >/dev/null 2>&1
 
 install_category "📦 安装邮件服务组件..." postfix dovecot-core dovecot-imapd dovecot-mysql mailutils dovecot-pop3d
 install_category "🛢️ 安装数据库服务..." mariadb-server
