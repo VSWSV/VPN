@@ -274,6 +274,11 @@ EOF
   postconf -e "non_smtpd_milters = inet:localhost:12301"
   success "opendkim配置完成并与Postfix关联"
 }
+# 工具检测函数
+check_command() {
+  command -v "$1" >/dev/null 2>&1
+}
+
 # ⑱ 申请 SSL 证书（自动关闭 Apache，防止端口冲突）
 function setup_ssl() {
   line
