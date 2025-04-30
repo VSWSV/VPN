@@ -93,7 +93,7 @@ rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mariadb
 
 # 卸载软件包
 packages=(
-  postfix dovecot-core dovecot-imapd dovecot-mysql dovecot-pop3d mailutils
+  postfix dovecot-core dovecot-imapd dovecot-mysql dovecot-pop3d mailutils dovecot-sql
   mariadb-server apache2 certbot opendkim opendkim-tools
   php php-cli php-fpm php-mysql php-zip php-xml php-mbstring php-intl php-imap php-ldap php-gd php-imagick
 )
