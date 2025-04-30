@@ -284,16 +284,23 @@ function setup_ssl() {
   echo -e "${yellow}❗临时关闭 Apache 以释放 80 端口...${reset}"
   systemctl stop apache2
 
-  certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive
+  CERTBOT_LOG="/tmp/certbot.log"
+  certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive | tee "$CERTBOT_LOG"
 
   systemctl start apache2
 
   if [[ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]]; then
-    echo -e "${green}[成功] SSL证书申请成功${reset}"
+    if grep -q "Certificate not yet due for renewal" "$CERTBOT_LOG"; then
+      echo -e "${yellow}[提示] 证书仍在有效期内，无需重新签发${reset}"
+    else
+      echo -e "${green}[成功] SSL证书申请成功${reset}"
+    fi
   else
     echo -e "${red}[错误] 证书申请失败，请检查域名解析和端口占用${reset}"
     exit 1
   fi
+
+  rm -f "$CERTBOT_LOG"
 }
 # ⑲ 配置 Apache 虚拟主机
 function config_apache() {
