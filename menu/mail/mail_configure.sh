@@ -347,24 +347,41 @@ EOF
   success "Apache 虚拟主机配置完成"
 }
 
-
-# ⑳ 自动写入 Roundcube 数据库配置（支持手输路径）
+# ⑳ 自动写入 Roundcube 数据库配置（支持路径刷新与网页安装提示）
 function config_roundcube_db() {
   line
   echo -n "尝试检测 Roundcube 配置路径..."
   RC_PATH=$(find / -type f -name "config.inc.php" 2>/dev/null | grep roundcube | head -n1)
+
+  # 获取本机 IP（用于提示安装器 URL）
+  SERVER_IP=$(hostname -I | awk '{print $1}')
+
   if [[ -z "$RC_PATH" ]]; then
     echo -e "${yellow}未找到 Roundcube 配置文件${reset}"
-    read -p "请输入 Roundcube 配置文件路径（如 /var/lib/roundcube/config/config.inc.php）: " RC_PATH
+    echo -e "${yellow}[提示] 你可能尚未完成 Roundcube 安装。请访问以下地址进行网页安装：${reset}"
+    echo -e "${cyan}http://${SERVER_IP}/roundcube/installer/${reset}"
+    
+    echo
+    read -p "若你已完成网页安装，请按回车重新检测配置路径..." temp
+    echo -n "重新检测配置文件..."
+    RC_PATH=$(find / -type f -name "config.inc.php" 2>/dev/null | grep roundcube | head -n1)
+  fi
+
+  if [[ -z "$RC_PATH" ]]; then
+    echo -e "${red}仍未找到 config.inc.php，配置写入已跳过${reset}"
+    return
+  else
+    echo -e "${green}已找到：$RC_PATH${reset}"
   fi
 
   if [[ -f "$RC_PATH" ]]; then
     sed -i "s#^\(\$config\['db_dsnw'\] = \).*#\1'mysql://${DBUSER}:${DBPASS}@localhost/${DBNAME}';#" "$RC_PATH"
     echo -e "${green}[成功]${reset} 已写入 Roundcube 配置文件：${cyan}$RC_PATH${reset}"
   else
-    warn "无法修改 Roundcube 配置文件，请手动配置数据库连接"
+    echo -e "${red}[错误] Roundcube 配置文件不可写，请检查权限${reset}"
   fi
 }
+
 # ㉑ 创建测试邮箱账户
 function create_test_account() {
   line
