@@ -14,7 +14,7 @@ fail_all=0
 
 function draw_header() {
   echo -e "${cyan}╔═════════════════════════════════════════════════════════════════════════════════╗${reset}"
-  echo -e "                               ${orange}📦 邮局系统卸载${reset}"
+  echo -e "                               ${orange}📦 邮局系统卸载 FINAL${reset}"
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
@@ -25,8 +25,8 @@ function draw_footer() {
 function uninstall_package() {
   local pkg=$1
   echo -n "🔍 处理 ${pkg}..."
-  if dpkg -s "$pkg"; then
-    apt purge "$pkg"
+  if dpkg -s "$pkg" >/dev/null 2>&1; then
+    apt purge -y "$pkg" >/dev/null 2>&1
     if [ $? -eq 0 ]; then
       echo -e "${green} ✓ 已卸载${reset}"
       success_all=$((success_all+1))
@@ -39,12 +39,12 @@ function uninstall_package() {
   fi
 }
 
-function remove_directory() {
-  local dir=$1
-  echo -n "🔍 删除 ${dir}..."
-  if [ -d "$dir" ]; then
-    rm -rf "$dir"
-    if [ ! -d "$dir" ]; then
+function remove_path() {
+  local path=$1
+  echo -n "🔍 删除 ${path}..."
+  if [ -e "$path" ]; then
+    rm -rf "$path"
+    if [ ! -e "$path" ]; then
       echo -e "${green} ✓ 已删除${reset}"
       success_all=$((success_all+1))
     else
@@ -54,6 +54,15 @@ function remove_directory() {
   else
     echo -e "${yellow} ⚠ 不存在，跳过${reset}"
   fi
+}
+
+function remove_users() {
+  echo -n "🔍 清理系统用户 vmail / opendkim..."
+  deluser --remove-home vmail >/dev/null 2>&1
+  delgroup vmail >/dev/null 2>&1
+  deluser opendkim >/dev/null 2>&1
+  delgroup opendkim >/dev/null 2>&1
+  echo -e "${green} ✓ 已处理${reset}"
 }
 
 echo -e "${yellow}⚡ 卸载操作需要输入密码确认${reset}"
@@ -71,48 +80,34 @@ fi
 
 draw_header
 
-uninstall_package postfix
-uninstall_package dovecot-core
-uninstall_package dovecot-imapd
-uninstall_package dovecot-mysql
-uninstall_package mariadb-server
-uninstall_package apache2
-uninstall_package php
-uninstall_package php-cli
-uninstall_package php-fpm
-uninstall_package php-mysql
-uninstall_package php-imap
-uninstall_package php-json
-uninstall_package php-intl
-uninstall_package php-gd
-uninstall_package opendkim
-uninstall_package opendkim-tools
-uninstall_package certbot
-uninstall_package mailutils
-uninstall_package dovecot-pop3d
-uninstall_package php-xml
-uninstall_package php-zip
-uninstall_package php-ldap
-uninstall_package php-imagick
+# 卸载所有包
+packages=(
+  postfix dovecot-core dovecot-imapd dovecot-mysql dovecot-pop3d mailutils
+  mariadb-server apache2 certbot opendkim opendkim-tools
+  php php-cli php-fpm php-mysql php-zip php-xml php-mbstring php-intl php-imap php-ldap php-gd php-imagick
+)
 
-remove_directory /etc/roundcube
-remove_directory /var/www/html/roundcube
-remove_directory /var/lib/mysql
-remove_directory /etc/mysql
-remove_directory /var/spool/postfix
-remove_directory /var/log/mail.log
-remove_directory /var/log/mail.err
-remove_directory /var/log/dovecot.log
-remove_directory /etc/opendkim
-remove_directory /etc/letsencrypt
+for p in "${packages[@]}"; do
+  uninstall_package "$p"
+done
+
+# 删除目录和文件
+paths=(
+  /etc/roundcube /var/www/html/roundcube /var/lib/mysql /etc/mysql
+  /var/spool/postfix /etc/opendkim /etc/letsencrypt
+  /var/log/mail.log /var/log/mail.err /var/log/dovecot.log
+  /var/mail/vhosts
+)
+
+for p in "${paths[@]}"; do
+  remove_path "$p"
+done
+
+remove_users
 
 echo -n "🔍 清理系统残余..."
-apt autoremove && apt clean
-if [ $? -eq 0 ]; then
-  echo -e "${green} ✓ 完成${reset}"
-else
-  echo -e "${red} ✗ 清理失败${reset}"
-fi
+apt autoremove -y >/dev/null 2>&1 && apt clean >/dev/null 2>&1
+echo -e "${green} ✓ 完成${reset}"
 
 draw_footer
 
