@@ -274,52 +274,69 @@ EOF
   postconf -e "non_smtpd_milters = inet:localhost:12301"
   success "opendkim配置完成并与Postfix关联"
 }
-# ⑱ 申请或导入 SSL 证书
+# ⑱ 设置 SSL 证书（支持 Cloudflare 代理）
 function setup_ssl() {
   line
-  echo -e "${yellow}❗请选择 SSL 证书方式：${reset}"
-  echo -e "${green}1.${reset} 自动申请（Certbot）"
-  echo -e "${green}2.${reset} 手动粘贴证书与私钥"
+  echo -e "${yellow}❗你的域名是否启用了 Cloudflare 的“代理”功能（即橙色小云）？${reset}"
+  echo -e "${green}1.${reset} 是（网站使用 Cloudflare Origin 证书；邮件服务将申请 Let's Encrypt）"
+  echo -e "${green}2.${reset} 否（网站与邮件服务均申请 Let's Encrypt）"
+  read -p "请输入选项编号 (1/2): " cf_mode
 
-  read -p "请输入选项编号 (1/2): " ssl_mode
+  # 始终为邮件服务申请 Let's Encrypt 证书
+  command -v certbot >/dev/null 2>&1 || apt install -y certbot
+  read -p "请输入申请SSL证书使用的邮箱地址（如 admin@$DOMAIN）: " SSLEMAIL
 
-  if [[ "$ssl_mode" == "1" ]]; then
-    command -v certbot >/dev/null 2>&1 || apt install -y certbot
-    read -p "请输入申请SSL证书使用的邮箱地址（如 admin@$DOMAIN）: " SSLEMAIL
+  echo -e "${yellow}❗临时关闭 Apache 以释放 80 端口...${reset}"
+  systemctl stop apache2
 
-    echo -e "${yellow}❗临时关闭 Apache 以释放 80 端口...${reset}"
-    systemctl stop apache2
+  TEMP_LOG="/tmp/certbot_mail.log"
+  certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive 2>&1 | tee "$TEMP_LOG"
 
-    certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive
+  systemctl start apache2
 
-    systemctl start apache2
-
-    if [[ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]]; then
-      echo -e "${green}[成功] SSL证书申请成功${reset}"
+  if [[ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]]; then
+    if grep -q "Certificate not yet due for renewal" "$TEMP_LOG"; then
+      echo -e "${yellow}[提示] 证书仍在有效期内，无需重新签发${reset}"
     else
-      echo -e "${red}[错误] 证书申请失败，请检查域名解析和端口占用${reset}"
-      exit 1
-    fi
-
-  elif [[ "$ssl_mode" == "2" ]]; then
-    echo -e "${yellow}✍️ 请粘贴你的 SSL 公钥证书（PEM 格式），完成后按 Ctrl+D 结束输入：${reset}"
-    cat > /etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
-
-    echo -e "${yellow}✍️ 请粘贴你的 SSL 私钥（KEY 格式），完成后按 Ctrl+D 结束输入：${reset}"
-    cat > /etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
-
-    if [[ -s "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" && -s "/etc/letsencrypt/live/$MAILDOMAIN/privkey.pem" ]]; then
-      echo -e "${green}[成功] 手动导入证书成功${reset}"
-    else
-      echo -e "${red}[错误] 文件为空，导入失败${reset}"
-      exit 1
+      echo -e "${green}[成功] 邮件服务证书申请成功（Let's Encrypt）${reset}"
     fi
   else
-    echo -e "${red}无效输入，已取消操作${reset}"
-    return
+    echo -e "${red}[错误] 证书申请失败，请检查域名解析和端口占用${reset}"
+    exit 1
+  fi
+  rm -f "$TEMP_LOG"
+
+  # 如果启用了 Cloudflare 代理，粘贴网站证书（可查看和修改现有内容）
+  if [[ "$cf_mode" == "1" ]]; then
+    mkdir -p /etc/ssl/web
+
+    if [[ -f "/etc/ssl/web/fullchain.pem" ]]; then
+      echo -e "${yellow}📄 当前网站公钥证书内容如下（/etc/ssl/web/fullchain.pem）：${reset}"
+      cat /etc/ssl/web/fullchain.pem
+      echo -e "${yellow}✍️ 请粘贴新的公钥证书内容，或修改后回车，完成后按 Ctrl+D：${reset}"
+    else
+      echo -e "${yellow}✍️ 请粘贴你的网站 SSL 公钥证书（PEM 格式），完成后按 Ctrl+D：${reset}"
+    fi
+    cat > /etc/ssl/web/fullchain.pem
+
+    if [[ -f "/etc/ssl/web/privkey.pem" ]]; then
+      echo -e "${yellow}📄 当前网站私钥内容如下（/etc/ssl/web/privkey.pem）：${reset}"
+      cat /etc/ssl/web/privkey.pem
+      echo -e "${yellow}✍️ 请粘贴新的私钥内容，或修改后回车，完成后按 Ctrl+D：${reset}"
+    else
+      echo -e "${yellow}✍️ 请粘贴你的网站 SSL 私钥（KEY 格式），完成后按 Ctrl+D：${reset}"
+    fi
+    cat > /etc/ssl/web/privkey.pem
+
+    if [[ -s "/etc/ssl/web/fullchain.pem" && -s "/etc/ssl/web/privkey.pem" ]]; then
+      echo -e "${green}[成功] 网站证书（Cloudflare）导入成功${reset}"
+    else
+      echo -e "${red}[错误] 网站证书导入失败，文件为空${reset}"
+      rm -f /etc/ssl/web/fullchain.pem /etc/ssl/web/privkey.pem
+      exit 1
+    fi
   fi
 }
-
 
 # ⑲ 配置 Apache 虚拟主机
 function config_apache() {
