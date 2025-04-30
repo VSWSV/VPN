@@ -273,37 +273,72 @@ EOF
   postconf -e "non_smtpd_milters = inet:localhost:12301"
   success "opendkim配置完成并与Postfix关联"
 }
-# ⑱ 申请 SSL 证书
+# ⑱ 申请 SSL 证书（自动关闭 Apache，防止端口冲突）
 function setup_ssl() {
   line
+  check_command certbot || apt install -y certbot
+
   read -p "请输入申请SSL证书使用的邮箱地址（如 admin@$DOMAIN）: " SSLEMAIL
-  certbot certonly --standalone -d $MAILDOMAIN --agree-tos --email $SSLEMAIL --non-interactive
+
+  info "临时关闭 Apache 以释放 80 端口..."
+  systemctl stop apache2
+
+  certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive
+
+  systemctl start apache2
+
   if [[ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]]; then
     success "SSL证书申请成功"
   else
-    fail_exit "证书申请失败，请检查域名解析"
+    fail_exit "证书申请失败，请检查域名解析和端口占用"
   fi
 }
 
 # ⑲ 配置 Apache 虚拟主机
 function config_apache() {
   line
+  local webroot="/var/www/html/roundcube"
+
+  mkdir -p "$webroot"
+
   cat >/etc/apache2/sites-available/$MAILDOMAIN.conf <<EOF
 <VirtualHost *:80>
   ServerName $MAILDOMAIN
-  DocumentRoot /var/lib/roundcube
-  <Directory /var/lib/roundcube>
+  DocumentRoot $webroot
+
+  <Directory $webroot>
     Options -Indexes
     AllowOverride All
+    Require all granted
   </Directory>
+
+  DirectoryIndex index.php index.html
+</VirtualHost>
+
+<VirtualHost *:443>
+  ServerName $MAILDOMAIN
+  DocumentRoot $webroot
+
+  <Directory $webroot>
+    Options -Indexes
+    AllowOverride All
+    Require all granted
+  </Directory>
+
+  DirectoryIndex index.php index.html
+
+  SSLEngine on
+  SSLCertificateFile /etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
+  SSLCertificateKeyFile /etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
 </VirtualHost>
 EOF
 
-  a2enmod ssl rewrite >/dev/null 2>&1
+  a2enmod ssl rewrite php7.4 >/dev/null 2>&1 || a2enmod php8.1 >/dev/null 2>&1
   a2ensite $MAILDOMAIN.conf
   systemctl reload apache2
   success "Apache 虚拟主机配置完成"
 }
+
 
 # ⑳ 自动写入 Roundcube 数据库配置（支持手输路径）
 function config_roundcube_db() {
