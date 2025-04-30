@@ -1,7 +1,6 @@
 #!/bin/bash
 # ==============================================
-# 邮箱账户管理脚本 FINAL V3（修复全部功能异常）
-# 适配 Ubuntu 20.04+，MySQL 后端，Roundcube/Postfix 环境
+# 邮箱账户管理脚本 FINAL V4（增加去重防插入逻辑）
 # ==============================================
 
 green="\033[1;32m"
@@ -63,11 +62,18 @@ function create_account() {
     fi
 
     DOMAIN_ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT id FROM ${DBNAME}.domain WHERE name='${DOMAIN}' AND active=1;" | head -n1)
-    [[ -z "$DOMAIN_ID" ]] && error_exit "未找到域名 ${DOMAIN}，请先在数据库中添加！"
+
+    if [[ -z "$DOMAIN_ID" ]]; then
+        mysql -u${DBUSER} -p${DBPASS} -e "INSERT IGNORE INTO ${DBNAME}.domain (name, active) VALUES ('${DOMAIN}', 1);"
+        DOMAIN_ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT id FROM ${DBNAME}.domain WHERE name='${DOMAIN}' AND active=1;" | head -n1)
+    fi
+
+    EMAIL="${USERNAME}@${DOMAIN}"
+    EXISTS=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT 1 FROM ${DBNAME}.mailbox WHERE username='${EMAIL}' LIMIT 1;")
+    [[ -n "$EXISTS" ]] && error_exit "邮箱账户 ${EMAIL} 已存在，不能重复添加！"
 
     ENCRYPT_PASS=$(doveadm pw -s MD5-CRYPT -p "$PASSWORD")
     MAILDIR="${DOMAIN}/${USERNAME}/"
-    EMAIL="${USERNAME}@${DOMAIN}"
 
     mysql -u${DBUSER} -p${DBPASS} -e "INSERT INTO ${DBNAME}.mailbox (domain_id, username, password, name, maildir, active) VALUES (${DOMAIN_ID}, '${EMAIL}', '${ENCRYPT_PASS}', '${NAME}', '${MAILDIR}', 1);"
 
@@ -130,7 +136,9 @@ function set_catch_all() {
     DOMAIN_ID=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT id FROM ${DBNAME}.domain WHERE name='${DOMAIN}' AND active=1;" | head -n1)
     [[ -z "$DOMAIN_ID" ]] && error_exit "未找到域名 ${DOMAIN}！"
 
-    mysql -u${DBUSER} -p${DBPASS} -e "DELETE FROM ${DBNAME}.alias WHERE source='@${DOMAIN}';"
+    EXISTS=$(mysql -u${DBUSER} -p${DBPASS} -Nse "SELECT 1 FROM ${DBNAME}.alias WHERE source='@${DOMAIN}' LIMIT 1;")
+    [[ -n "$EXISTS" ]] && mysql -u${DBUSER} -p${DBPASS} -e "DELETE FROM ${DBNAME}.alias WHERE source='@${DOMAIN}';"
+
     mysql -u${DBUSER} -p${DBPASS} -e "INSERT INTO ${DBNAME}.alias (domain_id, source, destination, active) VALUES (${DOMAIN_ID}, '@${DOMAIN}', '${TARGET}', 1);"
 
     success "Catch-All 设置成功，所有发往 ${DOMAIN} 未匹配的邮件将转发到 ${TARGET}。"
