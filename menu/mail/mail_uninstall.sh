@@ -18,7 +18,6 @@ function draw_header() {
   echo -e "${cyan}╠═════════════════════════════════════════════════════════════════════════════════╣${reset}"
 }
 
-function 
 # 强制停止服务并清理数据库残留
 systemctl stop mariadb mysql apache2 dovecot postfix >/dev/null 2>&1
 dpkg --remove --force-remove-reinstreq mariadb-common >/dev/null 2>&1
