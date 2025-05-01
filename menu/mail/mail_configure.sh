@@ -1,260 +1,381 @@
 #!/bin/bash
-# ① 颜色定义
+# ==============================================
+# 邮件服务器一键配置脚本 (Postfix + Dovecot + OpenDKIM + Roundcube)
+# 版本: 3.0
+# 更新: 2023-11-20
+# 支持: Ubuntu 20.04/22.04 | Debian 10/11
+# 功能:
+#   - SMTP (25/465/587) with TLS
+#   - IMAP/POP3 (993/995) with SSL
+#   - MySQL 集成
+#   - OpenDKIM 签名
+#   - Roundcube 网页邮件
+# ==============================================
+
+# ----------------------------
+# ① 初始化设置
+# ----------------------------
+# 颜色定义
 green="\033[1;32m"
 yellow="\033[1;33m"
 red="\033[1;31m"
-cyan="\033[1;36m"
-orange="\033[38;5;214m"
+blue="\033[1;34m"
 reset="\033[0m"
 
-# ② 分隔线函数
+# 系统检测
+OS=$(lsb_release -is)
+CODENAME=$(lsb_release -cs)
+IP=$(hostname -I | awk '{print $1}')
+
+# 检查root权限
+if [ "$(id -u)" -ne 0 ]; then
+  echo -e "${red}错误: 必须使用root用户运行此脚本${reset}"
+  exit 1
+fi
+
+# ----------------------------
+# ② 辅助函数
+# ----------------------------
 function line() {
-  echo -e "${cyan}================================================================================${reset}"
+  echo -e "${blue}================================================================================${reset}"
 }
 
-# ③ 成功提示函数
 function success() {
-  echo -e "${green}[成功]${reset} $1"
+  echo -e "${green}[✓]${reset} $1"
 }
 
-# ④ 警告提示函数
 function warn() {
-  echo -e "${yellow}[警告]${reset} $1"
+  echo -e "${yellow}[!]${reset} $1"
 }
 
-# ⑤ 错误提示函数
-function fail_exit() {
-  echo -e "${red}[错误]${reset} $1"
+function fail() {
+  echo -e "${red}[✗]${reset} $1"
   exit 1
 }
-# ⑥ 检查并逐个释放端口
-function check_and_release_ports() {
+
+function install_pkg() {
+  if ! dpkg -l | grep -q "^ii  $1 "; then
+    apt install -y $1 >/dev/null 2>&1 && success "安装 $1" || fail "安装 $1 失败"
+  else
+    success "$1 已安装"
+  fi
+}
+
+# ----------------------------
+# ③ 端口管理
+# ----------------------------
+function port_check() {
   line
-  echo -e "${green}检查必要端口是否被占用...${reset}"
-  PORTS=(25  465 587 143 993 110 995)
-  for PORT in "${PORTS[@]}"; do
-    LISTEN_INFO=$(ss -tunlp | grep ":$PORT ")
-    if [[ -n "$LISTEN_INFO" ]]; then
-      PID=$(echo "$LISTEN_INFO" | grep -oP 'pid=\K[0-9]+' | head -n1)
-      PROC=$(ps -p $PID -o comm= 2>/dev/null)
-      if [[ -n "$PID" ]]; then
-        echo -e "${yellow}[警告] 端口 $PORT 被占用，进程名: $PROC (PID: $PID)${reset}"
-        kill -9 $PID >/dev/null 2>&1 && echo -e "${green}[成功] 已释放端口 $PORT（进程 $PROC）${reset}"
+  echo -e "${green}检查端口占用情况...${reset}"
+  
+  declare -A PORT_SERVICES=(
+    ["25"]="Postfix"
+    ["465"]="Postfix/SMTPS"
+    ["587"]="Postfix/Submission"
+    ["993"]="Dovecot/IMAPS"
+    ["995"]="Dovecot/POP3S"
+    ["143"]="Dovecot/IMAP"
+    ["110"]="Dovecot/POP3"
+  )
+
+  for port in "${!PORT_SERVICES[@]}"; do
+    if ss -tulnp | grep -q ":$port "; then
+      pid=$(ss -tulnp | grep ":$port " | awk '{print $NF}' | cut -d= -f2 | cut -d, -f1)
+      service_name=$(ps -p $pid -o comm= 2>/dev/null || echo "未知服务")
+      warn "${PORT_SERVICES[$port]} 端口 $port 被 $service_name (PID: $pid) 占用"
+      
+      read -p "是否终止该进程? [y/N] " choice
+      if [[ $choice =~ ^[Yy]$ ]]; then
+        kill -9 $pid 2>/dev/null
+        success "已终止进程 $pid"
       else
-        warn "端口 $PORT 占用进程PID解析失败"
+        fail "必须释放端口 $port 才能继续"
       fi
     else
-      echo -e "${green}[成功] 端口 $PORT 空闲，可以使用。${reset}"
+      success "${PORT_SERVICES[$port]} 端口 $port 可用"
     fi
   done
 }
 
-# ⑦ 输入基础域名
-function get_basic_info() {
+# ----------------------------
+# ④ 用户输入
+# ----------------------------
+function user_input() {
   line
-  read -p "请输入主域名（例如 google.com）: " DOMAIN
-  [[ -z "$DOMAIN" ]] && fail_exit "主域名不能为空"
-  read -p "请输入子域名前缀（默认 mail）: " SUB
-  [[ -z "$SUB" ]] && SUB="mail"
+  echo -e "${green}请输入配置信息${reset}"
+  
+  # 域名设置
+  while true; do
+    read -p "主域名 (如 example.com): " DOMAIN
+    if [[ $DOMAIN =~ ^[a-zA-Z0-9.-]+$ ]]; then
+      break
+    else
+      warn "域名格式无效"
+    fi
+  done
+  
+  read -p "邮件服务器子域名 [默认 mail]: " SUB
+  SUB=${SUB:-mail}
   MAILDOMAIN="${SUB}.${DOMAIN}"
-  success "邮箱域名为：$MAILDOMAIN"
+  
+  # 数据库设置
+  echo -e "\n${yellow}数据库配置${reset}"
+  read -p "数据库名 [默认 maildb]: " DBNAME
+  DBNAME=${DBNAME:-maildb}
+  
+  read -p "数据库用户 [默认 mailuser]: " DBUSER
+  DBUSER=${DBUSER:-mailuser}
+  
+  while true; do
+    read -s -p "数据库密码: " DBPASS
+    echo
+    if [ -n "$DBPASS" ]; then
+      break
+    else
+      warn "密码不能为空"
+    fi
+  done
+  
+  # MariaDB root 密码
+  while true; do
+    read -s -p "MariaDB root 密码: " ROOTPASS
+    echo
+    if mysql -uroot -p"$ROOTPASS" -e "quit" 2>/dev/null; then
+      break
+    else
+      warn "MariaDB root 密码错误"
+    fi
+  done
+  
+  # SSL 证书邮箱
+  read -p "SSL 证书通知邮箱 (用于Let's Encrypt): " SSLEMAIL
+  SSLEMAIL=${SSLEMAIL:-admin@$DOMAIN}
+  
+  success "配置信息收集完成"
 }
 
-# ⑧ 输入数据库信息
-function input_db_info() {
+# ----------------------------
+# ⑤ 数据库配置
+# ----------------------------
+function setup_database() {
   line
-  read -p "数据库名称（默认 mail）: " DBNAME
-  [[ -z "$DBNAME" ]] && DBNAME="mail"
-  read -p "数据库用户名（默认 mail）: " DBUSER
-  [[ -z "$DBUSER" ]] && DBUSER="mail"
-  read -p "数据库密码（必填）: " DBPASS
-  [[ -z "$DBPASS" ]] && fail_exit "数据库密码不能为空"
-  read -p "请输入 MariaDB root 密码： " ROOTPASS
-  mysql -uroot -p"$ROOTPASS" -e "quit" 2>/dev/null || fail_exit "无法连接数据库 root 用户"
-  success "数据库连接成功"
-}
-
-# ⑨ 创建数据库和表结构
-function setup_mail_db() {
-  line
+  echo -e "${green}配置邮件数据库...${reset}"
+  
+  # 创建数据库和用户
   mysql -uroot -p"$ROOTPASS" <<EOF
-CREATE DATABASE IF NOT EXISTS ${DBNAME} DEFAULT CHARACTER SET utf8mb4;
+CREATE DATABASE IF NOT EXISTS ${DBNAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '${DBUSER}'@'localhost' IDENTIFIED BY '${DBPASS}';
 GRANT ALL PRIVILEGES ON ${DBNAME}.* TO '${DBUSER}'@'localhost';
 FLUSH PRIVILEGES;
 USE ${DBNAME};
-CREATE TABLE IF NOT EXISTS domain (
+CREATE TABLE IF NOT EXISTS domains (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  active TINYINT(1) DEFAULT 1
+  domain VARCHAR(255) NOT NULL UNIQUE,
+  active BOOLEAN DEFAULT TRUE
 );
-CREATE TABLE IF NOT EXISTS mailbox (
+CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  domain_id INT,
-  username VARCHAR(255) NOT NULL,
+  domain_id INT NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
-  name VARCHAR(255),
-  maildir VARCHAR(255) NOT NULL,
-  active TINYINT(1) DEFAULT 1
+  active BOOLEAN DEFAULT TRUE,
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
 );
-CREATE TABLE IF NOT EXISTS alias (
+CREATE TABLE IF NOT EXISTS aliases (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  domain_id INT,
+  domain_id INT NOT NULL,
   source VARCHAR(255) NOT NULL,
   destination TEXT NOT NULL,
-  active TINYINT(1) DEFAULT 1
+  active BOOLEAN DEFAULT TRUE,
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
 );
+INSERT IGNORE INTO domains (domain) VALUES ('$DOMAIN');
 EOF
-  mysql -uroot -p"$ROOTPASS" -e "INSERT IGNORE INTO ${DBNAME}.domain (name) VALUES ('$DOMAIN');"
-  success "数据库 $DBNAME 创建完成"
+
+  success "邮件数据库配置完成"
 }
-# ⑩ 配置 Postfix 主参数
-function config_postfix_main() {
+
+# ----------------------------
+# ⑥ Postfix 配置
+# ----------------------------
+function setup_postfix() {
   line
+  echo -e "${green}配置Postfix...${reset}"
+  
+  install_pkg postfix
+  install_pkg postfix-mysql
+  
+  # 基本配置
   postconf -e "myhostname = $MAILDOMAIN"
   postconf -e "mydomain = $DOMAIN"
-  postconf -e "myorigin = /etc/mailname"
+  postconf -e "myorigin = \$mydomain"
   postconf -e "mydestination = localhost"
-  postconf -e "relay_domains ="
-  postconf -e "home_mailbox = Maildir/"
-  postconf -e "virtual_transport = lmtp:unix:private/dovecot-lmtp"
   postconf -e "mynetworks = 127.0.0.0/8"
-  echo "$DOMAIN" > /etc/mailname
-  success "Postfix 主参数配置完成"
-}
-
-# ⑪ 配置 Postfix MySQL 集成
-function config_postfix_mysql() {
-  line
+  postconf -e "inet_interfaces = all"
+  postconf -e "home_mailbox = Maildir/"
+  postconf -e "mailbox_command = "
+  
+  # MySQL 集成
   mkdir -p /etc/postfix/sql
-  cat >/etc/postfix/sql/virtual_mailbox_domains.cf <<EOF
+  
+  cat > /etc/postfix/sql/virtual_domains.cf <<EOF
 user = $DBUSER
 password = $DBPASS
 hosts = 127.0.0.1
 dbname = $DBNAME
-query = SELECT 1 FROM domain WHERE name='%s' AND active = 1
+query = SELECT 1 FROM domains WHERE domain='%s' AND active=1
 EOF
 
-  cat >/etc/postfix/sql/virtual_mailbox_maps.cf <<EOF
+  cat > /etc/postfix/sql/virtual_mailboxes.cf <<EOF
 user = $DBUSER
 password = $DBPASS
 hosts = 127.0.0.1
 dbname = $DBNAME
-query = SELECT 1 FROM mailbox WHERE username='%s' AND active = 1
+query = SELECT 1 FROM users WHERE email='%s' AND active=1
 EOF
 
-  cat >/etc/postfix/sql/virtual_alias_maps.cf <<EOF
+  cat > /etc/postfix/sql/virtual_aliases.cf <<EOF
 user = $DBUSER
 password = $DBPASS
 hosts = 127.0.0.1
 dbname = $DBNAME
-query = SELECT destination FROM alias WHERE source='%s' AND active = 1
+query = SELECT destination FROM aliases WHERE source='%s' AND active=1
 EOF
 
-  postconf -e "virtual_mailbox_domains = mysql:/etc/postfix/sql/virtual_mailbox_domains.cf"
-  postconf -e "virtual_mailbox_maps = mysql:/etc/postfix/sql/virtual_mailbox_maps.cf"
-  postconf -e "virtual_alias_maps = mysql:/etc/postfix/sql/virtual_alias_maps.cf"
-  success "Postfix MySQL 集成配置完成"
-}
-
-# ⑫ 开启 Postfix 所有相关端口监听
-function config_postfix_ports() {
-  line
-  MASTER_CF="/etc/postfix/master.cf"
-
-  if ! grep -q "^smtps " $MASTER_CF; then
-cat >>$MASTER_CF <<EOF
-
-smtps     inet  n       -       y       -       -       smtpd
-  -o syslog_name=postfix/smtps
-  -o smtpd_tls_wrappermode=yes
-  -o smtpd_sasl_auth_enable=yes
-  -o smtpd_sasl_type=dovecot
-  -o smtpd_sasl_path=private/auth
-  -o smtpd_tls_cert_file=/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
-  -o smtpd_tls_key_file=/etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
-EOF
-  fi
-
-  if ! grep -q "^submission " $MASTER_CF; then
-cat >>$MASTER_CF <<EOF
-
-submission inet n       -       y       -       -       smtpd
-  -o syslog_name=postfix/submission
-  -o smtpd_tls_security_level=encrypt
-  -o smtpd_sasl_auth_enable=yes
-  -o smtpd_sasl_type=dovecot
-  -o smtpd_sasl_path=private/auth
-  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
-  -o smtpd_tls_cert_file=/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
-  -o smtpd_tls_key_file=/etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
-EOF
-  fi
-
-  # 主配置中设置 Postfix 与 Dovecot 的认证对接和 TLS 证书位置
+  postconf -e "virtual_mailbox_domains = mysql:/etc/postfix/sql/virtual_domains.cf"
+  postconf -e "virtual_mailbox_maps = mysql:/etc/postfix/sql/virtual_mailboxes.cf"
+  postconf -e "virtual_alias_maps = mysql:/etc/postfix/sql/virtual_aliases.cf"
+  
+  # 虚拟用户设置
+  postconf -e "virtual_mailbox_base = /var/mail/vhosts"
+  postconf -e "virtual_uid_maps = static:5000"
+  postconf -e "virtual_gid_maps = static:5000"
+  postconf -e "virtual_create_maildirsize = yes"
+  
+  # TLS 配置
   postconf -e "smtpd_tls_cert_file = /etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem"
   postconf -e "smtpd_tls_key_file = /etc/letsencrypt/live/$MAILDOMAIN/privkey.pem"
   postconf -e "smtpd_tls_security_level = may"
   postconf -e "smtpd_tls_auth_only = yes"
+  
+  # SASL 认证
   postconf -e "smtpd_sasl_auth_enable = yes"
-
-  # 新增必要的虚拟用户目录参数
-  postconf -e "virtual_mailbox_base = /var/mail/vhosts"
-  postconf -e "virtual_uid_maps = static:5000"
-  postconf -e "virtual_gid_maps = static:5000"
-
-  success "Postfix 已启用 25/465/587 端口监听与认证配置"
-}
-
-# ⑬ 配置 Dovecot 所有端口协议支持
-function config_dovecot() {
-  line
-  sed -i 's/^.*protocols =.*/protocols = imap pop3 lmtp/' /etc/dovecot/dovecot.conf
-  sed -i 's/^.*ssl = .*/ssl = required/' /etc/dovecot/conf.d/10-ssl.conf
-  sed -i "s|^.*ssl_cert =.*|ssl_cert = </etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem|" /etc/dovecot/conf.d/10-ssl.conf
-  sed -i "s|^.*ssl_key =.*|ssl_key = </etc/letsencrypt/live/$MAILDOMAIN/privkey.pem|" /etc/dovecot/conf.d/10-ssl.conf
-
-  # 启用 SQL 认证，禁用系统认证
-  sed -i 's/^!include auth-system.conf.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf
-  sed -i 's/^#!include auth-sql.conf.ext/!include auth-sql.conf.ext/' /etc/dovecot/conf.d/10-auth.conf
-
-  # 设置 mail_location
-  sed -i 's|^.*mail_location =.*|mail_location = maildir:/var/mail/vhosts/%d/%n|' /etc/dovecot/conf.d/10-mail.conf
-
-  success "Dovecot IMAP/POP3/SSL 协议及路径配置完成"
-}
-
-
-# ⑮ 配置 Dovecot SQL 登录
-function config_dovecot_sql() {
-  line
-  mkdir -p /etc/dovecot/sql
-  cat >/etc/dovecot/dovecot-sql.conf.ext <<EOF
-driver = mysql
-connect = host=127.0.0.1 dbname=${DBNAME} user=${DBUSER} password=${DBPASS}
-default_pass_scheme = MD5-CRYPT
-password_query = SELECT username AS user, password FROM mailbox WHERE username='%u' AND active = 1
-user_query = SELECT maildir AS home, 5000 AS uid, 5000 AS gid FROM mailbox WHERE username='%u' AND active = 1
+  postconf -e "smtpd_sasl_type = dovecot"
+  postconf -e "smtpd_sasl_path = private/auth"
+  postconf -e "smtpd_sasl_security_options = noanonymous"
+  
+  # 启用 Submission (587) 和 SMTPS (465)
+  cat >> /etc/postfix/master.cf <<EOF
+submission inet n - y - - smtpd
+  -o syslog_name=postfix/submission
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+  -o milter_macro_daemon_name=ORIGINATING
+smtps inet n - y - - smtpd
+  -o syslog_name=postfix/smtps
+  -o smtpd_tls_wrappermode=yes
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+  -o milter_macro_daemon_name=ORIGINATING
 EOF
-  success "Dovecot SQL认证配置完成"
+
+  systemctl restart postfix
+  success "Postfix 配置完成"
 }
 
-# ⑯ 生成 DKIM 密钥
-function setup_dkim() {
+# ----------------------------
+# ⑦ Dovecot 配置
+# ----------------------------
+function setup_dovecot() {
   line
+  echo -e "${green}配置Dovecot...${reset}"
+  
+  install_pkg dovecot-core
+  install_pkg dovecot-imapd
+  install_pkg dovecot-pop3d
+  install_pkg dovecot-mysql
+  install_pkg dovecot-lmtpd
+  
+  # 基础配置
+  sed -i 's/^#ssl =.*/ssl = required/' /etc/dovecot/conf.d/10-ssl.conf
+  sed -i "s|^#ssl_cert =.*|ssl_cert = </etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem|" /etc/dovecot/conf.d/10-ssl.conf
+  sed -i "s|^#ssl_key =.*|ssl_key = </etc/letsencrypt/live/$MAILDOMAIN/privkey.pem|" /etc/dovecot/conf.d/10-ssl.conf
+  
+  # 认证配置
+  echo "disable_plaintext_auth = no" > /etc/dovecot/conf.d/10-auth.conf
+  echo "auth_mechanisms = plain login" >> /etc/dovecot/conf.d/10-auth.conf
+  echo "!include auth-sql.conf.ext" >> /etc/dovecot/conf.d/10-auth.conf
+  
+  # SQL 认证
+  cat > /etc/dovecot/conf.d/auth-sql.conf.ext <<EOF
+passdb {
+  driver = sql
+  args = /etc/dovecot/dovecot-sql.conf.ext
+}
+userdb {
+  driver = static
+  args = uid=vmail gid=vmail home=/var/mail/vhosts/%d/%n
+}
+EOF
+
+  cat > /etc/dovecot/dovecot-sql.conf.ext <<EOF
+driver = mysql
+connect = host=127.0.0.1 dbname=$DBNAME user=$DBUSER password=$DBPASS
+default_pass_scheme = SHA512-CRYPT
+password_query = SELECT email AS user, password FROM users WHERE email='%u' AND active=1
+EOF
+
+  # 邮箱存储
+  mkdir -p /var/mail/vhosts/$DOMAIN
+  groupadd -g 5000 vmail 2>/dev/null
+  useradd -g vmail -u 5000 vmail -d /var/mail 2>/dev/null
+  chown -R vmail:vmail /var/mail
+  
+  # 邮件位置
+  sed -i 's|^#mail_location =.*|mail_location = maildir:/var/mail/vhosts/%d/%n|' /etc/dovecot/conf.d/10-mail.conf
+  
+  # 主服务配置
+  cat > /etc/dovecot/conf.d/10-master.conf <<EOF
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0666
+    user = postfix
+    group = postfix
+  }
+}
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}
+EOF
+
+  systemctl restart dovecot
+  success "Dovecot 配置完成"
+}
+
+# ----------------------------
+# ⑧ OpenDKIM 配置
+# ----------------------------
+function setup_opendkim() {
+  line
+  echo -e "${green}配置OpenDKIM...${reset}"
+  
+  install_pkg opendkim
+  install_pkg opendkim-tools
+  
   mkdir -p /etc/opendkim/keys/$DOMAIN
   opendkim-genkey -D /etc/opendkim/keys/$DOMAIN/ -d $DOMAIN -s default
   chown -R opendkim:opendkim /etc/opendkim
-  success "DKIM密钥生成成功"
-}
-
-# ⑰ 配置 opendkim.conf 与 postfix 配合项
-function config_opendkim() {
-  line
-  cat >/etc/opendkim.conf <<EOF
+  
+  # 主配置文件
+  cat > /etc/opendkim.conf <<EOF
 Syslog          yes
 UMask           002
-Canonicalization    relaxed/simple
+Canonicalization relaxed/simple
 Mode            sv
 SubDomains      no
 Socket          inet:12301@localhost
@@ -263,199 +384,302 @@ SigningTable    /etc/opendkim/SigningTable
 InternalHosts   /etc/opendkim/TrustedHosts
 EOF
 
-  cat >/etc/opendkim/KeyTable <<EOF
-default._domainkey.$DOMAIN $DOMAIN:default:/etc/opendkim/keys/$DOMAIN/default.private
-EOF
+  # KeyTable
+  echo "default._domainkey.$DOMAIN $DOMAIN:default:/etc/opendkim/keys/$DOMAIN/default.private" > /etc/opendkim/KeyTable
 
-  cat >/etc/opendkim/SigningTable <<EOF
-*@${DOMAIN} default._domainkey.${DOMAIN}
-EOF
+  # SigningTable
+  echo "*@$DOMAIN default._domainkey.$DOMAIN" > /etc/opendkim/SigningTable
 
-  cat >/etc/opendkim/TrustedHosts <<EOF
+  # TrustedHosts
+  cat > /etc/opendkim/TrustedHosts <<EOF
 127.0.0.1
 localhost
 $DOMAIN
+$MAILDOMAIN
 EOF
 
+  # 链接Postfix
   postconf -e "milter_default_action = accept"
   postconf -e "milter_protocol = 6"
   postconf -e "smtpd_milters = inet:localhost:12301"
   postconf -e "non_smtpd_milters = inet:localhost:12301"
-  success "opendkim配置完成并与Postfix关联"
+  
+  systemctl restart opendkim postfix
+  success "OpenDKIM 配置完成"
 }
-# ⑱ 申请 SSL 证书（自动关闭 Apache，防止端口冲突）
+
+# ----------------------------
+# ⑨ SSL 证书
+# ----------------------------
 function setup_ssl() {
   line
-  command -v certbot >/dev/null 2>&1 || apt install -y certbot
-
-  read -p "请输入申请SSL证书使用的邮箱地址（如 admin@$DOMAIN）: " SSLEMAIL
-
-  echo -e "${yellow}❗临时关闭 Apache 以释放 80 端口...${reset}"
-  systemctl stop apache2
-
-  CERTBOT_LOG="/tmp/certbot.log"
-  certbot certonly --standalone -d "$MAILDOMAIN" --agree-tos --email "$SSLEMAIL" --non-interactive | tee "$CERTBOT_LOG"
-
-  systemctl start apache2
-
-  if [[ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]]; then
-    if grep -q "Certificate not yet due for renewal" "$CERTBOT_LOG"; then
-      echo -e "${yellow}💡证书仍在有效期内，无需重新签发${reset}"
-    else
-      echo -e "${green}[成功] SSL证书申请成功${reset}"
-    fi
+  echo -e "${green}配置SSL证书...${reset}"
+  
+  install_pkg certbot
+  
+  # 临时停止占用80端口的服务
+  systemctl stop apache2 nginx 2>/dev/null
+  
+  # 申请证书
+  certbot certonly --standalone -d $MAILDOMAIN --agree-tos --email $SSLEMAIL --non-interactive
+  
+  # 重启服务
+  systemctl start apache2 nginx 2>/dev/null
+  
+  # 检查证书
+  if [ -f "/etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem" ]; then
+    success "SSL 证书已安装"
+    # 设置自动续期
+    (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook \"systemctl reload postfix dovecot\"") | crontab -
   else
-    echo -e "${red}[错误] 证书申请失败，请检查域名解析和端口占用${reset}"
-    exit 1
+    warn "SSL 证书获取失败，请手动检查"
   fi
-
-  rm -f "$CERTBOT_LOG"
 }
-# ⑲ 配置 Apache 虚拟主机
-function config_apache() {
+
+# ----------------------------
+# ⑩ Roundcube 配置
+# ----------------------------
+function setup_roundcube() {
   line
-  local webroot="/var/www/html/roundcube"
-
-  mkdir -p "$webroot"
-
-  cat >/etc/apache2/sites-available/$MAILDOMAIN.conf <<EOF
+  echo -e "${green}配置Roundcube...${reset}"
+  
+  install_pkg roundcube
+  install_pkg roundcube-core
+  install_pkg roundcube-mysql
+  install_pkg roundcube-plugins
+  
+  # 配置Apache
+  cat > /etc/apache2/sites-available/roundcube.conf <<EOF
 <VirtualHost *:80>
   ServerName $MAILDOMAIN
-  DocumentRoot $webroot
-
-  <Directory $webroot>
-    Options -Indexes
-    AllowOverride All
-    Require all granted
-  </Directory>
-
-  DirectoryIndex index.php index.html
+  Redirect permanent / https://$MAILDOMAIN/
 </VirtualHost>
 
 <VirtualHost *:443>
   ServerName $MAILDOMAIN
-  DocumentRoot $webroot
-
-  <Directory $webroot>
+  DocumentRoot /var/lib/roundcube
+  
+  SSLEngine on
+  SSLCertificateFile /etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
+  SSLCertificateKeyFile /etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
+  
+  <Directory /var/lib/roundcube>
     Options -Indexes
     AllowOverride All
     Require all granted
   </Directory>
-
-  DirectoryIndex index.php index.html
-
-  SSLEngine on
-  SSLCertificateFile /etc/letsencrypt/live/$MAILDOMAIN/fullchain.pem
-  SSLCertificateKeyFile /etc/letsencrypt/live/$MAILDOMAIN/privkey.pem
+  
+  ErrorLog \${APACHE_LOG_DIR}/roundcube_error.log
+  CustomLog \${APACHE_LOG_DIR}/roundcube_access.log combined
 </VirtualHost>
 EOF
 
-  a2enmod ssl rewrite php7.4 >/dev/null 2>&1 || a2enmod php8.1 >/dev/null 2>&1
-  a2ensite $MAILDOMAIN.conf
-  systemctl reload apache2
-  success "Apache 虚拟主机配置完成"
+  # 数据库配置
+  mysql -uroot -p"$ROOTPASS" $DBNAME <<EOF
+CREATE TABLE IF NOT EXISTS roundcube.contacts (
+  contact_id int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id int(10) UNSIGNED NOT NULL,
+  changed datetime NOT NULL DEFAULT '1000-01-01 00:00:00',
+  del tinyint(1) NOT NULL DEFAULT 0,
+  name varchar(128) NOT NULL DEFAULT '',
+  email text NOT NULL,
+  PRIMARY KEY (contact_id),
+  KEY user_id (user_id),
+  KEY email (email(255))
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS roundcube.identities (
+  identity_id int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id int(10) UNSIGNED NOT NULL,
+  standard tinyint(1) NOT NULL DEFAULT 0,
+  name varchar(128) NOT NULL,
+  organization varchar(128) NOT NULL DEFAULT '',
+  email varchar(128) NOT NULL,
+  reply-to varchar(128) NOT NULL DEFAULT '',
+  bcc varchar(128) NOT NULL DEFAULT '',
+  signature text NOT NULL,
+  html_signature tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (identity_id),
+  KEY user_id (user_id),
+  KEY email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+EOF
+
+  # 配置Roundcube
+  cat > /etc/roundcube/config.inc.php <<EOF
+<?php
+\$config = array();
+\$config['db_dsnw'] = 'mysql://${DBUSER}:${DBPASS}@localhost/${DBNAME}';
+\$config['default_host'] = 'ssl://${MAILDOMAIN}';
+\$config['default_port'] = 993;
+\$config['smtp_server'] = 'tls://${MAILDOMAIN}';
+\$config['smtp_port'] = 587;
+\$config['smtp_user'] = '%u';
+\$config['smtp_pass'] = '%p';
+\$config['support_url'] = '';
+\$config['product_name'] = '${DOMAIN} 邮件系统';
+\$config['des_key'] = '$(openssl rand -base64 24)';
+\$config['plugins'] = array('archive', 'zipdownload');
+\$config['skin'] = 'elastic';
+EOF
+
+  a2ensite roundcube.conf
+  a2enmod ssl rewrite
+  systemctl restart apache2
+  
+  success "Roundcube 配置完成"
 }
-# ⑳ 自动写入 Roundcube 数据库配置（最多3次重新检测）
-function config_roundcube_db() {
+
+# ----------------------------
+# ⑪ 防火墙配置
+# ----------------------------
+function setup_firewall() {
   line
-  echo -n "尝试检测 Roundcube 配置路径..."
-  RC_PATH=$(find / -type f -name "config.inc.php" 2>/dev/null | grep roundcube | head -n1)
-
-  SERVER_IP=$(hostname -I | awk '{print $1}')
-
-  if [[ -z "$RC_PATH" ]]; then
-    echo -e "${yellow}未找到 Roundcube 配置文件${reset}"
-    echo -e "${yellow}[提示] 你可能尚未完成 Roundcube 安装。请访问以下地址进行网页安装：${reset}"
-    echo -e "${cyan}http://${SERVER_IP}/roundcube/installer/${reset}"
-  fi
-
-  # 最多尝试3次等待用户安装后刷新检测
-  try=1
-  while [[ -z "$RC_PATH" && $try -le 3 ]]; do
-    echo
-    read -p "（第 ${try}/3 次）若你已完成网页安装，请按回车重新检测配置路径..." temp
-    echo -n "重新检测配置文件..."
-    RC_PATH=$(find / -type f -name "config.inc.php" 2>/dev/null | grep roundcube | head -n1)
-    if [[ -z "$RC_PATH" ]]; then
-      echo -e "${red}未找到${reset}"
-    else
-      echo -e "${green}已找到：$RC_PATH${reset}"
-    fi
-    try=$((try+1))
-  done
-
-  if [[ -z "$RC_PATH" ]]; then
-    echo -e "${red}仍未找到 config.inc.php，配置写入已跳过${reset}"
-    return
-  fi
-
-  if [[ -f "$RC_PATH" ]]; then
-    sed -i "s#^\(\$config\['db_dsnw'\] = \).*#\1'mysql://${DBUSER}:${DBPASS}@localhost/${DBNAME}';#" "$RC_PATH"
-    echo -e "${green}[成功]${reset} 已写入 Roundcube 配置文件：${cyan}$RC_PATH${reset}"
+  echo -e "${green}配置防火墙...${reset}"
+  
+  if command -v ufw >/dev/null; then
+    ufw allow 22/tcp
+    ufw allow 25/tcp
+    ufw allow 465/tcp
+    ufw allow 587/tcp
+    ufw allow 993/tcp
+    ufw allow 995/tcp
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+    ufw --force enable
+    success "UFW 防火墙已配置"
+  elif command -v firewall-cmd >/dev/null; then
+    firewall-cmd --permanent --add-service={smtp,smtps,submission,imaps,pop3s,http,https}
+    firewall-cmd --reload
+    success "Firewalld 已配置"
   else
-    echo -e "${red}[错误] Roundcube 配置文件不可写，请检查权限${reset}"
+    warn "未找到支持的防火墙工具"
   fi
 }
-# ㉒ 输出 DNS 配置建议（A/MX/TXT/SPF/DKIM/DMARC）
-function output_dns() {
-  line
-  SERVER_IP=$(curl -s https://api.ipify.org)
-  echo -e "${green}请根据以下信息配置 DNS 记录：${reset}"
-  echo -e "${yellow}  - 类型: A    主机名: @         内容: ${SERVER_IP}         TTL: 3600${reset}"
-  echo -e "${yellow}  - 类型: A    主机名: mail      内容: ${SERVER_IP}         TTL: 3600${reset}"
-  echo -e "${yellow}  - 类型: MX   主机名: @         内容: mail.${DOMAIN} (优先级10) TTL: 3600${reset}"
-  echo -e "${yellow}  - 类型: TXT  主机名: @         内容: \"v=spf1 mx ~all\"       TTL: 3600${reset}"
 
-  DKIMFILE="/etc/opendkim/keys/${DOMAIN}/default.txt"
-  if [[ -f "$DKIMFILE" ]]; then
-    DKIMTXT=$(awk '/p=/{gsub(/"/, "", $0); print $0}' "$DKIMFILE" | tr -d '\n' | sed 's/.*p=//')
-    if [[ -n "$DKIMTXT" ]]; then
-      echo -e "${yellow}  - 类型: TXT  主机名: default._domainkey 内容: \"v=DKIM1; k=rsa; p=${DKIMTXT}\" TTL: 3600${reset}"
-    else
-      warn "DKIM 公钥为空，请检查 $DKIMFILE 文件内容"
-    fi
+# ----------------------------
+# ⑫ 测试验证
+# ----------------------------
+function verify_setup() {
+  line
+  echo -e "${green}验证邮件服务器配置...${reset}"
+  
+  # 测试SMTP
+  echo -e "${blue}[测试SMTP连接]${reset}"
+  if echo "quit" | openssl s_client -connect $MAILDOMAIN:587 -starttls smtp -brief 2>/dev/null | grep -q "220"; then
+    success "SMTP (587) 连接正常"
   else
-    warn "未找到 DKIM 公钥文件"
+    fail "SMTP (587) 连接失败"
   fi
+  
+  # 测试IMAP
+  echo -e "\n${blue}[测试IMAP连接]${reset}"
+  if echo "a LOGOUT" | openssl s_client -connect $MAILDOMAIN:993 -quiet 2>/dev/null | grep -q "OK"; then
+    success "IMAPS (993) 连接正常"
+  else
+    fail "IMAPS (993) 连接失败"
+  fi
+  
+  # 测试DNS记录
+  echo -e "\n${blue}[测试DNS记录]${reset}"
+  if dig +short mx $DOMAIN | grep -q "$MAILDOMAIN"; then
+    success "MX 记录已设置"
+  else
+    warn "MX 记录未找到 (请设置 MX 指向 $MAILDOMAIN)"
+  fi
+  
+  # 测试DKIM
+  echo -e "\n${blue}[测试DKIM记录]${reset}"
+  if dig +short txt default._domainkey.$DOMAIN | grep -q "v=DKIM1"; then
+    success "DKIM 记录已设置"
+  else
+    warn "DKIM 记录未找到 (请添加以下TXT记录):"
+    cat /etc/opendkim/keys/$DOMAIN/default.txt
+  fi
+  
+  # 测试SPF
+  echo -e "\n${blue}[测试SPF记录]${reset}"
+  if dig +short txt $DOMAIN | grep -q "v=spf1"; then
+    success "SPF 记录已设置"
+  else
+    warn "SPF 记录未找到 (请添加 TXT 记录: \"v=spf1 mx ~all\")"
+  fi
+  
+  # 测试DMARC
+  echo -e "\n${blue}[测试DMARC记录]${reset}"
+  if dig +short txt _dmarc.$DOMAIN | grep -q "v=DMARC1"; then
+    success "DMARC 记录已设置"
+  else
+    warn "DMARC 记录未找到 (建议添加 TXT 记录: \"v=DMARC1; p=none; rua=mailto:postmaster@$DOMAIN\")"
+  fi
+  
+  # 测试网页邮件
+  echo -e "\n${blue}[测试网页邮件访问]${reset}"
+  if curl -s -I "https://$MAILDOMAIN" | grep -q "200 OK"; then
+    success "Roundcube 可正常访问: https://$MAILDOMAIN"
+  else
+    warn "Roundcube 访问异常 (请检查Apache配置)"
+  fi
+}
 
-  echo -e "${yellow}  - 类型: TXT  主机名: _dmarc    内容: \"v=DMARC1; p=none; rua=mailto:postmaster@${DOMAIN}\" TTL: 3600${reset}"
-  echo
-  echo -e "${cyan}注意：Cloudflare用户请关闭代理（仅DNS），确保邮件正常。${reset}"
+# ----------------------------
+# ⑬ 显示配置摘要
+# ----------------------------
+function show_summary() {
+  line
+  echo -e "${green}邮件服务器配置完成！${reset}"
+  echo -e "${blue}▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔${reset}"
+  echo -e "${yellow}▪ 服务器IP   :${reset} $IP"
+  echo -e "${yellow}▪ 邮件域名   :${reset} $MAILDOMAIN"
+  echo -e "${yellow}▪ 数据库信息 :${reset}"
+  echo -e "   - 数据库名: $DBNAME"
+  echo -e "   - 用户名  : $DBUSER"
+  echo -e "   - 密码    : $DBPASS"
+  echo -e "${yellow}▪ 服务端口   :${reset}"
+  echo -e "   - SMTP     : 25 (非加密), 587 (STARTTLS)"
+  echo -e "   - SMTPS    : 465 (SSL)"
+  echo -e "   - IMAP     : 143 (STARTTLS), 993 (SSL)"
+  echo -e "   - POP3     : 110 (STARTTLS), 995 (SSL)"
+  echo -e "${yellow}▪ 网页邮件   :${reset} https://$MAILDOMAIN"
+  echo -e "${yellow}▪ DKIM密钥   :${reset}"
+  cat /etc/opendkim/keys/$DOMAIN/default.txt 2>/dev/null || echo "未生成"
+  echo -e "${blue}▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔${reset}"
+  echo -e "${green}使用以下信息配置邮件客户端:${reset}"
+  echo -e "▪ 接收服务器: $MAILDOMAIN (IMAP/POP3)"
+  echo -e "▪ 发送服务器: $MAILDOMAIN (SMTP)"
+  echo -e "▪ 用户名   : 你的完整邮箱地址 (如 user@$DOMAIN)"
+  echo -e "▪ 密码     : 你的邮箱密码"
   line
 }
 
-# ㉓ 重启服务并检查监听状态
-function restart_services_and_check_ports() {
-  line
-  echo -e "${green}重启所有服务...${reset}"
-  systemctl restart postfix
-  systemctl restart dovecot
-  systemctl reload apache2
-  sleep 1
-  echo -e "${green}检测端口监听状态：${reset}"
-  ss -tunlp | grep -E ':25|:465|:587|:110|:995|:143|:993' || warn "未监听任何关键端口"
-}
-
-# ㉔ 主函数执行 main()
+# ----------------------------
+# 🚀 主执行流程
+# ----------------------------
 function main() {
-  check_and_release_ports
-  get_basic_info
-  input_db_info
-  setup_mail_db
-  config_postfix_main
-  config_postfix_mysql
-  config_postfix_ports
-  config_dovecot
-  setup_maildir
-  config_dovecot_sql
-  setup_dkim
-  config_opendkim
+  # 更新系统
+  line
+  echo -e "${green}更新系统软件包...${reset}"
+  apt update && apt upgrade -y
+  
+  # 执行配置步骤
+  port_check
+  user_input
+  setup_database
+  setup_postfix
+  setup_dovecot
+  setup_opendkim
   setup_ssl
-  config_apache
-  config_roundcube_db
-  output_dns
-  restart_services_and_check_ports
-  echo -e "${green}🎉 邮局系统配置完成！请通过 Roundcube 登录测试。${reset}"
+  setup_roundcube
+  setup_firewall
+  verify_setup
+  show_summary
+  
+  # 完成提示
+  line
+  echo -e "${green}🎉 邮件服务器配置完成！${reset}"
+  echo -e "请确保已正确设置DNS记录 (MX, SPF, DKIM, DMARC)"
+  echo -e "访问网页邮件: ${blue}https://$MAILDOMAIN${reset}"
 }
 
+# 执行主函数
 main
